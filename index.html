@@ -309,9 +309,15 @@ hr{border:none;border-top:1px solid #e2e8f0}
       <div class="fr"><label>お客様 *</label>
         <select id="dCust"><option value="">-- お客様を選択 --</option></select></div>
       <div class="r2">
-        <div class="fr"><label>日付</label><input type="date" id="dDate"></div>
+        <div class="fr"><label>受付日</label><input type="date" id="dDate"></div>
+        <div class="fr"><label>期限（いつまでに）</label><input type="date" id="dDeadline" oninput="updateDeadlineWarn()"></div>
+      </div>
+      <div class="r2">
         <div class="fr"><label>種別</label>
           <select id="dType"><option value="spot">スポット（単発）</option><option value="regular">定期便</option></select></div>
+        <div class="fr" id="deadlineWarnRow" style="display:flex;align-items:flex-end;padding-bottom:2px">
+          <span id="deadlineWarn" style="font-size:11px;color:#dc2626;font-weight:600"></span>
+        </div>
       </div>
       <div class="r2">
         <div class="fr"><label>ドライバー</label>
@@ -573,7 +579,8 @@ function writeSheet(name, headers, rows) {
             </div>
           </div>
         </div>
-        <button class="btn btn-p" onclick="addDriver()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-p" id="driverAddBtn" onclick="addDriver()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-s" id="driverCancelBtn" onclick="resetDriverForm()" style="margin-bottom:10px;display:none">キャンセル</button>
         <div class="dlist" id="driverList"></div>
       </div>
 
@@ -588,7 +595,8 @@ function writeSheet(name, headers, rows) {
           <div class="fr" style="margin:0"><label>必要免許</label>
             <select id="sVLic"><option value="普通">普通以上</option><option value="準中型">準中型以上</option><option value="中型（8tに限る）">中型（8tに限る）以上</option><option value="中型（限定解除）">中型（限定解除）以上</option><option value="大型">大型以上</option></select></div>
         </div>
-        <button class="btn btn-p" onclick="addVehicle()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-p" id="vehicleAddBtn" onclick="addVehicle()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-s" id="vehicleCancelBtn" onclick="resetVehicleForm()" style="margin-bottom:10px;display:none">キャンセル</button>
         <div class="dlist" id="vehicleList"></div>
       </div>
 
@@ -599,7 +607,8 @@ function writeSheet(name, headers, rows) {
           <div class="fr" style="margin:0"><label>住所</label><input type="text" id="sCAddr" placeholder="例: 東京都〇〇区..."></div>
         </div>
         <div class="fr" style="margin-bottom:10px"><label>担当者 / 連絡先</label><input type="text" id="sCContact" placeholder="例: 山田様 / TEL: 03-xxxx-xxxx"></div>
-        <button class="btn btn-p" onclick="addCustomer()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-p" id="customerAddBtn" onclick="addCustomer()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-s" id="customerCancelBtn" onclick="resetCustomerForm()" style="margin-bottom:10px;display:none">キャンセル</button>
         <div class="dlist" id="customerList"></div>
       </div>
 
@@ -963,12 +972,17 @@ function cardHTML(dp){
   const cls='ecard '+(isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
   const statusMark=dp.status==='pending'?'🔴 ':'';
   const sub=ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`;
+  const today=fmt(new Date());
+  const dlOver=dp.deadline&&dp.deadline<today;
+  const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
+  const dlHtml=dp.deadline?`<div class="ec-sub" style="font-size:10px;color:${dlOver?'#dc2626':dlSoon?'#d97706':'#64748b'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:'';
   return`<div class="${cls}" draggable="true" data-did="${dp.id}"
     ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
     onclick="event.stopPropagation();editDisp('${dp.id}')">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
     <div class="ec-cust">${statusMark}${custName(dp.customer)}</div>
     <div class="ec-sub">${sub}</div>
+    ${dlHtml}
     ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.6">${dp.notes}</div>`:''}
   </div>`;
 }
@@ -981,13 +995,18 @@ function renderPending(){
   if(!pend.length){
     html+=`<div style="display:flex;align-items:center;color:#94a3b8;font-size:12px;padding:8px">未割当の案件はありません ✅</div>`;
   } else {
-    html+=pend.map(dp=>`<div class="pcrd" draggable="true"
-      ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
-      onclick="editDisp('${dp.id}')">
-      <div class="pcrd-name">🔴 ${custName(dp.customer)}</div>
-      <div class="pcrd-info">${dp.date?`📅 ${dp.date}`:'📅 日付未定'}</div>
-      <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
-    </div>`).join('');
+    const today=fmt(new Date());
+    html+=pend.map(dp=>{
+      const dlOver=dp.deadline&&dp.deadline<today;
+      const dlHtml=dp.deadline?`<div class="pcrd-info" style="color:${dlOver?'#dc2626':'#d97706'};font-weight:700">⏰ 期限: ${dp.deadline}${dlOver?' ⚠過ぎています':''}</div>`:'';
+      return`<div class="pcrd" draggable="true"
+        ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+        onclick="editDisp('${dp.id}')">
+        <div class="pcrd-name">🔴 ${custName(dp.customer)}</div>
+        <div class="pcrd-info">${dp.date?`📅 ${dp.date}`:'📅 日付未定'}</div>
+        ${dlHtml}
+        <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
+      </div>`;}).join('');
   }
   body.innerHTML=html;
 }
@@ -1058,11 +1077,20 @@ function fillDSel(){
   document.getElementById('dDriver').innerHTML='<option value="">-- 未定 --</option>'+(db.drivers||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
   document.getElementById('dVehicle').innerHTML='<option value="">-- 未定 --</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}">${v.name}（${v.req}以上）</option>`).join('');
 }
+function updateDeadlineWarn(){
+  const date=document.getElementById('dDate').value;
+  const dl=document.getElementById('dDeadline').value;
+  const el=document.getElementById('deadlineWarn');
+  if(dl&&date&&dl<date)el.textContent='⚠ 期限が日付より前です';
+  else if(dl&&dl<fmt(new Date()))el.textContent='⚠ 期限が過ぎています';
+  else el.textContent='';
+}
 function openAddDispatch(date,rid,pending){
   ST.editId=null;fillDSel();
   document.getElementById('mDTitle').textContent='配車追加';
   document.getElementById('dCust').value='';
   document.getElementById('dDate').value=date||fmt(new Date());
+  document.getElementById('dDeadline').value='';
   document.getElementById('dType').value='spot';
   document.getElementById('dStatus').value=pending?'pending':'confirmed';
   document.getElementById('dDriver').value='';
@@ -1070,6 +1098,7 @@ function openAddDispatch(date,rid,pending){
   document.getElementById('dNotes').value='';
   document.getElementById('dDelBtn').classList.add('hid');
   document.getElementById('licWarn').classList.remove('show');
+  document.getElementById('deadlineWarn').textContent='';
   if(rid){if(ST.res==='driver')document.getElementById('dDriver').value=rid;else document.getElementById('dVehicle').value=rid;}
   openM('mDispatch');
 }
@@ -1079,6 +1108,7 @@ function editDisp(id){
   document.getElementById('mDTitle').textContent='配車編集';
   document.getElementById('dCust').value=dp.customer||'';
   document.getElementById('dDate').value=dp.date||'';
+  document.getElementById('dDeadline').value=dp.deadline||'';
   document.getElementById('dType').value=dp.isReg?'regular':'spot';
   document.getElementById('dStatus').value=dp.status||'pending';
   document.getElementById('dDriver').value=dp.driver||'';
@@ -1086,24 +1116,26 @@ function editDisp(id){
   document.getElementById('dNotes').value=dp.notes||'';
   document.getElementById('dDelBtn').classList.remove('hid');
   document.getElementById('licWarn').classList.remove('show');
+  updateDeadlineWarn();
   openM('mDispatch');
 }
 async function saveDispatch(){
   const cust=document.getElementById('dCust').value;
   if(!cust){alert('お客様を選択してください');return;}
   const date=document.getElementById('dDate').value||null;
+  const deadline=document.getElementById('dDeadline').value||null;
   const isReg=document.getElementById('dType').value==='regular';
   const status=document.getElementById('dStatus').value;
   const driver=document.getElementById('dDriver').value||null;
   const vehicle=document.getElementById('dVehicle').value||null;
   const notes=document.getElementById('dNotes').value.trim();
-  const finalStatus=(driver&&vehicle&&date)?status:'pending';
+  const finalStatus=status;
   if(ST.editId){
     const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
-    if(dp)Object.assign(dp,{customer:cust,date,status:finalStatus,driver,vehicle,notes,isReg,updated:new Date().toISOString()});
+    if(dp)Object.assign(dp,{customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,isReg,updated:new Date().toISOString()});
   } else {
     const now=new Date().toISOString();
-    db.dispatches.push({id:uid(),customer:cust,date,status:finalStatus,driver,vehicle,notes,isReg,created:now,updated:now});
+    db.dispatches.push({id:uid(),customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,isReg,created:now,updated:now});
   }
   await save();closeM('mDispatch');render();
 }
@@ -1141,6 +1173,7 @@ function renderSLists(){
         </div>
         <div class="di-meta">${(d.license||[]).map(l=>`<span class="bdg bdg-b">${l}</span>`).join('')}</div>
       </div>
+      <span class="di-del" onclick="startEditDriver('${d.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
       <span class="di-del" onclick="delDriver('${d.id}')">🗑</span></div>`).join('');
   document.getElementById('vehicleList').innerHTML=!(db.vehicles||[]).length?
     '<div class="empty">車両がありません</div>':
@@ -1148,12 +1181,36 @@ function renderSLists(){
       return`<div class="ditem"><div class="di-main"><div class="di-name">${v.name}</div>
       <div class="di-meta">${v.type||''} | ${v.plate||''}</div></div>
       <span class="bdg ${bc}">${r}以上</span>
+      <span class="di-del" onclick="startEditVehicle('${v.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
       <span class="di-del" onclick="delVehicle('${v.id}')">🗑</span></div>`;}).join('');
   document.getElementById('customerList').innerHTML=!(db.customers||[]).length?
     '<div class="empty">お客様がいません</div>':
     db.customers.map(c=>`<div class="ditem"><div class="di-main"><div class="di-name">${c.name}</div>
     <div class="di-meta">${c.addr||''}${c.contact?' | '+c.contact:''}</div></div>
+    <span class="di-del" onclick="startEditCustomer('${c.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
     <span class="di-del" onclick="delCustomer('${c.id}')">🗑</span></div>`).join('');
+}
+let editDriverId=null,editVehicleId=null,editCustomerId=null;
+
+function resetDriverForm(){
+  editDriverId=null;
+  document.getElementById('sDriverName').value='';
+  document.getElementById('sDriverGroup').value='';
+  document.getElementById('sDriverType').value='専任';
+  document.querySelectorAll('#sDriverLic input').forEach(e=>e.checked=false);
+  document.getElementById('driverAddBtn').textContent='追加';
+  document.getElementById('driverCancelBtn').style.display='none';
+}
+function startEditDriver(id){
+  const d=db.drivers.find(x=>x.id===id);if(!d)return;
+  editDriverId=id;
+  document.getElementById('sDriverName').value=d.name;
+  document.getElementById('sDriverGroup').value=d.group||'';
+  document.getElementById('sDriverType').value=d.type||'専任';
+  document.querySelectorAll('#sDriverLic input').forEach(e=>e.checked=(d.license||[]).includes(e.value));
+  document.getElementById('driverAddBtn').textContent='更新';
+  document.getElementById('driverCancelBtn').style.display='inline-flex';
+  document.getElementById('sDriverName').focus();
 }
 async function addDriver(){
   const name=document.getElementById('sDriverName').value.trim();
@@ -1161,35 +1218,80 @@ async function addDriver(){
   const group=document.getElementById('sDriverGroup').value.trim();
   const type=document.getElementById('sDriverType').value;
   if(!name){alert('ドライバー名を入力してください');return;}
-  db.drivers.push({id:uid(),name,license:lic.length?lic:['普通'],group,type});
-  await save();
-  document.getElementById('sDriverName').value='';
-  document.getElementById('sDriverGroup').value='';
-  document.getElementById('sDriverType').value='専任';
-  document.querySelectorAll('#sDriverLic input').forEach(e=>e.checked=false);
-  renderSLists();render();
+  if(editDriverId){
+    const d=db.drivers.find(x=>x.id===editDriverId);
+    if(d)Object.assign(d,{name,license:lic.length?lic:['普通'],group,type});
+  } else {
+    db.drivers.push({id:uid(),name,license:lic.length?lic:['普通'],group,type});
+  }
+  await save();resetDriverForm();renderSLists();render();
 }
 async function delDriver(id){
   if(!confirm('このドライバーを削除しますか？'))return;
   db.drivers=db.drivers.filter(x=>x.id!==id);await save();renderSLists();render();
 }
+
+function resetVehicleForm(){
+  editVehicleId=null;
+  ['sVName','sVPlate','sVType'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('sVLic').value='普通';
+  document.getElementById('vehicleAddBtn').textContent='追加';
+  document.getElementById('vehicleCancelBtn').style.display='none';
+}
+function startEditVehicle(id){
+  const v=db.vehicles.find(x=>x.id===id);if(!v)return;
+  editVehicleId=id;
+  document.getElementById('sVName').value=v.name;
+  document.getElementById('sVPlate').value=v.plate||'';
+  document.getElementById('sVType').value=v.type||'';
+  document.getElementById('sVLic').value=v.req||'普通';
+  document.getElementById('vehicleAddBtn').textContent='更新';
+  document.getElementById('vehicleCancelBtn').style.display='inline-flex';
+  document.getElementById('sVName').focus();
+}
 async function addVehicle(){
   const name=document.getElementById('sVName').value.trim();
   if(!name){alert('車両名を入力してください');return;}
-  db.vehicles.push({id:uid(),name,plate:document.getElementById('sVPlate').value.trim(),type:document.getElementById('sVType').value.trim(),req:document.getElementById('sVLic').value});
-  await save();['sVName','sVPlate','sVType'].forEach(i=>document.getElementById(i).value='');
-  renderSLists();render();
+  const vdata={name,plate:document.getElementById('sVPlate').value.trim(),type:document.getElementById('sVType').value.trim(),req:document.getElementById('sVLic').value};
+  if(editVehicleId){
+    const v=db.vehicles.find(x=>x.id===editVehicleId);
+    if(v)Object.assign(v,vdata);
+  } else {
+    db.vehicles.push({id:uid(),...vdata});
+  }
+  await save();resetVehicleForm();renderSLists();render();
 }
 async function delVehicle(id){
   if(!confirm('この車両を削除しますか？'))return;
   db.vehicles=db.vehicles.filter(x=>x.id!==id);await save();renderSLists();render();
 }
+function resetCustomerForm(){
+  editCustomerId=null;
+  ['sCName','sCAddr','sCContact'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('customerAddBtn').textContent='追加';
+  document.getElementById('customerCancelBtn').style.display='none';
+}
+function startEditCustomer(id){
+  const c=db.customers.find(x=>x.id===id);if(!c)return;
+  editCustomerId=id;
+  document.getElementById('sCName').value=c.name;
+  document.getElementById('sCAddr').value=c.addr||'';
+  document.getElementById('sCContact').value=c.contact||'';
+  document.getElementById('customerAddBtn').textContent='更新';
+  document.getElementById('customerCancelBtn').style.display='inline-flex';
+  document.getElementById('sCName').focus();
+}
 async function addCustomer(){
   const name=document.getElementById('sCName').value.trim();
   if(!name){alert('お客様名を入力してください');return;}
-  db.customers.push({id:uid(),name,addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim()});
-  await save();['sCName','sCAddr','sCContact'].forEach(i=>document.getElementById(i).value='');
-  renderSLists();
+  const cdata={name,addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim()};
+  if(editCustomerId){
+    const c=db.customers.find(x=>x.id===editCustomerId);
+    if(c)Object.assign(c,cdata);
+  } else {
+    db.customers.push({id:uid(),...cdata});
+  }
+  await save();resetCustomerForm();renderSLists();
 }
 async function delCustomer(id){
   if(!confirm('このお客様を削除しますか？'))return;
