@@ -42,7 +42,8 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .pending-body{display:flex;gap:8px;padding:7px 14px;overflow-x:auto;max-height:100px}
 .pending-panel.collapsed .pending-body{display:none}
 .pending-panel.collapsed .p-toggle{transform:rotate(-90deg)}
-.pcrd{flex-shrink:0;background:#fff;border:2px solid #dc2626;border-radius:8px;padding:6px 10px;min-width:170px;cursor:pointer;transition:box-shadow .15s}
+.pcrd{flex-shrink:0;background:#fff;border:2px solid #dc2626;border-radius:8px;padding:6px 10px;min-width:170px;cursor:grab;transition:box-shadow .15s}
+.pcrd:active{cursor:grabbing}
 .pcrd:hover{box-shadow:0 2px 10px rgba(220,38,38,.25)}
 .pcrd-name{font-weight:700;color:#dc2626;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
 .pcrd-info{font-size:11px;color:#64748b;margin-top:2px}
@@ -197,6 +198,23 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 ::-webkit-scrollbar-thumb:hover{background:#94a3b8}
 .hid{display:none!important}
 hr{border:none;border-top:1px solid #e2e8f0}
+
+/* ===== FILTER BAR ===== */
+.filter-bar{display:flex;align-items:center;gap:8px;padding:5px 14px;background:#f0f4f8;border-bottom:2px solid #cbd5e1;flex-shrink:0;flex-wrap:wrap}
+.filter-search{border:1.5px solid #cbd5e1;border-radius:8px;padding:4px 10px;font-size:12px;outline:none;min-width:150px;background:#fff}
+.filter-search:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.12)}
+.ftgl{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;color:#64748b;background:#e2e8f0;transition:all .15s;white-space:nowrap;cursor:pointer;border:none}
+.ftgl.on{background:#2563eb;color:#fff}
+.ftgl.ken{background:#ffedd5;color:#c2410c}
+.ftgl.ken.on{background:#ea580c;color:#fff}
+.ftgl.grp-btn{background:#f1f5f9;border:1px solid #cbd5e1;color:#475569}
+.ftgl.grp-btn.on{background:#1e3a5f;color:#fff;border-color:#1e3a5f}
+.filter-count{font-size:11px;color:#94a3b8;white-space:nowrap;margin-left:4px}
+
+/* ===== GROUP HEADER ===== */
+.grp-hdr-row td{background:#1e3a5f;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;cursor:pointer;user-select:none}
+.grp-hdr-row td:hover{background:#264d80}
+.grp-badge-ken{background:#ffedd5;color:#c2410c;display:inline-flex;align-items:center;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:700;margin-left:4px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -258,6 +276,18 @@ hr{border:none;border-top:1px solid #e2e8f0}
     <button class="reg-btn" onclick="openRegular()">🔁 定期設定</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
     <button class="add-btn" onclick="openAddDispatch()">＋ 配車追加</button>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar" id="filterBar">
+    <input class="filter-search" id="filterSearch" type="text" placeholder="🔍 名前で絞り込み..." oninput="applyFilter()">
+    <div style="display:flex;gap:4px;flex-shrink:0">
+      <button class="ftgl on" id="ft-all" onclick="setFilterType('all')">全員</button>
+      <button class="ftgl" id="ft-専任" onclick="setFilterType('専任')">専任</button>
+      <button class="ftgl ken" id="ft-兼任" onclick="setFilterType('兼任')">兼任</button>
+    </div>
+    <div id="filterGroups" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+    <span class="filter-count" id="filterCount"></span>
   </div>
 
   <!-- CALENDAR -->
@@ -531,6 +561,8 @@ function writeSheet(name, headers, rows) {
       <div class="spane" id="sp-drivers">
         <div class="r2" style="margin-bottom:10px">
           <div class="fr" style="margin:0"><label>ドライバー名</label><input type="text" id="sDriverName" placeholder="例: 田中 太郎"></div>
+          <div class="fr" style="margin:0"><label>班・グループ</label><input type="text" id="sDriverGroup" placeholder="例: 1班、収集A、運搬B"></div>
+          <div class="fr" style="margin:0"><label>区分</label><select id="sDriverType"><option value="専任">専任ドライバー</option><option value="兼任">兼任（他業務あり）</option></select></div>
           <div class="fr" style="margin:0"><label>保有免許（複数可）</label>
             <div class="dow-row" id="sDriverLic" style="margin-top:8px">
               <label class="dow-item"><input type="checkbox" value="普通"><span>普通</span></label>
@@ -795,7 +827,41 @@ function getWOM(d){const f=new Date(d.getFullYear(),d.getMonth(),1);return Math.
 // ================================================================
 // STATE
 // ================================================================
-const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,drag:null,drop:null};
+const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,drag:null,drop:null,collapsedGroups:new Set()};
+const FILTER={search:'',type:'all',groups:new Set()};
+
+function applyFilter(){FILTER.search=document.getElementById('filterSearch').value;render();}
+function setFilterType(t){
+  FILTER.type=t;
+  ['all','専任','兼任'].forEach(x=>document.getElementById('ft-'+x).classList.toggle('on',x===t));
+  render();
+}
+function toggleFilterGroup(g){
+  if(FILTER.groups.has(g))FILTER.groups.delete(g);else FILTER.groups.add(g);
+  document.querySelectorAll('.ftgl.grp-btn').forEach(b=>b.classList.toggle('on',FILTER.groups.has(b.dataset.grp)));
+  render();
+}
+function updateGroupButtons(){
+  const groups=[...new Set((db.drivers||[]).map(d=>d.group||'').filter(g=>g))].sort();
+  const el=document.getElementById('filterGroups');
+  if(!groups.length){el.innerHTML='';return;}
+  el.innerHTML='<span style="font-size:11px;color:#64748b;white-space:nowrap">班：</span>'+
+    groups.map(g=>`<button class="ftgl grp-btn${FILTER.groups.has(g)?' on':''}" data-grp="${g}" onclick="toggleFilterGroup('${g}')">${g}</button>`).join('');
+}
+function getFilteredResources(){
+  let res=getResources();
+  const q=FILTER.search.trim();
+  if(q)res=res.filter(r=>r.name.includes(q));
+  if(ST.res==='driver'){
+    if(FILTER.type!=='all')res=res.filter(r=>(r.type||'専任')===FILTER.type);
+    if(FILTER.groups.size>0)res=res.filter(r=>FILTER.groups.has(r.group||''));
+  }
+  return res;
+}
+function toggleGrp(g){
+  if(ST.collapsedGroups.has(g))ST.collapsedGroups.delete(g);else ST.collapsedGroups.add(g);
+  render();
+}
 
 // ================================================================
 // CALENDAR RENDER
@@ -820,7 +886,6 @@ function pendingDisps(){
 function render(){
   if(!db){return;}
   const dates=getDates();
-  const resources=getResources();
   const today=fmt(new Date());
   const isMonth=ST.view==='month';
 
@@ -843,31 +908,51 @@ function render(){
   th+='</tr>';
   document.getElementById('calHead').innerHTML=th;
 
+  const resources=getFilteredResources();
+  updateGroupButtons();
+  const total=getResources().length;
+  document.getElementById('filterCount').textContent=resources.length<total?`${resources.length}/${total}名表示`:'';
+
+  function renderResRow(res){
+    let row='<tr>';
+    if(ST.res==='driver'){
+      const lbs=(res.license||[]).map(l=>`<span class="bdg bdg-b">${l}</span>`).join('');
+      const kenBadge=res.type==='兼任'?'<span class="grp-badge-ken">兼任</span>':'';
+      row+=`<td class="res-cell"><div class="res-name">${res.name}${kenBadge}</div><div class="res-meta">${lbs}</div></td>`;
+    } else {
+      const r=res.req,bc=r==='大型'?'bdg-r':r.includes('中型')?'bdg-o':r==='準中型'?'bdg-v':'bdg-g';
+      row+=`<td class="res-cell"><div class="res-name">${res.name}</div><div class="res-meta"><span class="bdg ${bc}">${r}以上</span><br><span style="font-size:10px;color:#94a3b8">${res.plate||''}</span></div></td>`;
+    }
+    for(const dt of dates){
+      const ds=fmt(dt),dow=dt.getDay();
+      let cc='ev-cell'+(isMonth?' td-month':'');
+      if(ds===today)cc+=' td-now';else if(dow===0)cc+=' td-sun';else if(dow===6)cc+=' td-sat';
+      const disps=cellDisps(ds,res.id);
+      const cards=disps.map(dp=>cardHTML(dp)).join('');
+      row+=`<td class="${cc}" data-date="${ds}" data-rid="${res.id}"
+        ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
+        onclick="cellClick(event,'${ds}','${res.id}')">${cards}</td>`;
+    }
+    return row+'</tr>';
+  }
+
   let tb='';
   if(!resources.length){
-    tb=`<tr><td colspan="${dates.length+1}"><div class="empty">⚙ 設定から${ST.res==='driver'?'ドライバー':'車両'}を追加してください</div></td></tr>`;
-  } else {
-    for(const res of resources){
-      tb+='<tr>';
-      if(ST.res==='driver'){
-        const lbs=(res.license||[]).map(l=>`<span class="bdg bdg-b">${l}</span>`).join('');
-        tb+=`<td class="res-cell"><div class="res-name">${res.name}</div><div class="res-meta">${lbs}</div></td>`;
-      } else {
-        const r=res.req,bc=r==='大型'?'bdg-r':r==='中型'?'bdg-o':r==='準中型'?'bdg-v':'bdg-g';
-        tb+=`<td class="res-cell"><div class="res-name">${res.name}</div><div class="res-meta"><span class="bdg ${bc}">${r}以上</span><br><span style="font-size:10px;color:#94a3b8">${res.plate||''}</span></div></td>`;
+    tb=`<tr><td colspan="${dates.length+1}"><div class="empty">⚙ 設定から${ST.res==='driver'?'ドライバー':'車両'}を追加してください（またはフィルターを解除してください）</div></td></tr>`;
+  } else if(ST.res==='driver'){
+    const grpNames=[...new Set(resources.map(r=>r.group||''))].sort((a,b)=>a?b?a.localeCompare(b,'ja'):-1:1);
+    const multiGrp=grpNames.length>1||(grpNames.length===1&&grpNames[0]!=='');
+    for(const grp of grpNames){
+      const grpRes=resources.filter(r=>(r.group||'')===grp);
+      const label=grp||'班未設定';
+      const collapsed=ST.collapsedGroups.has(label);
+      if(multiGrp){
+        tb+=`<tr class="grp-hdr-row" onclick="toggleGrp('${label}')"><td colspan="${dates.length+1}">${collapsed?'▶':'▼'} ${label} <span style="opacity:.65">(${grpRes.length}名)</span></td></tr>`;
       }
-      for(const dt of dates){
-        const ds=fmt(dt),dow=dt.getDay();
-        let cc='ev-cell'+(isMonth?' td-month':'');
-        if(ds===today)cc+=' td-now';else if(dow===0)cc+=' td-sun';else if(dow===6)cc+=' td-sat';
-        const disps=cellDisps(ds,res.id);
-        const cards=disps.map(dp=>cardHTML(dp)).join('');
-        tb+=`<td class="${cc}" data-date="${ds}" data-rid="${res.id}"
-          ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-          onclick="cellClick(event,'${ds}','${res.id}')">${cards}</td>`;
-      }
-      tb+='</tr>';
+      if(!collapsed)for(const res of grpRes)tb+=renderResRow(res);
     }
+  } else {
+    for(const res of resources)tb+=renderResRow(res);
   }
   document.getElementById('calBody').innerHTML=tb;
   renderPending();
@@ -896,7 +981,9 @@ function renderPending(){
   if(!pend.length){
     html+=`<div style="display:flex;align-items:center;color:#94a3b8;font-size:12px;padding:8px">未割当の案件はありません ✅</div>`;
   } else {
-    html+=pend.map(dp=>`<div class="pcrd" onclick="editDisp('${dp.id}')">
+    html+=pend.map(dp=>`<div class="pcrd" draggable="true"
+      ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+      onclick="editDisp('${dp.id}')">
       <div class="pcrd-name">🔴 ${custName(dp.customer)}</div>
       <div class="pcrd-info">${dp.date?`📅 ${dp.date}`:'📅 日付未定'}</div>
       <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
@@ -1048,8 +1135,12 @@ function renderSLists(){
   document.getElementById('driverList').innerHTML=!(db.drivers||[]).length?
     '<div class="empty">ドライバーがいません</div>':
     db.drivers.map(d=>`<div class="ditem">
-      <div class="di-main"><div class="di-name">${d.name}</div>
-      <div class="di-meta">${(d.license||[]).map(l=>`<span class="bdg bdg-b">${l}</span>`).join('')}</div></div>
+      <div class="di-main">
+        <div class="di-name">${d.name}${d.group?`<span style="font-size:10px;color:#94a3b8;margin-left:6px">${d.group}</span>`:''}
+          ${d.type==='兼任'?'<span class="bdg bdg-o" style="font-size:9px">兼任</span>':'<span class="bdg bdg-g" style="font-size:9px">専任</span>'}
+        </div>
+        <div class="di-meta">${(d.license||[]).map(l=>`<span class="bdg bdg-b">${l}</span>`).join('')}</div>
+      </div>
       <span class="di-del" onclick="delDriver('${d.id}')">🗑</span></div>`).join('');
   document.getElementById('vehicleList').innerHTML=!(db.vehicles||[]).length?
     '<div class="empty">車両がありません</div>':
@@ -1067,9 +1158,14 @@ function renderSLists(){
 async function addDriver(){
   const name=document.getElementById('sDriverName').value.trim();
   const lic=[...document.querySelectorAll('#sDriverLic input:checked')].map(e=>e.value);
+  const group=document.getElementById('sDriverGroup').value.trim();
+  const type=document.getElementById('sDriverType').value;
   if(!name){alert('ドライバー名を入力してください');return;}
-  db.drivers.push({id:uid(),name,license:lic.length?lic:['普通']});
-  await save();document.getElementById('sDriverName').value='';
+  db.drivers.push({id:uid(),name,license:lic.length?lic:['普通'],group,type});
+  await save();
+  document.getElementById('sDriverName').value='';
+  document.getElementById('sDriverGroup').value='';
+  document.getElementById('sDriverType').value='専任';
   document.querySelectorAll('#sDriverLic input').forEach(e=>e.checked=false);
   renderSLists();render();
 }
