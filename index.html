@@ -889,7 +889,7 @@ function cellDisps(ds,rid){
   });
 }
 function pendingDisps(){
-  return(db.dispatches||[]).filter(dp=>dp.status==='pending'||!dp.date||!dp.driver||!dp.vehicle);
+  return(db.dispatches||[]).filter(dp=>!dp.date||(!dp.driver&&!dp.vehicle));
 }
 
 function render(){
