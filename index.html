@@ -326,6 +326,7 @@ hr{border:none;border-top:1px solid #e2e8f0}
           <select id="dVehicle" onchange="chkLic()"><option value="">-- 未定 --</option></select></div>
       </div>
       <div class="warn-txt" id="licWarn">⚠ このドライバーは選択車両の必要免許を持っていない可能性があります。</div>
+      <div class="fr"><label>受付担当者</label><input type="text" id="dReceptionist" placeholder="受付した担当者名"></div>
       <div class="fr"><label>ステータス</label>
         <select id="dStatus"><option value="pending">🔴 保留中</option><option value="confirmed">✅ 確定</option></select></div>
       <div class="fr"><label>備考</label><textarea id="dNotes" rows="2" placeholder="収集品目、特記事項など"></textarea></div>
@@ -490,11 +491,12 @@ function writeReadableSheets(data) {
       dp.isReg ? '定期' : 'スポット',
       dp.status === 'confirmed' ? '確定' : '保留',
       dp.notes || '',
+      dp.receptionist || '',
       (dp.created||'').slice(0,10)
     ];
   });
   writeSheet('📋配車一覧',
-    ['日付','曜日','お客様','ドライバー','車両','種別','ステータス','備考','登録日'],
+    ['日付','曜日','お客様','ドライバー','車両','種別','ステータス','備考','受付担当者','登録日'],
     dispRows
   );
 
@@ -1096,6 +1098,7 @@ function openAddDispatch(date,rid,pending){
   document.getElementById('dDriver').value='';
   document.getElementById('dVehicle').value='';
   document.getElementById('dNotes').value='';
+  document.getElementById('dReceptionist').value='';
   document.getElementById('dDelBtn').classList.add('hid');
   document.getElementById('licWarn').classList.remove('show');
   document.getElementById('deadlineWarn').textContent='';
@@ -1114,6 +1117,7 @@ function editDisp(id){
   document.getElementById('dDriver').value=dp.driver||'';
   document.getElementById('dVehicle').value=dp.vehicle||'';
   document.getElementById('dNotes').value=dp.notes||'';
+  document.getElementById('dReceptionist').value=dp.receptionist||'';
   document.getElementById('dDelBtn').classList.remove('hid');
   document.getElementById('licWarn').classList.remove('show');
   updateDeadlineWarn();
@@ -1129,13 +1133,14 @@ async function saveDispatch(){
   const driver=document.getElementById('dDriver').value||null;
   const vehicle=document.getElementById('dVehicle').value||null;
   const notes=document.getElementById('dNotes').value.trim();
+  const receptionist=document.getElementById('dReceptionist').value.trim();
   const finalStatus=status;
   if(ST.editId){
     const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
-    if(dp)Object.assign(dp,{customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,isReg,updated:new Date().toISOString()});
+    if(dp)Object.assign(dp,{customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,receptionist,isReg,updated:new Date().toISOString()});
   } else {
     const now=new Date().toISOString();
-    db.dispatches.push({id:uid(),customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,isReg,created:now,updated:now});
+    db.dispatches.push({id:uid(),customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,receptionist,isReg,created:now,updated:now});
   }
   await save();closeM('mDispatch');render();
 }
