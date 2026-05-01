@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -42,11 +42,11 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .pending-body{display:flex;gap:8px;padding:7px 14px;overflow-x:auto;max-height:100px}
 .pending-panel.collapsed .pending-body{display:none}
 .pending-panel.collapsed .p-toggle{transform:rotate(-90deg)}
-.pcrd{flex-shrink:0;background:#fff;border:2px solid #dc2626;border-radius:8px;padding:6px 10px;min-width:170px;cursor:grab;transition:box-shadow .15s}
+.pcrd{flex-shrink:0;background:#fff;border:1.5px solid #dc2626;border-radius:6px;padding:3px 8px;min-width:130px;cursor:grab;transition:box-shadow .15s}
 .pcrd:active{cursor:grabbing}
-.pcrd:hover{box-shadow:0 2px 10px rgba(220,38,38,.25)}
-.pcrd-name{font-weight:700;color:#dc2626;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
-.pcrd-info{font-size:11px;color:#64748b;margin-top:2px}
+.pcrd:hover{box-shadow:0 2px 8px rgba(220,38,38,.22)}
+.pcrd-name{font-weight:700;color:#dc2626;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
+.pcrd-info{font-size:10px;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
 .p-add-btn{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:100px;height:80px;border:2px dashed #fca5a5;border-radius:8px;color:#dc2626;font-size:22px;cursor:pointer;transition:background .15s}
 .p-add-btn:hover{background:#fef2f2}
 
@@ -74,29 +74,92 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .cal-wrap{min-width:max-content}
 .cal-tbl{border-collapse:collapse}
 .cal-tbl th,.cal-tbl td{border:1px solid #e2e8f0}
-.res-hd{position:sticky;left:0;top:0;z-index:20;background:#1e3a5f;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;min-width:110px;white-space:nowrap;vertical-align:middle}
-.res-cell{position:sticky;left:0;z-index:10;background:#f8fafc;padding:6px 9px;min-width:110px;border-right:2px solid #cbd5e1;vertical-align:top}
-.res-name{font-size:12px;font-weight:700;color:#1e293b}
+.res-hd{position:sticky;left:0;top:0;z-index:20;background:#1e3a5f;color:#fff;padding:6px 10px;font-size:12px;font-weight:700;min-width:110px;white-space:nowrap;vertical-align:middle;user-select:none}
+.res-cell{position:sticky;left:0;z-index:10;background:#f8fafc;padding:6px 9px;min-width:110px;border-right:2px solid #cbd5e1;vertical-align:top;overflow:hidden}
+.res-name{font-size:12px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ===== 列幅リサイズハンドル ===== */
+.col-resize-handle{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;z-index:25;background:transparent;transition:background .15s}
+.col-resize-handle:hover{background:rgba(96,165,250,.5)}
+.col-resize-handle.dragging{background:rgba(59,130,246,.7)}
 .res-meta{margin-top:2px}
 .dt-hd{text-align:center;padding:5px 4px;background:#f1f5f9;font-size:11px;font-weight:700;min-width:110px;white-space:nowrap;position:sticky;top:0;z-index:15}
 .dt-hd.td-now{background:#dbeafe;color:#1e40af}
 .dt-hd.td-sun{color:#dc2626}.dt-hd.td-sat{color:#7c3aed}
 .dt-hd.td-month{min-width:68px}
+/* 祝日ヘッダー */
+.dt-hd.td-hol{background:#fff0f0;color:#dc2626}
+.dt-hol-name{font-size:9px;font-weight:600;color:#dc2626;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;display:block;margin-top:1px}
 .ev-cell{vertical-align:top;padding:3px;min-height:64px;position:relative;transition:background .1s}
 .ev-cell.td-now{background:#eff6ff}.ev-cell.td-sun{background:#fff8f8}.ev-cell.td-sat{background:#faf5ff}
+.ev-cell.td-hol{background:#fff5f5}
 .ev-cell.td-month{min-width:68px;min-height:50px;padding:2px}
 .ev-cell.drag-over{background:#dbeafe !important;outline:2px dashed #3b82f6;outline-offset:-2px}
-.ecard{border-radius:6px;padding:4px 8px;margin-bottom:2px;font-size:11px;cursor:grab;position:relative;line-height:1.4;border-left:3px solid transparent;transition:box-shadow .1s,opacity .1s;user-select:none}
+/* セル内スクロール（カードが多い時に行が膨らまないよう制限） */
+.cell-scrl{max-height:116px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+.cell-scrl::-webkit-scrollbar{width:3px}
+.cell-scrl::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px}
+.ecard{border-radius:6px;padding:3px 7px;margin-bottom:2px;font-size:11px;cursor:grab;position:relative;line-height:1.35;border-left:3px solid transparent;transition:box-shadow .1s,opacity .1s;user-select:none}
 .ecard:hover{box-shadow:0 2px 8px rgba(0,0,0,.15)}.ecard:active{cursor:grabbing}
 .ecard.dragging{opacity:.35}
 .ecard.ec-reg{background:#dbeafe;border-left-color:#2563eb;color:#1e3a8a}
 .ecard.ec-spot{background:#dcfce7;border-left-color:#16a34a;color:#14532d}
 .ecard.ec-pend{background:#fee2e2;border-left-color:#dc2626;color:#7f1d1d}
+/* 祝日カード */
+.ecard.ec-hol{outline:1.5px solid #fca5a5;outline-offset:-1px}
+.ec-hol-badge{display:inline-block;font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle;line-height:1.5;white-space:nowrap}
 .ec-cust{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
 .ec-sub{opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
 .ec-del{position:absolute;top:2px;right:4px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;display:none;line-height:1}
 .ecard:hover .ec-del{display:block}.ec-del:hover{opacity:1}
 
+/* ===== DAY VIEW TIMELINE ===== */
+.cal-wrap.day-view{min-width:unset;width:100%}
+.cal-wrap.day-view .cal-tbl{width:100%}
+.cal-wrap.day-view .day-ev-cell{width:9999px}
+.day-sched-hd{text-align:left !important;padding:8px 14px !important;min-width:unset !important;width:100%}
+.day-cell-wrap{display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;padding:6px 8px;overflow-x:auto;min-height:88px;align-items:flex-start;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+.day-cell-wrap::-webkit-scrollbar{height:3px}
+.day-cell-wrap::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px}
+.ec-day{min-width:155px;max-width:215px;flex-shrink:0;padding:7px 10px;border-left-width:4px !important;border-radius:8px}
+.ec-day-seq{font-size:9px;font-weight:800;color:#64748b;letter-spacing:.03em;margin-bottom:4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ec-day-time{display:inline-block;background:#e2e8f0;border-radius:3px;padding:0 4px;font-size:9px;font-weight:700;color:#475569}
+.ec-day-cust{font-size:12px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:195px}
+.ec-day-veh{font-size:11px;color:#475569;margin-top:3px;white-space:nowrap}
+.ec-day-site{font-size:10px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:195px}
+.ec-day-note{font-size:10px;color:#94a3b8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:195px}
+.day-arrow{display:flex;align-items:center;color:#cbd5e1;font-size:20px;flex-shrink:0;align-self:center;padding-bottom:8px}
+.day-empty-lbl{font-size:11px;color:#e2e8f0;font-style:italic;padding:8px 4px;align-self:center}
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){
+  .dt-hd{min-width:90px}
+  .res-cell,.res-hd{min-width:90px}
+}
+@media(max-width:768px){
+  .tsp{display:none}
+  .view-btn{padding:4px 7px;font-size:11px}
+  .today-btn{padding:4px 7px;font-size:11px}
+  .dt-label{font-size:11px;min-width:100px}
+  .add-btn,.reg-btn,.set-btn{font-size:11px;padding:5px 8px}
+  .filter-search{flex:1;min-width:0}
+  .res-cell,.res-hd{min-width:78px;max-width:78px}
+  .res-name{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62px}
+  .dt-hd{min-width:78px;font-size:10px}
+  .ecard{font-size:10px}
+  .ec-cust,.ec-sub{max-width:95px}
+  .r2{grid-template-columns:1fr}
+  .mbox{width:100% !important;max-height:95vh;border-radius:10px 10px 0 0;margin:0}
+  .ovl{align-items:flex-end;padding:0}
+  /* 日ビューはモバイルで縦積み */
+  .day-cell-wrap{flex-direction:column;overflow-x:hidden;min-height:60px}
+  .ec-day{min-width:unset;max-width:unset;width:100%;box-sizing:border-box}
+  .day-arrow{transform:rotate(90deg);align-self:flex-start;margin-left:8px}
+}
+@media(max-width:480px){
+  .set-btn,.reg-btn{display:none}
+  .res-cell,.res-hd{min-width:65px;max-width:65px}
+  .res-name{max-width:50px;font-size:10px}
+  .dt-hd{min-width:65px;font-size:9px}
+}
 /* ===== MODALS ===== */
 .ovl{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
 .ovl.hid{display:none}
@@ -199,6 +262,40 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .hid{display:none!important}
 hr{border:none;border-top:1px solid #e2e8f0}
 
+/* ===== MASTER PICKER ===== */
+.mp-wrap{position:fixed;z-index:3000;background:#fff;border:2px solid #3b82f6;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.25);width:360px;max-height:440px;display:flex;flex-direction:column;overflow:hidden}
+.mp-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 8px;flex-shrink:0;border-bottom:1px solid #e2e8f0;background:#eff6ff}
+.mp-head-txt{font-size:13px;font-weight:700;color:#1e3a5f}
+.mp-head-cls{background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;line-height:1;padding:2px 4px}
+.mp-head-cls:hover{color:#475569}
+.mp-srch-wrap{padding:8px 10px;flex-shrink:0;border-bottom:1px solid #f1f5f9}
+.mp-srch{width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;outline:none}
+.mp-srch:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.12)}
+.mp-list{flex:1;overflow-y:auto;min-height:40px}
+.mp-item{padding:9px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:1px;transition:background .1s}
+.mp-item:hover{background:#eff6ff}
+.mp-item.active{background:#dbeafe}
+.mp-item-name{font-size:13px;font-weight:600;color:#1e293b}
+.mp-item.active .mp-item-name{color:#1d4ed8}
+.mp-item-sub{font-size:10px;color:#94a3b8}
+.mp-empty{padding:20px;text-align:center;color:#94a3b8;font-size:12px}
+.mp-add-sec{padding:8px 10px;border-top:2px solid #e2e8f0;background:#f0fdf4;flex-shrink:0}
+.mp-add-lbl{font-size:11px;font-weight:700;color:#15803d;margin-bottom:5px}
+.mp-add-row{display:flex;gap:6px}
+.mp-add-inp{flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#fff}
+.mp-add-inp:focus{border-color:#16a34a}
+.mp-add-btn2{background:#16a34a;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.mp-add-btn2:hover{background:#15803d}
+/* picker trigger in dispatch form */
+.mp-trigger{width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;background:#fff;text-align:left;font-size:13px;cursor:pointer;display:flex;align-items:center;transition:border-color .15s,box-shadow .15s}
+.mp-trigger:hover,.mp-trigger:focus{border-color:#3b82f6;outline:none;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.mp-trigger-txt{flex:1;color:#94a3b8;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-trigger-txt.filled{color:#1e293b;font-weight:600}
+.mp-trigger-arr{color:#94a3b8;font-size:10px;flex-shrink:0;margin-left:6px}
+/* mhdr drag cursor */
+.mhdr{cursor:move;user-select:none}
+.mhdr .mcls{cursor:pointer}
+
 /* ===== FILTER BAR ===== */
 .filter-bar{display:flex;align-items:center;gap:8px;padding:5px 14px;background:#f0f4f8;border-bottom:2px solid #cbd5e1;flex-shrink:0;flex-wrap:wrap}
 .filter-search{border:1.5px solid #cbd5e1;border-radius:8px;padding:4px 10px;font-size:12px;outline:none;min-width:150px;background:#fff}
@@ -215,6 +312,76 @@ hr{border:none;border-top:1px solid #e2e8f0}
 .grp-hdr-row td{background:#1e3a5f;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;cursor:pointer;user-select:none}
 .grp-hdr-row td:hover{background:#264d80}
 .grp-badge-ken{background:#ffedd5;color:#c2410c;display:inline-flex;align-items:center;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:700;margin-left:4px;vertical-align:middle}
+
+/* ===== ROW DRAG & REORDER ===== */
+.row-drag-handle{cursor:grab;color:#cbd5e1;font-size:13px;flex-shrink:0;padding:1px 3px 0 0;user-select:none;line-height:1}
+.row-drag-handle:hover{color:#64748b}
+.row-drag-handle:active{cursor:grabbing}
+.res-cell-inner{display:flex;align-items:flex-start;gap:3px}
+tr.row-dragging .res-cell{opacity:.35}
+tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b82f6;outline-offset:-2px}
+
+/* ===== USAGE GROUPS ===== */
+.usage-hdr-row td{font-size:11px;font-weight:700;padding:4px 14px;cursor:pointer;user-select:none;border-bottom:none}
+.usage-freq td{background:#e0f2fe;color:#0369a1}
+.usage-freq td:hover{background:#bae6fd}
+.usage-infreq td{background:#f3f4f6;color:#6b7280}
+.usage-infreq td:hover{background:#e5e7eb}
+.usage-star-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;line-height:1;flex-shrink:0;transition:transform .15s;vertical-align:middle}
+.usage-star-btn:hover{transform:scale(1.3)}
+
+/* ===== 作業条件チェック ===== */
+.cond-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f1f5f9}
+.cond-row:last-child{border-bottom:none}
+.cond-chk{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:600;min-width:120px;flex-shrink:0}
+.cond-chk input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:#2563eb;flex-shrink:0}
+.cond-sub{display:flex;align-items:center;gap:6px;font-size:12px}
+.cond-input{border:1.5px solid #cbd5e1;border-radius:6px;padding:4px 8px;font-size:12px;outline:none;transition:border-color .15s}
+.cond-input:focus{border-color:#3b82f6}
+
+/* ===== 担当者サジェスト ===== */
+.csug-wrap{position:fixed;z-index:3500;background:#fff;border:1.5px solid #3b82f6;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.2);max-height:220px;overflow-y:auto;min-width:200px;scrollbar-width:thin}
+.csug-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .1s}
+.csug-item:hover{background:#eff6ff}
+.csug-item:last-child{border-bottom:none}
+.csug-name{font-size:12px;font-weight:700;color:#1e293b}
+.csug-phone{font-size:11px;color:#64748b;margin-top:2px}
+.csug-badge{font-size:9px;background:#e0f2fe;color:#0369a1;border-radius:3px;padding:0 4px;margin-left:4px;vertical-align:middle;font-weight:700}
+/* ===== 収集先ドロップダウン ===== */
+.site-sel-row{display:flex;gap:6px;margin-bottom:10px}
+.site-sel-row select{flex:1;border:1.5px solid #3b82f6;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#f0f7ff;color:#1e3a5f;font-weight:600}
+.site-save-btn{padding:5px 10px;border-radius:6px;background:#f1f5f9;color:#475569;font-size:11px;font-weight:700;border:1.5px solid #cbd5e1;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.site-save-btn:hover{background:#e2e8f0}
+
+/* ===== 定期便ROW ===== */
+.reg-fixed-hdr td{background:#f0fdf4;color:#15803d;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #86efac}
+.reg-fixed-cell{background:#f0fdf4 !important;vertical-align:top;padding:3px;min-height:36px}
+/* ===== 持込みROW ===== */
+.carry-fixed-hdr td{background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #93c5fd}
+.carry-fixed-cell{background:#eff6ff !important;vertical-align:top;padding:3px;min-height:36px}
+.ec-carry{border:1.5px solid #3b82f6 !important;background:#dbeafe !important}
+
+/* ===== マニフェスト ===== */
+.mfst-wrap{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.mfst-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mfst-row-label{font-size:11px;color:#64748b;font-weight:700;min-width:52px;white-space:nowrap}
+.mfst-btn{display:inline-flex;align-items:center;padding:3px 11px;border-radius:6px;background:#f1f5f9;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #e2e8f0;transition:all .15s;user-select:none}
+.mfst-btn:has(input:checked){background:#1e3a5f;color:#fff;border-color:#1e3a5f}
+.mfst-btn input{display:none}
+.mfst-btn.type-yes:has(input:checked){background:#16a34a;border-color:#16a34a}
+.mfst-btn.type-no:has(input:checked){background:#6b7280;border-color:#6b7280}
+.mfst-btn.type-paper:has(input:checked){background:#d97706;border-color:#d97706}
+.mfst-btn.type-sys:has(input:checked){background:#6366f1;border-color:#6366f1}
+
+/* ===== ホバーポップアップ ===== */
+.disp-popup{position:fixed;z-index:600;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.18);padding:14px 16px;font-size:12px;min-width:250px;max-width:330px;pointer-events:none;opacity:0;transition:opacity .15s;line-height:1.75;color:#1e293b}
+.disp-popup.visible{opacity:1}
+.pop-title{font-size:13px;font-weight:800;color:#1e3a5f;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+.pop-row{display:flex;gap:6px;margin-bottom:3px}
+.pop-label{color:#94a3b8;font-size:10px;font-weight:700;min-width:64px;flex-shrink:0;padding-top:1px}
+.pop-val{font-size:12px;color:#1e293b;flex:1}
+.pop-section{margin-top:8px;padding-top:6px;border-top:1px dashed #e2e8f0}
+.pop-sec-title{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -290,13 +457,35 @@ hr{border:none;border-top:1px solid #e2e8f0}
     <span class="filter-count" id="filterCount"></span>
   </div>
 
-  <!-- CALENDAR -->
+  <!-- 担当者サジェストドロップダウン（共有） -->
+<div id="contactSuggest" class="csug-wrap hid"></div>
+
+<!-- CALENDAR -->
   <div class="cal-area" id="calArea">
-    <div class="cal-wrap">
+    <div class="cal-wrap" id="calWrap">
       <table class="cal-tbl" id="calTbl">
         <thead id="calHead"></thead>
         <tbody id="calBody"></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MASTER PICKER POPUP ===== -->
+<div id="masterPicker" class="mp-wrap hid">
+  <div class="mp-head">
+    <span class="mp-head-txt" id="mpHeadTxt">選択</span>
+    <button class="mp-head-cls" onclick="closeMP()">×</button>
+  </div>
+  <div class="mp-srch-wrap">
+    <input type="text" id="mpSrch" class="mp-srch" placeholder="🔍 名前で検索..." oninput="filterMP()">
+  </div>
+  <div id="mpList" class="mp-list"></div>
+  <div class="mp-add-sec">
+    <div class="mp-add-lbl">＋ 新規追加してすぐ選択</div>
+    <div class="mp-add-row">
+      <input type="text" id="mpNewName" class="mp-add-inp" placeholder="新しい名前を入力...">
+      <button class="mp-add-btn2" onclick="addFromMP()">追加</button>
     </div>
   </div>
 </div>
@@ -306,38 +495,171 @@ hr{border:none;border-top:1px solid #e2e8f0}
   <div class="mbox">
     <div class="mhdr"><h2 id="mDTitle">配車追加</h2><span class="mcls" onclick="closeM('mDispatch')">×</span></div>
     <div class="mbdy">
-      <div class="fr"><label>お客様 *</label>
-        <select id="dCust"><option value="">-- お客様を選択 --</option></select></div>
+      <!-- ① お客様情報 -->
+      <div style="font-size:11px;font-weight:700;color:#1e3a5f;margin-bottom:6px;background:#e0f2fe;padding:4px 8px;border-radius:4px">🏢 お客様情報</div>
       <div class="r2">
-        <div class="fr"><label>受付日</label><input type="date" id="dDate"></div>
-        <div class="fr"><label>期限（いつまでに）</label><input type="date" id="dDeadline" oninput="updateDeadlineWarn()"></div>
+        <div class="fr"><label>お客様 *</label>
+          <button type="button" class="mp-trigger" id="dCustTrigger" onclick="openMP('customer',this,'dCust')">
+            <span class="mp-trigger-txt" id="dCustTxt">-- お客様を選択 --</span>
+            <span class="mp-trigger-arr">▼</span>
+          </button>
+          <select id="dCust" style="display:none" onchange="onCustChange()"><option value="">-- お客様を選択 --</option></select></div>
+        <div class="fr"><label>お客様 担当者名</label><input type="text" id="dCustContact" placeholder="例: 山田 部長" autocomplete="off" onfocus="showContactSuggest(this,'dCustPhone','customer')" oninput="showContactSuggest(this,'dCustPhone','customer')" onblur="hideContactSuggest()"></div>
       </div>
       <div class="r2">
-        <div class="fr"><label>種別</label>
-          <select id="dType"><option value="spot">スポット（単発）</option><option value="regular">定期便</option></select></div>
-        <div class="fr" id="deadlineWarnRow" style="display:flex;align-items:flex-end;padding-bottom:2px">
-          <span id="deadlineWarn" style="font-size:11px;color:#dc2626;font-weight:600"></span>
+        <div class="fr"><label>① お客様担当者 電話番号</label><input type="tel" id="dCustPhone" placeholder="例: 090-0000-0000"></div>
+        <div class="fr"><label>T-PlannerCD</label>
+          <div id="dTpcdDisp" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;background:#f8fafc;font-size:13px;color:#64748b;min-height:36px">
+            <span id="dTpcdVal" style="font-family:monospace;font-weight:700;color:#1e293b"></span>
+          </div>
         </div>
       </div>
+
+      <!-- ② 収集先情報（お客様情報の直下） -->
+      <div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:6px;background:#dcfce7;padding:4px 8px;border-radius:4px">📍 収集先情報</div>
+      <div class="site-sel-row">
+        <select id="dSiteSelect" onchange="onSiteSelect()">
+          <option value="">🔍 登録済み収集先から選択して自動入力...</option>
+        </select>
+        <button class="site-save-btn" onclick="saveSiteTemplate()" title="現在の収集先情報をテンプレートとして登録">📌 収集先を登録</button>
+      </div>
       <div class="r2">
+        <div class="fr"><label>収集先 名称</label><input type="text" id="dSiteName" placeholder="例: 〇〇工場 / 〇〇ビル地下"></div>
+        <div class="fr"><label>収集先 担当者名</label><input type="text" id="dSiteContact" placeholder="例: 鈴木 様" autocomplete="off" onfocus="showContactSuggest(this,'dSitePhone','site')" oninput="showContactSuggest(this,'dSitePhone','site')" onblur="hideContactSuggest()"></div>
+      </div>
+      <div class="r2">
+        <div class="fr"><label>② 収集先担当者 電話番号</label><input type="tel" id="dSitePhone" placeholder="例: 082-000-0000"></div>
+        <div class="fr"><label>収集先 住所</label><input type="text" id="dSiteAddr" placeholder="例: 東京都〇〇区〇〇1-2-3"></div>
+      </div>
+      <hr style="margin:10px 0">
+      <!-- 日程・配車 -->
+      <div class="r2">
+        <div class="fr"><label>受付日（依頼受付日）</label><input type="date" id="dDate"></div>
+        <div class="fr"><label>🚛 配車確定日 <span style="font-size:9px;color:#3b82f6;font-weight:400">※ドラッグ&amp;ドロップで自動入力</span></label><input type="date" id="dDispatchDate"></div>
+      </div>
+      <div class="r2">
+        <div class="fr"><label>期限（いつまでに）</label><input type="date" id="dDeadline" oninput="updateDeadlineWarn()"></div>
+        <div class="fr"><label>種別</label>
+          <select id="dType"><option value="spot">スポット（単発）</option><option value="regular">定期便</option></select></div>
+      </div>
+      <div id="deadlineWarnRow" style="margin-top:-8px;margin-bottom:6px">
+        <span id="deadlineWarn" style="font-size:11px;color:#dc2626;font-weight:600"></span>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;font-size:13px;font-weight:700;color:#1d4ed8">
+          <input type="checkbox" id="dCarryIn" onchange="onCarryInChange()" style="width:16px;height:16px;accent-color:#3b82f6">
+          🏭 持込み（ドライバー・車両 不要）
+        </label>
+      </div>
+      <div class="r2" id="dDriverVehicleRow">
         <div class="fr"><label>ドライバー</label>
-          <select id="dDriver" onchange="chkLic()"><option value="">-- 未定 --</option></select></div>
+          <button type="button" class="mp-trigger" id="dDriverTrigger" onclick="openMP('driver',this,'dDriver')">
+            <span class="mp-trigger-txt" id="dDriverTxt">-- 未定 --</span>
+            <span class="mp-trigger-arr">▼</span>
+          </button>
+          <select id="dDriver" style="display:none" onchange="chkLic()"><option value="">-- 未定 --</option></select></div>
         <div class="fr"><label>車両</label>
-          <select id="dVehicle" onchange="chkLic()"><option value="">-- 未定 --</option></select></div>
+          <button type="button" class="mp-trigger" id="dVehicleTrigger" onclick="openMP('vehicle',this,'dVehicle')">
+            <span class="mp-trigger-txt" id="dVehicleTxt">-- 未定 --</span>
+            <span class="mp-trigger-arr">▼</span>
+          </button>
+          <select id="dVehicle" style="display:none" onchange="chkLic()"><option value="">-- 未定 --</option></select></div>
       </div>
       <div class="warn-txt" id="licWarn">⚠ このドライバーは選択車両の必要免許を持っていない可能性があります。</div>
-      <div class="fr"><label>受付担当者</label><input type="text" id="dReceptionist" placeholder="受付した担当者名"></div>
-      <div class="fr"><label>ステータス</label>
-        <select id="dStatus"><option value="pending">🔴 保留中</option><option value="confirmed">✅ 確定</option></select></div>
-      <div class="fr"><label>備考</label><textarea id="dNotes" rows="2" placeholder="収集品目、特記事項など"></textarea></div>
+      <div class="r2">
+        <div class="fr"><label>受付担当者</label><input type="text" id="dReceptionist" placeholder="受付した担当者名"></div>
+        <div class="fr"><label>ステータス</label>
+          <select id="dStatus"><option value="pending">🔴 保留中</option><option value="confirmed">✅ 確定</option></select></div>
+      </div>
+      <hr style="margin:10px 0">
+      <!-- 🔧 作業種別 -->
+      <div style="font-size:11px;font-weight:700;color:#6d28d9;margin-bottom:6px;background:#ede9fe;padding:4px 8px;border-radius:4px">🔧 作業種別</div>
+      <div style="border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;margin-bottom:10px;background:#faf5ff">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">作業タイプ：</span>
+          <label class="mfst-btn"><input type="radio" name="wkType" value="" onchange="onWkTypeChange()" checked>未選択</label>
+          <label class="mfst-btn type-yes"><input type="radio" name="wkType" value="manual" onchange="onWkTypeChange()">🖐 手積み</label>
+          <label class="mfst-btn type-sys"><input type="radio" name="wkType" value="container" onchange="onWkTypeChange()">🗃 コンテナ</label>
+        </div>
+        <div id="containerOpts" style="display:none;padding-top:8px;border-top:1px dashed #ddd6fe;margin-top:4px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">コンテナ作業：</span>
+            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="set" checked>📥 設置</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="swap">🔄 交換</label>
+            <label class="mfst-btn type-no"><input type="radio" name="wkContainerOp" value="remove">📤 撤去</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">サイズ：</span>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="1.5box" checked>1.5BOX <span style="font-size:9px;color:#fca5a5;font-weight:800">クレーン</span></label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="2t">2tコンテナ</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="4t">4tコンテナ</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="large">大型コンテナ</label>
+          </div>
+        </div>
+      </div>
+      <hr style="margin:10px 0">
+      <!-- マニフェスト -->
+      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;background:#f1f5f9;padding:4px 8px;border-radius:4px">📋 マニフェスト</div>
+      <div class="mfst-wrap">
+        <div class="mfst-row">
+          <span class="mfst-row-label">必要性：</span>
+          <label class="mfst-btn type-yes"><input type="radio" name="mfstNeeded" value="yes" onchange="onMfstChange()">要</label>
+          <label class="mfst-btn type-no"><input type="radio" name="mfstNeeded" value="no" onchange="onMfstChange()" checked>不要</label>
+          <label class="mfst-btn type-yes"><input type="radio" name="mfstNeeded" value="bring" onchange="onMfstChange()">持参</label>
+          <label class="mfst-btn type-yes"><input type="radio" name="mfstNeeded" value="receive" onchange="onMfstChange()">受領</label>
+        </div>
+        <div class="mfst-row hid" id="mfstTypeRow">
+          <span class="mfst-row-label">種類：</span>
+          <label class="mfst-btn type-paper"><input type="radio" name="mfstType" value="paper" onchange="onMfstChange()" checked>📄 紙</label>
+          <label class="mfst-btn type-paper"><input type="radio" name="mfstType" value="electronic" onchange="onMfstChange()">💻 電子</label>
+        </div>
+        <div class="mfst-row hid" id="mfstSysRow">
+          <span class="mfst-row-label">システム：</span>
+          <label class="mfst-btn type-sys"><input type="radio" name="mfstSys" value="jwnet" checked>JWNET</label>
+          <label class="mfst-btn type-sys"><input type="radio" name="mfstSys" value="ereverse">イーリバース</label>
+        </div>
+      </div>
+      <hr style="margin:10px 0">
+      <!-- ⑤ 作業条件 -->
+      <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;background:#ede9fe;padding:4px 8px;border-radius:4px">⚙ 作業条件</div>
+      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:10px">
+        <div class="cond-row">
+          <label class="cond-chk"><input type="checkbox" id="dTimeEnabled" onchange="document.getElementById('dTimeInput').style.display=this.checked?'flex':'none'">🕐 時間指定 有り</label>
+          <div class="cond-sub" id="dTimeInput" style="display:none">
+            <input type="time" id="dTimeVal" class="cond-input" style="width:110px">
+            <span style="font-size:11px;color:#64748b">に集荷</span>
+          </div>
+        </div>
+        <div class="cond-row">
+          <label class="cond-chk"><input type="checkbox" id="dAssistEnabled" onchange="document.getElementById('dAssistInput').style.display=this.checked?'flex':'none'">👷 作業助手 要</label>
+          <div class="cond-sub" id="dAssistInput" style="display:none">
+            <input type="number" id="dAssistCount" min="1" max="20" value="1" class="cond-input" style="width:65px">
+            <span style="font-size:11px;color:#64748b">名</span>
+          </div>
+        </div>
+        <div class="cond-row">
+          <label class="cond-chk"><input type="checkbox" id="dMeasure">⚖ 計量 要</label>
+        </div>
+      </div>
+      <!-- 備考・注意事項 -->
+      <div class="fr"><label>備考・作業内容</label><textarea id="dNotes" rows="3" placeholder="収集品目、数量、特記事項など"></textarea></div>
+      <div class="fr"><label>⚠ 注意事項（収集先固有の注意・入構ルール等）</label><textarea id="dCaution" rows="2" placeholder="危険物の有無、駐車場、入構証など"></textarea></div>
     </div>
-    <div class="mftr">
+    <div class="mftr" style="flex-wrap:wrap;gap:6px">
       <button class="btn btn-s" onclick="closeM('mDispatch')">キャンセル</button>
       <button class="btn btn-d hid" id="dDelBtn" onclick="delDispatch()">🗑 削除</button>
+      <button class="btn hid" id="dPrintBtn" style="background:#7c3aed;color:#fff;gap:0">
+        <span onclick="printWorkOrder(ST.editId,'collect')" style="padding:0 8px;border-right:1px solid rgba(255,255,255,.4)" title="収集用を印刷">🖨 収集用</span>
+        <span onclick="printWorkOrder(ST.editId,'customer')" style="padding:0 8px;border-right:1px solid rgba(255,255,255,.4)" title="お客様控えを印刷">お客様控え</span>
+        <span onclick="printWorkOrder(ST.editId,'both')" style="padding:0 8px" title="2部まとめて印刷">2部</span>
+      </button>
       <button class="btn btn-p" onclick="saveDispatch()">💾 保存</button>
     </div>
   </div>
 </div>
+
+<!-- ===== DISPATCH HOVER POPUP ===== -->
+<div class="disp-popup" id="dispPopup"></div>
 
 <!-- ===== MODAL: CONFIRM DROP ===== -->
 <div class="ovl hid" id="mConfirm">
@@ -367,6 +689,7 @@ hr{border:none;border-top:1px solid #e2e8f0}
       <div class="stab" onclick="stab('drivers')">👤 ドライバー</div>
       <div class="stab" onclick="stab('vehicles')">🚛 車両</div>
       <div class="stab" onclick="stab('customers')">🏢 お客様</div>
+      <div class="stab" onclick="stab('sites')">📍 収集先</div>
       <div class="stab" onclick="stab('data')">💾 データ</div>
     </div>
     <div class="mbdy">
@@ -467,55 +790,101 @@ function getSheet(name) {
 
 function writeReadableSheets(data) {
   const DOW = ['日','月','火','水','木','金','土'];
-  function cust(id) {
+  function custName(id) {
     const c = (data.customers||[]).find(x => x.id === id);
-    return c ? c.name : '';
+    return c ? c.name : (id||'');
   }
-  function drv(id) {
+  function drvName(id) {
     if (!id) return '未定';
     const d = (data.drivers||[]).find(x => x.id === id);
     return d ? d.name : '未定';
   }
-  function veh(id) {
+  function vehName(id) {
     if (!id) return '未定';
     const v = (data.vehicles||[]).find(x => x.id === id);
     return v ? v.name : '未定';
   }
+  function fmtDate(s) {
+    if (!s) return '';
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? s : (d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'));
+  }
+  function dow(s) {
+    if (!s) return '';
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? '' : DOW[d.getDay()];
+  }
 
-  // 配車一覧シート
-  const dispRows = (data.dispatches||[]).map(dp => {
-    const d = dp.date ? new Date(dp.date) : null;
+  // ===== 📋 配車一覧（全件） =====
+  const dispAll = (data.dispatches||[]).map(dp => {
+    const wDate = dp.dispatchDate || dp.date || '';
+    const wt = dp.workType || {};
+    const wtStr = wt.type === 'container' ? 'コンテナ(' + (wt.containerOp||'') + '/' + (wt.containerSize||'') + ')' : wt.type === 'manual' ? '手積み' : '';
+    const mf = dp.manifest || {};
     return [
-      dp.date || '', d ? DOW[d.getDay()] : '',
-      cust(dp.customer), drv(dp.driver), veh(dp.vehicle),
-      dp.isReg ? '定期' : 'スポット',
+      fmtDate(wDate), dow(wDate),
+      custName(dp.customer),
+      dp.custContact || '', dp.custPhone || '',
+      dp.siteName || '', dp.siteContact || '', dp.sitePhone || '', dp.siteAddr || '',
+      drvName(dp.driver), vehName(dp.vehicle),
+      dp.isCarryIn ? '持込み' : dp.isReg ? '定期便' : 'スポット',
       dp.status === 'confirmed' ? '確定' : '保留',
-      dp.notes || '',
+      wtStr,
+      mf.needed === 'yes' || mf.needed === 'bring' || mf.needed === 'receive' ? '要' : '不要',
+      dp.notes || '', dp.caution || '',
       dp.receptionist || '',
-      (dp.created||'').slice(0,10)
+      fmtDate(dp.date),
+      (dp.deadline || ''), (dp.created||'').slice(0,10)
     ];
   });
   writeSheet('📋配車一覧',
-    ['日付','曜日','お客様','ドライバー','車両','種別','ステータス','備考','受付担当者','登録日'],
-    dispRows
+    ['配車確定日','曜日','お客様名','お客様担当者','担当者電話','収集先名称','収集先担当者','収集先電話','収集先住所',
+     'ドライバー','車両','種別','ステータス','作業種別','マニフェスト','備考','注意事項','受付担当者','受付日','期限','登録日'],
+    dispAll
   );
 
-  // ドライバー一覧
-  writeSheet('👤ドライバー',
-    ['ID','名前','保有免許'],
-    (data.drivers||[]).map(d => [d.id, d.name, (d.license||[]).join('・')])
+  // ===== ✅ 配車実績（確定済みのみ） =====
+  const dispDone = (data.dispatches||[]).filter(dp =>
+    dp.status === 'confirmed' && (dp.dispatchDate || dp.date)
+  ).map(dp => {
+    const wDate = dp.dispatchDate || dp.date || '';
+    return [
+      fmtDate(wDate), dow(wDate),
+      custName(dp.customer), dp.custContact || '', dp.custPhone || '',
+      dp.siteName || '', dp.siteContact || '', dp.sitePhone || '',
+      drvName(dp.driver), vehName(dp.vehicle),
+      dp.isCarryIn ? '持込み' : dp.isReg ? '定期便' : 'スポット',
+      dp.notes || '', dp.receptionist || '', fmtDate(dp.date)
+    ];
+  });
+  writeSheet('✅配車実績',
+    ['配車日','曜日','お客様名','お客様担当者','担当者電話','収集先名称','収集先担当者','収集先電話',
+     'ドライバー','車両','種別','備考','受付担当者','受付日'],
+    dispDone
   );
 
-  // 車両一覧
-  writeSheet('🚛車両',
-    ['ID','名前','ナンバー','種別','必要免許'],
-    (data.vehicles||[]).map(v => [v.id, v.name, v.plate||'', v.type||'', v.req||''])
-  );
-
-  // お客様一覧
+  // ===== 🏢 お客様マスタ =====
   writeSheet('🏢お客様',
-    ['ID','お客様名','住所','連絡先'],
-    (data.customers||[]).map(c => [c.id, c.name, c.addr||'', c.contact||''])
+    ['ID','T-PlannerCD','お客様名','住所','担当者名','電話番号'],
+    (data.customers||[]).map(c => [c.id, c.tpcd||'', c.name, c.addr||'', c.contact||'', c.phone||''])
+  );
+
+  // ===== 📍 収集先マスタ =====
+  writeSheet('📍収集先',
+    ['ID','お客様ID','収集先名称','担当者名','電話番号','住所','注意事項'],
+    (data.sites||[]).map(s => [s.id, s.customerId||'', s.name, s.contact||'', s.phone||'', s.addr||'', s.caution||''])
+  );
+
+  // ===== 👤 ドライバーマスタ =====
+  writeSheet('👤ドライバー',
+    ['ID','名前','グループ','種別','保有免許'],
+    (data.drivers||[]).map(d => [d.id, d.name, [d.group,d.group2].filter(x=>x).join('/'), d.type||'', (d.license||[]).join('・')])
+  );
+
+  // ===== 🚛 車両マスタ =====
+  writeSheet('🚛車両',
+    ['ID','車両名','ナンバー','車種','必要免許'],
+    (data.vehicles||[]).map(v => [v.id, v.name, v.plate||'', v.type||'', v.req||''])
   );
 }
 
@@ -569,7 +938,8 @@ function writeSheet(name, headers, rows) {
       <div class="spane" id="sp-drivers">
         <div class="r2" style="margin-bottom:10px">
           <div class="fr" style="margin:0"><label>ドライバー名</label><input type="text" id="sDriverName" placeholder="例: 田中 太郎"></div>
-          <div class="fr" style="margin:0"><label>班・グループ</label><input type="text" id="sDriverGroup" placeholder="例: 1班、収集A、運搬B"></div>
+          <div class="fr" style="margin:0"><label>班1（メイン）</label><input type="text" id="sDriverGroup" placeholder="例: 1班、収集A"></div>
+          <div class="fr" style="margin:0"><label>班2（サブ）</label><input type="text" id="sDriverGroup2" placeholder="例: 運搬B（任意）"></div>
           <div class="fr" style="margin:0"><label>区分</label><select id="sDriverType"><option value="専任">専任ドライバー</option><option value="兼任">兼任（他業務あり）</option></select></div>
           <div class="fr" style="margin:0"><label>保有免許（複数可）</label>
             <div class="dow-row" id="sDriverLic" style="margin-top:8px">
@@ -606,23 +976,76 @@ function writeSheet(name, headers, rows) {
       <div class="spane" id="sp-customers">
         <div class="r2" style="margin-bottom:6px">
           <div class="fr" style="margin:0"><label>お客様名</label><input type="text" id="sCName" placeholder="例: 株式会社〇〇"></div>
-          <div class="fr" style="margin:0"><label>住所</label><input type="text" id="sCAddr" placeholder="例: 東京都〇〇区..."></div>
+          <div class="fr" style="margin:0"><label>T-PlannerCD <span style="font-size:9px;color:#94a3b8;font-weight:400">（販売管理ソフトの得意先CD）</span></label><input type="text" id="sCTpcd" placeholder="例: T001234"></div>
         </div>
-        <div class="fr" style="margin-bottom:10px"><label>担当者 / 連絡先</label><input type="text" id="sCContact" placeholder="例: 山田様 / TEL: 03-xxxx-xxxx"></div>
+        <div class="r2" style="margin-bottom:6px">
+          <div class="fr" style="margin:0"><label>住所</label><input type="text" id="sCAddr" placeholder="例: 東京都〇〇区..."></div>
+          <div class="fr" style="margin:0"><label>担当者名</label><input type="text" id="sCContact" placeholder="例: 山田様"></div>
+        </div>
+        <div class="r2" style="margin-bottom:10px">
+          <div class="fr" style="margin:0"><label>担当者 電話番号</label><input type="tel" id="sCPhone" placeholder="例: 082-000-0000"></div>
+          <div class="fr" style="margin:0"></div>
+        </div>
         <button class="btn btn-p" id="customerAddBtn" onclick="addCustomer()" style="margin-bottom:10px">追加</button>
         <button class="btn btn-s" id="customerCancelBtn" onclick="resetCustomerForm()" style="margin-bottom:10px;display:none">キャンセル</button>
         <div class="dlist" id="customerList"></div>
       </div>
 
+      <!-- SITES（収集先マスタ） -->
+      <div class="spane" id="sp-sites">
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#15803d">
+          💡 ここで登録した収集先は、配車編集画面の「収集先情報」ドロップダウンからすぐに呼び出せます。工事現場など頻繁に変わる現場もここで管理してください。
+        </div>
+        <div class="r2" style="margin-bottom:6px">
+          <div class="fr" style="margin:0"><label>紐づけお客様</label>
+            <select id="sSiteCustId" style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;outline:none">
+              <option value="">（共通・全お客様）</option>
+            </select>
+          </div>
+          <div class="fr" style="margin:0"><label>収集先 名称 *</label><input type="text" id="sSiteName" placeholder="例: 〇〇工場 / △△現場"></div>
+        </div>
+        <div class="r2" style="margin-bottom:6px">
+          <div class="fr" style="margin:0"><label>担当者名</label><input type="text" id="sSiteContact" placeholder="例: 鈴木 様"></div>
+          <div class="fr" style="margin:0"><label>電話番号</label><input type="tel" id="sSitePhone" placeholder="例: 082-000-0000"></div>
+        </div>
+        <div class="r2" style="margin-bottom:6px">
+          <div class="fr" style="margin:0"><label>住所</label><input type="text" id="sSiteAddr" placeholder="例: 広島市〇〇区..."></div>
+          <div class="fr" style="margin:0"><label>注意事項（内部メモ）</label><input type="text" id="sSiteCaution" placeholder="例: 入構証が必要"></div>
+        </div>
+        <button class="btn btn-p" id="siteAddBtn" onclick="addSite()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-s" id="siteCancelBtn" onclick="resetSiteForm()" style="margin-bottom:10px;display:none">キャンセル</button>
+        <div class="dlist" id="siteList"></div>
+      </div>
+
       <!-- DATA -->
       <div class="spane" id="sp-data">
         <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:10px">
-          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📊 エクスポート</div>
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📑 マスターデータ CSVエクスポート</div>
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">※同一IDで再インポートすると上書き更新されます</div>
+          <button class="btn btn-v" onclick="exportMasterCSV('customers')" style="margin:3px">🏢 お客様CSV</button>
+          <button class="btn btn-v" onclick="exportMasterCSV('drivers')" style="margin:3px">👤 ドライバーCSV</button>
+          <button class="btn btn-v" onclick="exportMasterCSV('vehicles')" style="margin:3px">🚛 車両CSV</button>
+          <button class="btn btn-v" onclick="exportMasterCSV('sites')" style="margin:3px">📍 収集先CSV</button>
+        </div>
+        <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📥 マスターデータ CSVインポート</div>
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">同一ID → 上書き更新　／　ID未記入または新規ID → 自動採番して追加</div>
+          <button class="btn btn-g" onclick="document.getElementById('fi-csv-c').click()" style="margin:3px">🏢 お客様CSV読込</button>
+          <button class="btn btn-g" onclick="document.getElementById('fi-csv-d').click()" style="margin:3px">👤 ドライバーCSV読込</button>
+          <button class="btn btn-g" onclick="document.getElementById('fi-csv-v').click()" style="margin:3px">🚛 車両CSV読込</button>
+          <button class="btn btn-g" onclick="document.getElementById('fi-csv-s').click()" style="margin:3px">📍 収集先CSV読込</button>
+          <input id="fi-csv-c" type="file" accept=".csv" class="hid" onchange="importMasterCSV(event,'customers')">
+          <input id="fi-csv-d" type="file" accept=".csv" class="hid" onchange="importMasterCSV(event,'drivers')">
+          <input id="fi-csv-v" type="file" accept=".csv" class="hid" onchange="importMasterCSV(event,'vehicles')">
+          <input id="fi-csv-s" type="file" accept=".csv" class="hid" onchange="importMasterCSV(event,'sites')">
+        </div>
+        <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📊 配車データ エクスポート</div>
           <button class="btn btn-p" onclick="exportCSV()" style="margin:3px">配車データ CSV出力</button>
           <button class="btn btn-v" onclick="exportJSON()" style="margin:3px">全データ バックアップ(JSON)</button>
         </div>
         <div style="background:#f8fafc;border-radius:8px;padding:12px">
-          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📂 インポート・リセット</div>
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📂 復元・リセット</div>
           <button class="btn btn-g" onclick="document.getElementById('fi-json').click()" style="margin:3px">JSONから復元</button>
           <button class="btn btn-d" onclick="resetAll()" style="margin:3px">⚠ 全データリセット</button>
         </div>
@@ -771,7 +1194,7 @@ async function loadDB(){
       const res=await fetch(GAS_URL+'?t='+Date.now(),{redirect:'follow'});
       const data=await res.json();
       if(data&&Array.isArray(data.dispatches)){
-        db=data;
+        db=data;normalizeDB();
         localStorage.setItem('haishaDB2',JSON.stringify(db));
         setSyncStatus('ok');return;
       }
@@ -780,9 +1203,20 @@ async function loadDB(){
       setSyncStatus('error','サーバー接続失敗（ローカルを使用）');
     }
   }
-  try{const s=localStorage.getItem('haishaDB2');if(s){db=JSON.parse(s);return;}}catch(e){}
+  try{const s=localStorage.getItem('haishaDB2');if(s){db=JSON.parse(s);normalizeDB();return;}}catch(e){}
   db=JSON.parse(JSON.stringify(DEMO_DB));
+  normalizeDB();
   if(!GAS_URL)setSyncStatus('none');
+}
+function normalizeDB(){
+  if(!db.driverOrder)db.driverOrder=[];
+  if(!db.vehicleOrder)db.vehicleOrder=[];
+  if(!db.sites)db.sites=[];
+  if(!db.customers)db.customers=[];
+  if(!db.drivers)db.drivers=[];
+  if(!db.vehicles)db.vehicles=[];
+  if(!db.dispatches)db.dispatches=[];
+  (db.drivers||[]).forEach(d=>{if(!d.usageGroup)d.usageGroup='frequent';if(!d.group2)d.group2='';});
 }
 
 async function save(){
@@ -838,7 +1272,7 @@ function getWOM(d){const f=new Date(d.getFullYear(),d.getMonth(),1);return Math.
 // ================================================================
 // STATE
 // ================================================================
-const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,drag:null,drop:null,collapsedGroups:new Set()};
+const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,drag:null,drop:null,collapsedGroups:new Set(),rowDrag:null,collapsedInfreq:false};
 const FILTER={search:'',type:'all',groups:new Set()};
 
 function applyFilter(){FILTER.search=document.getElementById('filterSearch').value;render();}
@@ -853,21 +1287,31 @@ function toggleFilterGroup(g){
   render();
 }
 function updateGroupButtons(){
-  const groups=[...new Set((db.drivers||[]).map(d=>d.group||'').filter(g=>g))].sort();
-  const el=document.getElementById('filterGroups');
-  if(!groups.length){el.innerHTML='';return;}
-  el.innerHTML='<span style="font-size:11px;color:#64748b;white-space:nowrap">班：</span>'+
-    groups.map(g=>`<button class="ftgl grp-btn${FILTER.groups.has(g)?' on':''}" data-grp="${g}" onclick="toggleFilterGroup('${g}')">${g}</button>`).join('');
+  // 班フィルターボタンは非表示
+  document.getElementById('filterGroups').innerHTML='';
 }
 function getFilteredResources(){
   let res=getResources();
+  res=getOrderedResources(res,ST.res);
   const q=FILTER.search.trim();
   if(q)res=res.filter(r=>r.name.includes(q));
   if(ST.res==='driver'){
     if(FILTER.type!=='all')res=res.filter(r=>(r.type||'専任')===FILTER.type);
-    if(FILTER.groups.size>0)res=res.filter(r=>FILTER.groups.has(r.group||''));
+    if(FILTER.groups.size>0)res=res.filter(r=>FILTER.groups.has(r.group||'')||FILTER.groups.has(r.group2||''));
   }
   return res;
+}
+function getOrderedResources(resources,type){
+  const order=type==='driver'?(db.driverOrder||[]):(db.vehicleOrder||[]);
+  if(!order.length)return resources;
+  const mapped=resources.map(r=>({r,i:order.indexOf(r.id)}));
+  mapped.sort((a,b)=>{
+    if(a.i===-1&&b.i===-1)return 0;
+    if(a.i===-1)return 1;
+    if(b.i===-1)return -1;
+    return a.i-b.i;
+  });
+  return mapped.map(x=>x.r);
 }
 function toggleGrp(g){
   if(ST.collapsedGroups.has(g))ST.collapsedGroups.delete(g);else ST.collapsedGroups.add(g);
@@ -884,14 +1328,27 @@ function getDates(){
   const s=som(d),n=dim(d);return Array.from({length:n},(_,i)=>addD(s,i));
 }
 function getResources(){return ST.res==='driver'?db.drivers:db.vehicles;}
+function workDate(dp){return dp.dispatchDate||dp.date;} // 配車確定日 優先、旧データ互換
 function cellDisps(ds,rid){
   return(db.dispatches||[]).filter(dp=>{
-    if(!dp.date||dp.date!==ds)return false;
+    if(dp.isCarryIn)return false;
+    if(!workDate(dp)||workDate(dp)!==ds)return false;
     return ST.res==='driver'?dp.driver===rid:dp.vehicle===rid;
   });
 }
 function pendingDisps(){
-  return(db.dispatches||[]).filter(dp=>!dp.date||(!dp.driver&&!dp.vehicle));
+  return(db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&(!workDate(dp)||(!dp.driver&&!dp.vehicle)));
+}
+function regularDispsForDate(ds){
+  return(db.dispatches||[]).filter(dp=>dp.isReg&&workDate(dp)===ds);
+}
+function carryInDispsForDate(ds){
+  return(db.dispatches||[]).filter(dp=>dp.isCarryIn&&workDate(dp)===ds);
+}
+function onCarryInChange(){
+  const isCarryIn=document.getElementById('dCarryIn').checked;
+  document.getElementById('dDriverVehicleRow').style.display=isCarryIn?'none':'';
+  if(isCarryIn)document.getElementById('licWarn').classList.remove('show');
 }
 
 function render(){
@@ -907,14 +1364,41 @@ function render(){
   else lbl=`${d.getFullYear()}年${d.getMonth()+1}月`;
   document.getElementById('dtLabel').textContent=lbl;
 
+  const isDay=ST.view==='day';
+  // calWrapのday-viewクラス切替
+  const calWrapEl=document.getElementById('calWrap');
+  if(calWrapEl)calWrapEl.classList.toggle('day-view',isDay);
+
   let th='<tr>';
   th+=`<th class="res-hd">${ST.res==='driver'?'👤 ドライバー':'🚛 車両'}</th>`;
-  for(const dt of dates){
+  if(isDay){
+    // 日ビュー：横スケジュール表示の単一ヘッダー列
+    const dt=dates[0];
     const ds=fmt(dt),dow=dt.getDay();
-    let cls='dt-hd'+(isMonth?' dt-month':'');
-    if(ds===today)cls+=' td-now';else if(dow===0)cls+=' td-sun';else if(dow===6)cls+=' td-sat';
-    const top=isMonth?`${dt.getDate()}<br><small style="font-weight:400">${DOW_JP[dow]}</small>`:`${dt.getMonth()+1}/${dt.getDate()}<br><small style="font-weight:400">${DOW_JP[dow]}</small>`;
-    th+=`<th class="${cls}">${top}</th>`;
+    const holName=HOLIDAYS[ds]||'';
+    let cls='dt-hd day-sched-hd';
+    if(ds===today)cls+=' td-now';
+    else if(holName)cls+=' td-hol';
+    else if(dow===0)cls+=' td-sun';
+    else if(dow===6)cls+=' td-sat';
+    const holBadge=holName?`<span class="dt-hol-name">🎌 ${holName}</span>`:'';
+    th+=`<th class="${cls}">
+      <div style="font-weight:700;font-size:12px">📅 本日のスケジュール（左から時間順）${holBadge}</div>
+      <div style="font-size:10px;color:#94a3b8;font-weight:400;margin-top:2px">第1業務 → 第2業務 → 第3業務 →　　（カードをクリックで編集・ドラッグで移動）</div>
+    </th>`;
+  } else {
+    for(const dt of dates){
+      const ds=fmt(dt),dow=dt.getDay();
+      const holName=HOLIDAYS[ds]||'';
+      let cls='dt-hd'+(isMonth?' dt-month':'');
+      if(ds===today)cls+=' td-now';
+      else if(holName)cls+=' td-hol';
+      else if(dow===0)cls+=' td-sun';
+      else if(dow===6)cls+=' td-sat';
+      const top=isMonth?`${dt.getDate()}<br><small style="font-weight:400">${DOW_JP[dow]}</small>`:`${dt.getMonth()+1}/${dt.getDate()}<br><small style="font-weight:400">${DOW_JP[dow]}</small>`;
+      const holBadge=holName?`<span class="dt-hol-name">🎌 ${holName}</span>`:'';
+      th+=`<th class="${cls}">${top}${holBadge}</th>`;
+    }
   }
   th+='</tr>';
   document.getElementById('calHead').innerHTML=th;
@@ -924,66 +1408,268 @@ function render(){
   const total=getResources().length;
   document.getElementById('filterCount').textContent=resources.length<total?`${resources.length}/${total}名表示`:'';
 
-  function renderResRow(res){
-    let row='<tr>';
-    if(ST.res==='driver'){
+  function renderResRow(res,type){
+    const rid=res.id;
+    let row=`<tr data-res-id="${rid}"
+      ondragover="onRowOver(event,'${rid}')" ondragleave="onRowLeave(event)" ondrop="onRowDrop(event,'${rid}','${type}')"
+      ondragend="onRowDragEnd(event)">`;
+    if(type==='driver'){
       const lbs=(res.license||[]).map(l=>`<span class="bdg bdg-b">${l}</span>`).join('');
       const kenBadge=res.type==='兼任'?'<span class="grp-badge-ken">兼任</span>':'';
-      row+=`<td class="res-cell"><div class="res-name">${res.name}${kenBadge}</div><div class="res-meta">${lbs}</div></td>`;
+      const grpTxt=[res.group,res.group2].filter(g=>g).join(' / ');
+      const isInfreq=(res.usageGroup||'frequent')==='infrequent';
+      const starIcon=isInfreq?'☆':'★';
+      const starColor=isInfreq?'#94a3b8':'#f59e0b';
+      const starTitle=isInfreq?'よく使うに移動':'あまり使わないに移動';
+      row+=`<td class="res-cell">
+        <div class="res-cell-inner">
+          <span class="row-drag-handle" draggable="true" ondragstart="onRowDragStart(event,'${rid}','driver')" title="ドラッグで行を移動">⠿</span>
+          <div style="flex:1;min-width:0">
+            <div class="res-name" style="display:flex;align-items:center;gap:4px">
+              <button class="usage-star-btn" style="color:${starColor}" onclick="event.stopPropagation();toggleUsageGroup('${rid}')" title="${starTitle}">${starIcon}</button>
+              ${res.name}${kenBadge}
+            </div>
+            ${grpTxt?`<div style="font-size:10px;color:#64748b">${grpTxt}</div>`:''}
+            <div class="res-meta">${lbs}</div>
+          </div>
+        </div>
+      </td>`;
     } else {
       const r=res.req,bc=r==='大型'?'bdg-r':r.includes('中型')?'bdg-o':r==='準中型'?'bdg-v':'bdg-g';
-      row+=`<td class="res-cell"><div class="res-name">${res.name}</div><div class="res-meta"><span class="bdg ${bc}">${r}以上</span><br><span style="font-size:10px;color:#94a3b8">${res.plate||''}</span></div></td>`;
+      row+=`<td class="res-cell">
+        <div class="res-cell-inner">
+          <span class="row-drag-handle" draggable="true" ondragstart="onRowDragStart(event,'${rid}','vehicle')" title="ドラッグで行を移動">⠿</span>
+          <div>
+            <div class="res-name">${res.name}</div>
+            <div class="res-meta"><span class="bdg ${bc}">${r}以上</span><br><span style="font-size:10px;color:#94a3b8">${res.plate||''}</span></div>
+          </div>
+        </div>
+      </td>`;
     }
     for(const dt of dates){
       const ds=fmt(dt),dow=dt.getDay();
+      const holName=HOLIDAYS[ds]||'';
       let cc='ev-cell'+(isMonth?' td-month':'');
-      if(ds===today)cc+=' td-now';else if(dow===0)cc+=' td-sun';else if(dow===6)cc+=' td-sat';
-      const disps=cellDisps(ds,res.id);
-      const cards=disps.map(dp=>cardHTML(dp)).join('');
-      row+=`<td class="${cc}" data-date="${ds}" data-rid="${res.id}"
-        ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-        onclick="cellClick(event,'${ds}','${res.id}')">${cards}</td>`;
+      if(ds===today)cc+=' td-now';
+      else if(holName)cc+=' td-hol';
+      else if(dow===0)cc+=' td-sun';
+      else if(dow===6)cc+=' td-sat';
+      const disps=cellDisps(ds,rid);
+      if(isDay){
+        const sorted=disps.slice().sort((a,b)=>{
+          const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
+          const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
+          return ta<tb2?-1:ta>tb2?1:0;
+        });
+        const parts=sorted.map((dp,i)=>dayCardHTML(dp,i+1));
+        const dayHtml=parts.join('<div class="day-arrow">›</div>');
+        row+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid="${rid}"
+          ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
+          onclick="cellClick(event,'${ds}','${rid}')">
+          <div class="day-cell-wrap">${dayHtml||`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`}</div></td>`;
+      } else {
+        const cards=disps.map(dp=>cardHTML(dp)).join('');
+        row+=`<td class="${cc}" data-date="${ds}" data-rid="${rid}"
+          ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
+          onclick="cellClick(event,'${ds}','${rid}')"><div class="cell-scrl">${cards}</div></td>`;
+      }
     }
     return row+'</tr>';
   }
 
+  // ===== 定期便専用行（カレンダー最上部） =====
   let tb='';
-  if(!resources.length){
-    tb=`<tr><td colspan="${dates.length+1}"><div class="empty">⚙ 設定から${ST.res==='driver'?'ドライバー':'車両'}を追加してください（またはフィルターを解除してください）</div></td></tr>`;
-  } else if(ST.res==='driver'){
-    const grpNames=[...new Set(resources.map(r=>r.group||''))].sort((a,b)=>a?b?a.localeCompare(b,'ja'):-1:1);
-    const multiGrp=grpNames.length>1||(grpNames.length===1&&grpNames[0]!=='');
-    for(const grp of grpNames){
-      const grpRes=resources.filter(r=>(r.group||'')===grp);
-      const label=grp||'班未設定';
-      const collapsed=ST.collapsedGroups.has(label);
-      if(multiGrp){
-        tb+=`<tr class="grp-hdr-row" onclick="toggleGrp('${label}')"><td colspan="${dates.length+1}">${collapsed?'▶':'▼'} ${label} <span style="opacity:.65">(${grpRes.length}名)</span></td></tr>`;
+  {
+    let regRow=`<tr class="reg-fixed-hdr"><td class="res-cell" style="background:#f0fdf4;border-right:2px solid #86efac;position:sticky;left:0;z-index:10">
+      <div style="font-size:11px;font-weight:700;color:#15803d">🔁 定期便</div></td>`;
+    if(isDay){
+      const ds=fmt(dates[0]);
+      const holName=HOLIDAYS[ds]||'';
+      let cc='reg-fixed-cell ev-cell';
+      if(ds===today)cc+=' td-now';
+      else if(holName)cc+=' td-hol';
+      const sorted=regularDispsForDate(ds).slice().sort((a,b)=>{
+        const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
+        const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
+        return ta<tb2?-1:ta>tb2?1:0;
+      });
+      const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1)).join('<div class="day-arrow">›</div>');
+      regRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
+        ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
+        onclick="cellClick(event,'${ds}','')">
+        <div class="day-cell-wrap">${dayHtml||''}</div></td>`;
+    } else {
+      for(const dt of dates){
+        const ds=fmt(dt),dow=dt.getDay();
+        const holName=HOLIDAYS[ds]||'';
+        let cc='reg-fixed-cell ev-cell'+(isMonth?' td-month':'');
+        if(ds===today)cc+=' td-now';
+        else if(holName)cc+=' td-hol';
+        const regCards=regularDispsForDate(ds).map(dp=>cardHTML(dp)).join('');
+        regRow+=`<td class="${cc}" data-date="${ds}" data-rid=""
+          ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
+          onclick="cellClick(event,'${ds}','')"><div class="cell-scrl">${regCards}</div></td>`;
       }
-      if(!collapsed)for(const res of grpRes)tb+=renderResRow(res);
+    }
+    regRow+='</tr>';
+    tb+=regRow;
+  }
+
+  // ===== 持込み専用行（定期便行の下） =====
+  {
+    let carryRow=`<tr class="carry-fixed-hdr"><td class="res-cell" style="background:#eff6ff;border-right:2px solid #93c5fd;position:sticky;left:0;z-index:10">
+      <div style="font-size:11px;font-weight:700;color:#1d4ed8">🏭 持込み</div></td>`;
+    if(isDay){
+      const ds=fmt(dates[0]);
+      const holName=HOLIDAYS[ds]||'';
+      let cc='carry-fixed-cell ev-cell';
+      if(ds===today)cc+=' td-now';
+      else if(holName)cc+=' td-hol';
+      const sorted=carryInDispsForDate(ds).slice().sort((a,b)=>{
+        const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
+        const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
+        return ta<tb2?-1:ta>tb2?1:0;
+      });
+      const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1)).join('<div class="day-arrow">›</div>');
+      carryRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
+        ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
+        onclick="cellClick(event,'${ds}','')">
+        <div class="day-cell-wrap">${dayHtml||''}</div></td>`;
+    } else {
+      for(const dt of dates){
+        const ds=fmt(dt);
+        const holName=HOLIDAYS[ds]||'';
+        let cc='carry-fixed-cell ev-cell'+(isMonth?' td-month':'');
+        if(ds===today)cc+=' td-now';
+        else if(holName)cc+=' td-hol';
+        const carryCards=carryInDispsForDate(ds).map(dp=>cardHTML(dp)).join('');
+        carryRow+=`<td class="${cc}" data-date="${ds}" data-rid=""
+          ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
+          onclick="cellClick(event,'${ds}','')"><div class="cell-scrl">${carryCards}</div></td>`;
+      }
+    }
+    carryRow+='</tr>';
+    tb+=carryRow;
+  }
+
+  if(!resources.length){
+    tb+=`<tr><td colspan="${dates.length+1}"><div class="empty">⚙ 設定から${ST.res==='driver'?'ドライバー':'車両'}を追加してください（またはフィルターを解除してください）</div></td></tr>`;
+  } else if(ST.res==='driver'){
+    // よく使う / あまり使わない の2セクション
+    const freqRes=resources.filter(r=>(r.usageGroup||'frequent')==='frequent');
+    const infreqRes=resources.filter(r=>(r.usageGroup||'frequent')==='infrequent');
+    const cols=dates.length+1;
+    // よく使う section
+    tb+=`<tr class="usage-hdr-row usage-freq"><td colspan="${cols}">⭐ よく使うドライバー（${freqRes.length}名）</td></tr>`;
+    for(const res of freqRes)tb+=renderResRow(res,'driver');
+    // あまり使わない section
+    if(infreqRes.length){
+      tb+=`<tr class="usage-hdr-row usage-infreq" onclick="toggleInfreqSection()"><td colspan="${cols}">${ST.collapsedInfreq?'▶':'▼'} あまり使わないドライバー（${infreqRes.length}名）</td></tr>`;
+      if(!ST.collapsedInfreq)for(const res of infreqRes)tb+=renderResRow(res,'driver');
     }
   } else {
-    for(const res of resources)tb+=renderResRow(res);
+    for(const res of resources)tb+=renderResRow(res,'vehicle');
   }
   document.getElementById('calBody').innerHTML=tb;
   renderPending();
+  initColResize();
 }
 
-function cardHTML(dp){
-  const isUnass=!dp.driver||!dp.vehicle;
-  const cls='ecard '+(isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
+/* ===== ドライバー/車両列 リサイズ ===== */
+let RES_COL_W=parseInt(localStorage.getItem('res_col_w')||'130');
+function applyColW(){
+  const w=RES_COL_W+'px';
+  document.querySelectorAll('.res-hd,.res-cell').forEach(el=>{
+    el.style.minWidth=w;
+    el.style.width=w;
+    el.style.maxWidth=w;
+  });
+}
+function initColResize(){
+  applyColW();
+  const hd=document.querySelector('.res-hd');
+  if(!hd)return;
+  let h=hd.querySelector('.col-resize-handle');
+  if(!h){
+    h=document.createElement('div');
+    h.className='col-resize-handle';
+    h.title='ドラッグで列幅を変更';
+    hd.style.position='sticky'; // ensure relative for absolute child
+    hd.appendChild(h);
+  }
+  h.onmousedown=function(e){
+    e.preventDefault();
+    const startX=e.clientX,startW=RES_COL_W;
+    h.classList.add('dragging');
+    document.body.style.cursor='col-resize';
+    function onMove(e){
+      RES_COL_W=Math.max(80,Math.min(280,startW+e.clientX-startX));
+      applyColW();
+    }
+    function onUp(){
+      h.classList.remove('dragging');
+      document.body.style.cursor='';
+      localStorage.setItem('res_col_w',RES_COL_W);
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+    }
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+  };
+}
+
+function dayCardHTML(dp,seqNo){
+  const isCarryIn=!!dp.isCarryIn;
+  const wdate=workDate(dp)||'';
+  const holName=HOLIDAYS[wdate]||'';
+  const veh=!isCarryIn?(vehName(dp.vehicle)||'未定'):'';
+  const time=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'';
+  const holBadge=holName?`<span class="ec-hol-badge">🎌</span>`:'';
   const statusMark=dp.status==='pending'?'🔴 ':'';
-  const sub=ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`;
+  const today=fmt(new Date());
+  const dlOver=dp.deadline&&dp.deadline<today;
+  const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
+  let cls='ecard ec-day ';
+  if(isCarryIn)cls+='ec-carry';
+  else if(!dp.driver||!dp.vehicle)cls+='ec-pend';
+  else if(dp.isReg)cls+='ec-reg';
+  else cls+='ec-spot';
+  if(holName)cls+=' ec-hol';
+  return`<div class="${cls}" draggable="true" data-did="${dp.id}"
+    ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+    onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
+    onclick="event.stopPropagation();editDisp('${dp.id}')">
+    <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
+    <div class="ec-day-seq">${statusMark}第${seqNo}業務${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div>
+    <div class="ec-day-cust">${custName(dp.customer)}</div>
+    ${!isCarryIn?`<div class="ec-day-veh">🚛 ${veh}</div>`:`<div class="ec-day-veh">🏭 持込み</div>`}
+    ${dp.siteName?`<div class="ec-day-site">📍 ${dp.siteName}</div>`:''}
+    ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:''}
+    ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
+  </div>`;
+}
+function cardHTML(dp){
+  const isCarryIn=!!dp.isCarryIn;
+  const isUnass=!isCarryIn&&(!dp.driver||!dp.vehicle);
+  const wdate=workDate(dp)||'';
+  const holName=HOLIDAYS[wdate]||'';
+  let cls='ecard '+(isCarryIn?'ec-carry':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
+  if(holName)cls+=' ec-hol';
+  const statusMark=dp.status==='pending'?'🔴 ':'';
+  const holBadge=holName?`<span class="ec-hol-badge">🎌 祝</span>`:'';
+  const sub=isCarryIn?'🏭 持込み':(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
   const dlHtml=dp.deadline?`<div class="ec-sub" style="font-size:10px;color:${dlOver?'#dc2626':dlSoon?'#d97706':'#64748b'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:'';
   return`<div class="${cls}" draggable="true" data-did="${dp.id}"
     ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+    onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();editDisp('${dp.id}')">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-    <div class="ec-cust">${statusMark}${custName(dp.customer)}</div>
+    <div class="ec-cust">${statusMark}${custName(dp.customer)}${holBadge}</div>
     <div class="ec-sub">${sub}</div>
+    ${holName?`<div class="ec-sub" style="font-size:9px;color:#dc2626;font-weight:700">🎌 ${holName}</div>`:''}
     ${dlHtml}
     ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.6">${dp.notes}</div>`:''}
   </div>`;
@@ -1005,7 +1691,7 @@ function renderPending(){
         ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
         onclick="editDisp('${dp.id}')">
         <div class="pcrd-name">🔴 ${custName(dp.customer)}</div>
-        <div class="pcrd-info">${dp.date?`📅 ${dp.date}`:'📅 日付未定'}</div>
+        <div class="pcrd-info">${workDate(dp)?`🚛 配車日: ${workDate(dp)}`:'🚛 配車日: 未定'}${dp.date&&dp.date!==workDate(dp)?`<span style="font-size:9px;color:#94a3b8"> (受付: ${dp.date})</span>`:''}</div>
         ${dlHtml}
         <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
       </div>`;}).join('');
@@ -1065,11 +1751,500 @@ function onDrop(e,cell){
 async function confirmDrop(){
   const{date,id,newDriver,newVehicle}=ST.drop;
   const dp=(db.dispatches||[]).find(x=>x.id===id);
-  if(dp){dp.date=date;dp.driver=newDriver;dp.vehicle=newVehicle;dp.status=(dp.driver&&dp.vehicle&&dp.date)?'confirmed':'pending';await save();}
+  if(dp){
+    dp.dispatchDate=date;  // 配車確定日を更新（受付日 dp.date は変えない）
+    dp.driver=newDriver;
+    dp.vehicle=newVehicle;
+    dp.status=(dp.driver&&dp.vehicle&&dp.dispatchDate)?'confirmed':'pending';
+    await save();
+  }
   ST.drag=null;ST.drop=null;closeM('mConfirm');render();
 }
 function cancelDrop(){ST.drag=null;ST.drop=null;closeM('mConfirm');}
 function cellClick(e,date,rid){if(e.target.closest('.ecard'))return;openAddDispatch(date,rid,false);}
+
+// ================================================================
+// ROW DRAG & REORDER
+// ================================================================
+function onRowDragStart(e,id,type){
+  ST.rowDrag={id,type};
+  e.dataTransfer.setData('row-drag',id);
+  e.stopPropagation();
+  setTimeout(()=>{const tr=document.querySelector(`tr[data-res-id="${id}"]`);if(tr)tr.classList.add('row-dragging');},0);
+}
+function onRowOver(e,targetId){
+  if(!ST.rowDrag||ST.rowDrag.id===targetId)return;
+  e.preventDefault();e.stopPropagation();
+  document.querySelectorAll('tr.row-drag-over').forEach(el=>el.classList.remove('row-drag-over'));
+  const tr=document.querySelector(`tr[data-res-id="${targetId}"]`);if(tr)tr.classList.add('row-drag-over');
+}
+function onRowLeave(e){
+  if(!ST.rowDrag)return;
+  const tr=e.currentTarget;tr.classList.remove('row-drag-over');
+}
+async function onRowDrop(e,targetId,type){
+  e.preventDefault();e.stopPropagation();
+  document.querySelectorAll('tr.row-drag-over,tr.row-dragging').forEach(el=>el.classList.remove('row-drag-over','row-dragging'));
+  if(!ST.rowDrag||ST.rowDrag.id===targetId){ST.rowDrag=null;return;}
+  const resources=type==='driver'?[...db.drivers]:[...db.vehicles];
+  const ordered=getOrderedResources(resources,type);
+  const ids=ordered.map(r=>r.id);
+  const fromIdx=ids.indexOf(ST.rowDrag.id);
+  const toIdx=ids.indexOf(targetId);
+  if(fromIdx!==-1&&toIdx!==-1){ids.splice(fromIdx,1);ids.splice(toIdx,0,ST.rowDrag.id);}
+  if(type==='driver')db.driverOrder=ids;else db.vehicleOrder=ids;
+  ST.rowDrag=null;
+  await save();render();
+}
+function onRowDragEnd(e){
+  document.querySelectorAll('tr.row-drag-over,tr.row-dragging').forEach(el=>el.classList.remove('row-drag-over','row-dragging'));
+  ST.rowDrag=null;
+}
+// ================================================================
+// COLLECTION SITE MASTER（収集先テンプレート）
+// ================================================================
+// 収集先ドロップダウン（選択中のお客様でフィルタリング）
+function fillSiteSel(){
+  const sel=document.getElementById('dSiteSelect');
+  if(!sel)return;
+  const custId=document.getElementById('dCust')?.value||'';
+  const allSites=db.sites||[];
+  // お客様が選択されていれば「そのお客様専用」＋「共通（customerId未設定）」を表示
+  // 選択なしなら全件表示
+  let filtered=allSites;
+  if(custId){
+    filtered=allSites.filter(s=>!s.customerId||s.customerId===custId);
+  }
+  const hasCustSites=custId&&filtered.some(s=>s.customerId===custId);
+  let html='<option value="">🔍 登録済み収集先から選択して自動入力...</option>';
+  if(hasCustSites){
+    const custSites=filtered.filter(s=>s.customerId===custId);
+    const sharedSites=filtered.filter(s=>!s.customerId);
+    html+='<optgroup label="── このお客様の収集先 ──">'+
+      custSites.map(s=>`<option value="${s.id}">📍 ${s.name}${s.addr?' ('+s.addr+')':''}</option>`).join('')+'</optgroup>';
+    if(sharedSites.length){
+      html+='<optgroup label="── 共通収集先 ──">'+
+        sharedSites.map(s=>`<option value="${s.id}">${s.name}${s.addr?' ('+s.addr+')':''}</option>`).join('')+'</optgroup>';
+    }
+  } else {
+    html+=filtered.map(s=>`<option value="${s.id}">${s.name}${s.addr?' ('+s.addr+')':''}</option>`).join('');
+  }
+  sel.innerHTML=html;
+}
+// ===== 担当者サジェスト =====
+function showContactSuggest(input,phoneId,type){
+  const q=(input.value||'').toLowerCase();
+  const custId=document.getElementById('dCust').value;
+  let items=[];
+  if(type==='customer'&&custId){
+    const cust=(db.customers||[]).find(c=>c.id===custId);
+    if(cust&&cust.contact)items.push({name:cust.contact,phone:cust.phone||'',src:'master'});
+    const seen=new Set();
+    if(cust&&cust.contact)seen.add(cust.contact.toLowerCase());
+    (db.dispatches||[]).filter(dp=>dp.customer===custId&&dp.custContact).forEach(dp=>{
+      const k=dp.custContact.toLowerCase();
+      if(!seen.has(k)){seen.add(k);items.push({name:dp.custContact,phone:dp.custPhone||'',src:'history'});}
+    });
+  }else if(type==='site'){
+    const siteName=document.getElementById('dSiteName').value;
+    const siteId=document.getElementById('dSiteSelect').value;
+    if(siteId){
+      const site=(db.sites||[]).find(s=>s.id===siteId);
+      if(site&&site.contact)items.push({name:site.contact,phone:site.phone||'',src:'master'});
+    }
+    const seen=new Set();
+    items.forEach(i=>seen.add(i.name.toLowerCase()));
+    (db.dispatches||[]).filter(dp=>dp.siteContact&&siteName&&dp.siteName===siteName).forEach(dp=>{
+      const k=dp.siteContact.toLowerCase();
+      if(!seen.has(k)){seen.add(k);items.push({name:dp.siteContact,phone:dp.sitePhone||'',src:'history'});}
+    });
+  }
+  if(q)items=items.filter(i=>i.name.toLowerCase().includes(q));
+  const csug=document.getElementById('contactSuggest');
+  if(!items.length){csug.classList.add('hid');return;}
+  const rect=input.getBoundingClientRect();
+  csug.style.left=rect.left+'px';
+  csug.style.top=(rect.bottom+3)+'px';
+  csug.style.width=Math.max(rect.width,220)+'px';
+  csug.innerHTML=items.map(i=>`<div class="csug-item" onmousedown="selectContactSug('${input.id}','${phoneId}',${JSON.stringify(i.name)},${JSON.stringify(i.phone)})">
+    <div class="csug-name">${i.src==='master'?'⭐ ':'📋 '}${i.name}<span class="csug-badge">${i.src==='master'?'マスター':'履歴'}</span></div>
+    ${i.phone?`<div class="csug-phone">📞 ${i.phone}</div>`:''}
+  </div>`).join('');
+  csug.classList.remove('hid');
+}
+function selectContactSug(inputId,phoneId,name,phone){
+  document.getElementById(inputId).value=name;
+  document.getElementById(phoneId).value=phone;
+  document.getElementById('contactSuggest').classList.add('hid');
+}
+function hideContactSuggest(){
+  setTimeout(()=>{const el=document.getElementById('contactSuggest');if(el)el.classList.add('hid');},160);
+}
+
+function onCustChange(){
+  // お客様が変わったら収集先を絞り込み＆T-PlannerCDを表示
+  fillSiteSel();
+  document.getElementById('dSiteSelect').value='';
+  const custId=document.getElementById('dCust').value;
+  const c=(db.customers||[]).find(x=>x.id===custId);
+  const tpcdEl=document.getElementById('dTpcdVal');
+  if(tpcdEl){
+    tpcdEl.textContent=c?.tpcd||'';
+    tpcdEl.closest('#dTpcdDisp').style.color=c?.tpcd?'#1e293b':'#94a3b8';
+  }
+}
+function onSiteSelect(){
+  const id=document.getElementById('dSiteSelect').value;
+  if(!id)return;
+  const s=(db.sites||[]).find(x=>x.id===id);if(!s)return;
+  document.getElementById('dSiteName').value=s.name||'';
+  document.getElementById('dSiteContact').value=s.contact||'';
+  document.getElementById('dSitePhone').value=s.phone||'';
+  document.getElementById('dSiteAddr').value=s.addr||'';
+  if(s.caution)document.getElementById('dCaution').value=s.caution;
+}
+async function saveSiteTemplate(){
+  const name=document.getElementById('dSiteName').value.trim();
+  if(!name){alert('収集先名称を入力してください');return;}
+  const custId=document.getElementById('dCust').value||'';
+  const contact=document.getElementById('dSiteContact').value.trim();
+  const phone=document.getElementById('dSitePhone').value.trim();
+  const addr=document.getElementById('dSiteAddr').value.trim();
+  const caution=document.getElementById('dCaution').value.trim();
+  if(!db.sites)db.sites=[];
+  // 同名 & 同お客様で既存チェック
+  const existing=db.sites.find(s=>s.name===name&&(s.customerId||'')===(custId||''));
+  if(existing){
+    Object.assign(existing,{contact,phone,addr,caution,customerId:custId});
+    alert(`✅「${name}」の情報を更新しました`);
+  } else {
+    db.sites.push({id:uid(),name,contact,phone,addr,caution,customerId:custId});
+    alert(`✅「${name}」を収集先テンプレートに登録しました`);
+  }
+  await save();fillSiteSel();
+}
+
+// ================================================================
+// MANIFEST
+// ================================================================
+function onMfstChange(){
+  const needed=document.querySelector('input[name="mfstNeeded"]:checked')?.value||'no';
+  const type=document.querySelector('input[name="mfstType"]:checked')?.value||'paper';
+  const needsDoc=['yes','bring','receive'].includes(needed);
+  document.getElementById('mfstTypeRow').classList.toggle('hid',!needsDoc);
+  document.getElementById('mfstSysRow').classList.toggle('hid',!(needsDoc&&type==='electronic'));
+}
+function setMfst(m){
+  const needed=m.needed||'no';
+  const type=m.type||'paper';
+  const sys=m.sys||'jwnet';
+  const nr=document.querySelector(`input[name="mfstNeeded"][value="${needed}"]`);
+  if(nr)nr.checked=true;
+  const tr=document.querySelector(`input[name="mfstType"][value="${type}"]`);
+  if(tr)tr.checked=true;
+  const sr=document.querySelector(`input[name="mfstSys"][value="${sys}"]`);
+  if(sr)sr.checked=true;
+  onMfstChange();
+}
+function getMfst(){
+  return{
+    needed:document.querySelector('input[name="mfstNeeded"]:checked')?.value||'no',
+    type:document.querySelector('input[name="mfstType"]:checked')?.value||'paper',
+    sys:document.querySelector('input[name="mfstSys"]:checked')?.value||'jwnet'
+  };
+}
+function mfstLabel(m){
+  if(!m)return'不要';
+  const nl={yes:'要',no:'不要',bring:'持参',receive:'受領'};
+  const tl={paper:'紙',electronic:'電子'};
+  const sl={jwnet:'JWNET',ereverse:'イーリバース'};
+  let s=nl[m.needed]||'不要';
+  if(['yes','bring','receive'].includes(m.needed)){
+    s+=' ／ '+(tl[m.type]||'紙');
+    if(m.type==='electronic')s+=' （'+(sl[m.sys]||'JWNET')+'）';
+  }
+  return s;
+}
+function onWkTypeChange(){
+  const v=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
+  document.getElementById('containerOpts').style.display=v==='container'?'block':'none';
+}
+function workTypeLabel(wt){
+  if(!wt||!wt.type)return '';
+  if(wt.type==='manual')return '🖐 手積み';
+  if(wt.type==='container'){
+    const opMap={set:'設置',swap:'交換',remove:'撤去'};
+    const szMap={'1.5box':'1.5BOX（クレーン対応）','2t':'2tコンテナ','4t':'4tコンテナ','large':'大型コンテナ'};
+    const parts=[];
+    if(wt.containerOp)parts.push(opMap[wt.containerOp]);
+    if(wt.containerSize)parts.push(szMap[wt.containerSize]);
+    return '🗃 コンテナ：'+parts.join(' / ');
+  }
+  return '';
+}
+
+// ================================================================
+// HOVER POPUP
+// ================================================================
+function showDispPopup(e,id){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
+  const cu=db.customers.find(x=>x.id===dp.customer);
+  const dr=db.drivers.find(x=>x.id===dp.driver);
+  const ve=db.vehicles.find(x=>x.id===dp.vehicle);
+  const DOW2=['日','月','火','水','木','金','土'];
+  const wDate=dp.dispatchDate||dp.date;
+  const dispDateStr=wDate?(()=>{const d=pd(wDate);return`${wDate}（${DOW2[d.getDay()]}）`;})():'未定';
+  const rcvDateStr=dp.date||'—';
+  const statusStr=dp.status==='confirmed'?'✅ 確定':'🔴 保留中';
+  let rows=`<div class="pop-title">${cu?cu.name:'（お客様未設定）'}</div>`;
+  rows+=`<div class="pop-row"><span class="pop-label" style="color:#1e40af;font-weight:800">配車確定日</span><span class="pop-val" style="color:#1e40af;font-weight:700">${dispDateStr}</span></div>`;
+  rows+=`<div class="pop-row"><span class="pop-label">受付日</span><span class="pop-val" style="font-size:10px;color:#94a3b8">${rcvDateStr}</span></div>`;
+  if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">期限</span><span class="pop-val">${dp.deadline}</span></div>`;
+  rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
+  if(dp.workType&&dp.workType.type)rows+=`<div class="pop-row"><span class="pop-label" style="color:#6d28d9;font-weight:800">作業種別</span><span class="pop-val" style="font-weight:700;color:#6d28d9">${workTypeLabel(dp.workType)}</span></div>`;
+  if(dp.custContact)rows+=`<div class="pop-row"><span class="pop-label">お客様担当</span><span class="pop-val">${dp.custContact}</span></div>`;
+  rows+=`<div class="pop-row"><span class="pop-label">ドライバー</span><span class="pop-val">${dr?dr.name:'未定'}</span></div>`;
+  rows+=`<div class="pop-row"><span class="pop-label">車両</span><span class="pop-val">${ve?ve.name:'未定'}${ve&&ve.plate?` (${ve.plate})`:''}</span></div>`;
+  if(dp.siteName||dp.siteAddr){
+    rows+=`<div class="pop-section"><div class="pop-sec-title">📍 収集先</div>`;
+    if(dp.siteName)rows+=`<div class="pop-row"><span class="pop-label">名称</span><span class="pop-val">${dp.siteName}</span></div>`;
+    if(dp.siteContact)rows+=`<div class="pop-row"><span class="pop-label">担当者</span><span class="pop-val">${dp.siteContact}</span></div>`;
+    if(dp.siteAddr)rows+=`<div class="pop-row"><span class="pop-label">住所</span><span class="pop-val">${dp.siteAddr}</span></div>`;
+    rows+=`</div>`;
+  }
+  if(dp.manifest&&dp.manifest.needed!=='no'){
+    rows+=`<div class="pop-row" style="margin-top:4px"><span class="pop-label">マニフェスト</span><span class="pop-val">${mfstLabel(dp.manifest)}</span></div>`;
+  }
+  if(dp.notes){rows+=`<div class="pop-section"><div class="pop-sec-title">📝 備考</div><div style="color:#475569;white-space:pre-wrap">${dp.notes}</div></div>`;}
+  if(dp.caution){rows+=`<div class="pop-section" style="background:#fffbeb;border-radius:6px;padding:6px 8px;margin-top:6px"><div class="pop-sec-title" style="color:#b45309">⚠ 注意事項</div><div style="color:#92400e;white-space:pre-wrap">${dp.caution}</div></div>`;}
+  if(dp.receptionist)rows+=`<div class="pop-row" style="margin-top:4px"><span class="pop-label">受付担当</span><span class="pop-val">${dp.receptionist}</span></div>`;
+  const popup=document.getElementById('dispPopup');
+  popup.innerHTML=rows;
+  const rect=e.currentTarget.getBoundingClientRect();
+  let left=rect.right+10,top=rect.top;
+  if(left+340>window.innerWidth)left=rect.left-340-10;
+  if(top+popup.offsetHeight+20>window.innerHeight)top=Math.max(8,window.innerHeight-popup.offsetHeight-20);
+  popup.style.left=left+'px';popup.style.top=Math.max(8,top)+'px';
+  popup.classList.add('visible');
+}
+function hideDispPopup(){document.getElementById('dispPopup').classList.remove('visible');}
+
+// ================================================================
+// PRINT WORK ORDER（作業指示書）
+// ================================================================
+function printWorkOrder(id,mode){
+  if(!id){alert('保存後に印刷できます');return;}
+  const dp=(db.dispatches||[]).find(x=>x.id===id);
+  if(!dp){alert('データが見つかりません');return;}
+  const printMode=mode||'collect'; // 'collect' | 'customer' | 'both'
+  const dr=db.drivers.find(x=>x.id===dp.driver);
+  const ve=db.vehicles.find(x=>x.id===dp.vehicle);
+  const cu=db.customers.find(x=>x.id===dp.customer);
+  const DOW_JP2=['日','月','火','水','木','金','土'];
+  const dateStr=dp.date?(()=>{const d=pd(dp.date);return`${dp.date}（${DOW_JP2[d.getDay()]}）`;})():'未定';
+  const dispDate=dp.dispatchDate||dp.date;
+  const dispDateStr=dispDate?(()=>{const d=pd(dispDate);return`${dispDate}（${DOW_JP2[d.getDay()]}）`;})():'未定';
+  const dlStr=dp.deadline||'—';
+  const statusStr=dp.status==='confirmed'?'✅ 確定':'🔴 保留中';
+  const typeStr=dp.isReg?'定期便':'スポット（単発）';
+  // 作業条件テキスト生成
+  const condItems=[];
+  if(dp.timeSpec&&dp.timeSpec.enabled)condItems.push(`🕐 時間指定：${dp.timeSpec.time||'—'}`);
+  if(dp.assistant&&dp.assistant.enabled)condItems.push(`👷 作業助手：${dp.assistant.count||1}名`);
+  if(dp.measurement)condItems.push('⚖ 計量：要');
+  const condStr=condItems.length?condItems.join('　／　'):'なし';
+
+  // 1ページ分のHTML生成関数
+  function buildPage(title,isCustomer){
+    const custSec=`<div class="section">
+  <div class="sec-hdr">🏢 お客様情報</div>
+  <div class="sec-body">
+    <div class="row2">
+      <div class="field"><div class="field-label">お客様名</div><div class="field-val big">${cu?cu.name:'—'}</div></div>
+      <div class="field"><div class="field-label">お客様 担当者名</div><div class="field-val big">${dp.custContact||'—'}${dp.custPhone?`<span style="font-size:10px;font-weight:400;color:#475569;margin-left:6px">📞 ${dp.custPhone}</span>`:''}</div></div>
+    </div>
+    ${cu&&cu.addr?`<div class="field"><div class="field-label">住所</div><div class="field-val">${cu.addr}</div></div>`:''}
+    ${cu&&cu.contact?`<div class="field"><div class="field-label">会社連絡先</div><div class="field-val">${cu.contact}</div></div>`:''}
+  </div>
+</div>`;
+    const siteSec=(dp.siteName||dp.siteAddr||dp.siteContact)?`<div class="section">
+  <div class="sec-hdr">📍 収集先情報</div>
+  <div class="sec-body">
+    <div class="row2">
+      <div class="field"><div class="field-label">収集先 名称</div><div class="field-val big">${dp.siteName||'—'}</div></div>
+      <div class="field"><div class="field-label">収集先 担当者名</div><div class="field-val big">${dp.siteContact||'—'}${dp.sitePhone?`<span style="font-size:10px;font-weight:400;color:#475569;margin-left:6px">📞 ${dp.sitePhone}</span>`:''}</div></div>
+    </div>
+    ${dp.siteAddr?`<div class="field"><div class="field-label">収集先 住所</div><div class="field-val">${dp.siteAddr}</div></div>`:''}
+  </div>
+</div>`:'';
+    const drvSec=`<div class="section">
+  <div class="sec-hdr">🚛 配車情報</div>
+  <div class="sec-body row2">
+    <div class="field"><div class="field-label">ドライバー</div><div class="field-val big">${dr?dr.name:'未定'}</div></div>
+    <div class="field"><div class="field-label">使用車両</div>
+      <div class="field-val big">${ve?ve.name:'未定'}${ve&&ve.plate?`<span style="font-size:10px;font-weight:400;color:#64748b;margin-left:6px">${ve.plate}</span>`:''}</div>
+      ${ve&&ve.type?`<div style="font-size:9px;color:#64748b;margin-top:1px">${ve.type}</div>`:''}
+    </div>
+  </div>
+</div>`;
+    // 収集内容：手書き記入用の固定フォーム（印刷専用）
+    const collectSec=`<div class="section">
+  <div class="sec-hdr">📦 収集内容　― ドライバー記入欄</div>
+  <div class="sec-body" style="padding:0">
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <tr style="background:#fef3c7">
+        <th style="text-align:left;padding:3px 8px;border:1px solid #fde68a;font-size:9px;color:#92400e;font-weight:700;width:90px">産廃品目</th>
+        <th style="padding:3px 8px;border:1px solid #fde68a;text-align:center;font-size:9px;color:#92400e;font-weight:700;width:85px">m³</th>
+        <th style="padding:3px 8px;border:1px solid #fde68a;text-align:center;font-size:9px;color:#92400e;font-weight:700;width:85px">kg</th>
+      </tr>
+      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">廃プラ</td><td style="border:1px solid #e2e8f0;background:#fffdf0;min-height:20px;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">金属くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">木くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">紙くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">ガラス陶磁器</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">石膏ボード</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
+      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">がれき類</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
+      <tr style="background:#f0fdf4">
+        <td style="padding:5px 8px;border:2px solid #86efac;font-weight:800;color:#15803d;font-size:10px">合　計</td>
+        <td style="border:2px solid #86efac;background:#f0fdf4;padding:5px 8px"></td>
+        <td style="border:2px solid #86efac;background:#f0fdf4;padding:5px 8px"></td>
+      </tr>
+    </table>
+    <div style="background:#e0f2fe;border:1px solid #7dd3fc;border-top:none;padding:5px 8px">
+      <div style="font-size:9px;font-weight:700;color:#0369a1;margin-bottom:4px">家電・特定品目</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:10px">
+        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">TV</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
+        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">冷蔵庫</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
+        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">洗濯機</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
+        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">AC</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
+        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">タイヤ</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 本</span></div>
+        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">蛍光灯</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 本</span></div>
+      </div>
+    </div>
+  </div>
+</div>`;
+    const condSec=`<div class="section">
+  <div class="sec-hdr">⚙ 作業条件　＆　📋 マニフェスト</div>
+  <div class="sec-body row2">
+    <div class="field"><div class="field-label">作業条件</div><div class="field-val" style="font-size:10px">${condStr}</div></div>
+    <div class="field"><div class="field-label">マニフェスト</div><div class="field-val" style="font-weight:700">${mfstLabel(dp.manifest)}</div></div>
+  </div>
+</div>`;
+    const notesSec=`<div class="section">
+  <div class="sec-hdr">📝 作業内容・備考</div>
+  <div class="sec-body"><div class="notes-box">${dp.notes||'（記載なし）'}</div></div>
+</div>`;
+    const cautionSec=(!isCustomer&&dp.caution)?`<div class="section" style="border-color:#fde68a">
+  <div class="sec-hdr" style="background:#fffbeb;color:#92400e">⚠ 注意事項</div>
+  <div class="sec-body"><div class="notes-box warn">${dp.caution}</div></div>
+</div>`:'';
+    const signSec=`<div class="sign-row">
+  <div class="sign-box"><div class="sign-label">${isCustomer?'受取確認':'確認（管理者）'}</div></div>
+  <div class="sign-box"><div class="sign-label">ドライバー確認</div></div>
+  <div class="sign-box"><div class="sign-label">${isCustomer?'担当者サイン':'完了確認'}</div></div>
+</div>`;
+    return`<div class="page-wrap" id="${isCustomer?'wrap2':'wrap1'}">
+<div class="header">
+  <div>
+    <div class="company">廃棄物収集・運搬</div>
+    <div class="title">${title}</div>
+  </div>
+  <div class="doc-no">
+    <div>No. ${dp.id.slice(-6).toUpperCase()}</div>
+    <div>発行日: ${fmt(new Date())}</div>
+    <div style="margin-top:4px"><span class="status-badge">${statusStr}</span></div>
+  </div>
+</div>
+<div class="meta-row">
+  <div class="meta-item"><span class="meta-label" style="color:#1e40af;font-weight:800">🚛 配車確定日:</span><span class="meta-val" style="color:#1e40af;font-weight:800;font-size:11px">${dispDateStr}</span></div>
+  <div class="meta-item"><span class="meta-label">受付日:</span><span class="meta-val" style="font-size:9px;color:#64748b">${dateStr}</span></div>
+  <div class="meta-item"><span class="meta-label">期限:</span><span class="meta-val" style="color:${dp.deadline&&dp.deadline<fmt(new Date())?'#dc2626':'#1e293b'}">${dlStr}</span></div>
+  <div class="meta-item"><span class="meta-label">種別:</span><span class="meta-val">${typeStr}</span></div>
+  ${dp.receptionist&&!isCustomer?`<div class="meta-item"><span class="meta-label">受付担当:</span><span class="meta-val">${dp.receptionist}</span></div>`:''}
+</div>
+${dp.workType&&dp.workType.type?`<div style="background:#ede9fe;border:1px solid #ddd6fe;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10px;font-weight:700;color:#6d28d9">🔧 作業種別：${workTypeLabel(dp.workType)}</div>`:''}
+${custSec}${siteSec}${drvSec}${collectSec}${condSec}${notesSec}${cautionSec}${signSec}
+<div class="footer">
+  <span>廃棄物収集・運搬 配車管理システム　${isCustomer?'【お客様控え】':'【収集用】'}</span>
+  <span>印刷日時: ${new Date().toLocaleString('ja-JP')}</span>
+</div>
+</div>`;
+  }
+
+  let bodyContent='';
+  if(printMode==='collect') bodyContent=buildPage('作業指示書（収集用）',false);
+  else if(printMode==='customer') bodyContent=buildPage('作業指示書（お客様控え）',true);
+  else bodyContent=buildPage('作業指示書（収集用）',false)+`<div style="page-break-after:always"></div>`+buildPage('作業指示書（お客様控え）',true);
+
+  const w=window.open('','_blank','width=860,height=1200');
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>作業指示書</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff}
+body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:11px;color:#1e293b}
+.page-wrap{width:680px;padding:8mm 10mm 5mm;background:#fff;margin:0 auto}
+.header{border-bottom:2px solid #1e3a5f;padding-bottom:7px;margin-bottom:10px;display:flex;align-items:flex-end;justify-content:space-between}
+.company{font-size:9px;color:#64748b}
+.title{font-size:17px;font-weight:900;color:#1e3a5f;letter-spacing:.06em}
+.doc-no{font-size:9px;color:#94a3b8;text-align:right;line-height:1.7}
+.status-badge{display:inline-block;padding:1px 8px;border-radius:3px;font-size:9px;font-weight:700;background:${dp.status==='confirmed'?'#dcfce7':'#fee2e2'};color:${dp.status==='confirmed'?'#15803d':'#dc2626'}}
+.meta-row{display:flex;gap:12px;margin-bottom:7px;font-size:10px;flex-wrap:wrap;background:#f8fafc;padding:4px 8px;border-radius:4px}
+.meta-item{display:flex;gap:4px;align-items:center}
+.meta-label{color:#94a3b8;white-space:nowrap}
+.meta-val{font-weight:700;color:#1e293b}
+.section{border:1px solid #e2e8f0;border-radius:5px;margin-bottom:6px;overflow:hidden}
+.sec-hdr{background:#f1f5f9;padding:3px 10px;font-size:9px;font-weight:700;color:#475569;letter-spacing:.04em;border-bottom:1px solid #e2e8f0}
+.sec-body{padding:5px 10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.field{margin-bottom:4px}.field:last-child{margin-bottom:0}
+.field-label{font-size:8px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
+.field-val{font-size:11px;font-weight:600;color:#1e293b;padding:2px 0;border-bottom:1px solid #f1f5f9;min-height:17px}
+.field-val.big{font-size:13px;font-weight:800;color:#1e3a5f}
+.notes-box{background:#fafaf8;border:1px solid #e2e8f0;border-radius:4px;padding:5px 8px;font-size:10px;line-height:1.6;min-height:32px;white-space:pre-wrap;color:#334155}
+.notes-box.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+.sign-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:7px}
+.sign-box{border:1px solid #e2e8f0;border-radius:4px;padding:4px 8px;text-align:center;min-height:72px}
+.sign-label{font-size:8px;color:#94a3b8;font-weight:700;margin-bottom:3px}
+.footer{margin-top:5px;border-top:1px solid #f1f5f9;padding-top:3px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  html,body{background:#fff}
+  .page-wrap{width:100%;padding:7mm 10mm 4mm}
+}
+</style></head><body>${bodyContent}
+<script>
+window.onload=function(){
+  var pages=document.querySelectorAll('.page-wrap');
+  var maxH=1060;
+  var minZ=1;
+  pages.forEach(function(p){
+    var h=p.scrollHeight;
+    if(h>maxH) minZ=Math.min(minZ,maxH/h);
+  });
+  pages.forEach(function(p){
+    if(minZ<1){
+      var s=document.createElement('style');
+      s.textContent='@media print{#'+p.id+'{zoom:'+minZ+'}}';
+      document.head.appendChild(s);
+      p.style.transform='scale('+minZ+')';
+      p.style.transformOrigin='top center';
+      p.style.width=(680/minZ)+'px';
+    }
+  });
+  setTimeout(function(){window.print();},400);
+};
+<\/script>
+</body></html>`);
+  w.document.close();
+}
+
+async function toggleUsageGroup(driverId){
+  const d=db.drivers.find(x=>x.id===driverId);if(!d)return;
+  d.usageGroup=(d.usageGroup||'frequent')==='infrequent'?'frequent':'infrequent';
+  await save();render();
+}
+function toggleInfreqSection(){ST.collapsedInfreq=!ST.collapsedInfreq;render();}
 
 // ================================================================
 // DISPATCH MODAL
@@ -1079,6 +2254,15 @@ function fillDSel(){
   document.getElementById('dDriver').innerHTML='<option value="">-- 未定 --</option>'+(db.drivers||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
   document.getElementById('dVehicle').innerHTML='<option value="">-- 未定 --</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}">${v.name}（${v.req}以上）</option>`).join('');
 }
+function syncMPTrigger(selId){
+  const sel=document.getElementById(selId);if(!sel)return;
+  const opt=sel.options[sel.selectedIndex];
+  const map={dCust:'dCustTxt',dDriver:'dDriverTxt',dVehicle:'dVehicleTxt'};
+  const txtEl=document.getElementById(map[selId]);if(!txtEl)return;
+  if(opt&&opt.value){txtEl.textContent=opt.text;txtEl.classList.add('filled');}
+  else{txtEl.textContent=opt?opt.text:'-- 選択 --';txtEl.classList.remove('filled');}
+}
+function syncAllMPTriggers(){['dCust','dDriver','dVehicle'].forEach(syncMPTrigger);}
 function updateDeadlineWarn(){
   const date=document.getElementById('dDate').value;
   const dl=document.getElementById('dDeadline').value;
@@ -1091,18 +2275,44 @@ function openAddDispatch(date,rid,pending){
   ST.editId=null;fillDSel();
   document.getElementById('mDTitle').textContent='配車追加';
   document.getElementById('dCust').value='';
-  document.getElementById('dDate').value=date||fmt(new Date());
+  document.getElementById('dDate').value=fmt(new Date()); // 受付日は常に今日
+  document.getElementById('dDispatchDate').value=date||'';  // 配車確定日はセルクリック日（未定なら空）
   document.getElementById('dDeadline').value='';
   document.getElementById('dType').value='spot';
   document.getElementById('dStatus').value=pending?'pending':'confirmed';
   document.getElementById('dDriver').value='';
   document.getElementById('dVehicle').value='';
   document.getElementById('dNotes').value='';
+  document.getElementById('dCaution').value='';
   document.getElementById('dReceptionist').value='';
+  document.getElementById('dCustContact').value='';
+  document.getElementById('dCustPhone').value='';
+  document.getElementById('dSiteName').value='';
+  document.getElementById('dSiteContact').value='';
+  document.getElementById('dSitePhone').value='';
+  document.getElementById('dSiteAddr').value='';
+  document.getElementById('dTimeEnabled').checked=false;
+  document.getElementById('dTimeVal').value='';
+  document.getElementById('dTimeInput').style.display='none';
+  document.getElementById('dAssistEnabled').checked=false;
+  document.getElementById('dAssistCount').value=1;
+  document.getElementById('dAssistInput').style.display='none';
+  document.getElementById('dMeasure').checked=false;
+  document.getElementById('dCarryIn').checked=false;
+  onCarryInChange();
+  document.querySelectorAll('input[name="wkType"]').forEach(r=>{r.checked=r.value==='';});
+  document.querySelector('input[name="wkContainerOp"][value="set"]').checked=true;
+  document.querySelector('input[name="wkContainerSize"][value="1.5box"]').checked=true;
+  onWkTypeChange();
+  setMfst({needed:'no',type:'paper',sys:'jwnet'});
+  fillSiteSel();
+  document.getElementById('dSiteSelect').value='';
   document.getElementById('dDelBtn').classList.add('hid');
+  document.getElementById('dPrintBtn').classList.add('hid');
   document.getElementById('licWarn').classList.remove('show');
   document.getElementById('deadlineWarn').textContent='';
   if(rid){if(ST.res==='driver')document.getElementById('dDriver').value=rid;else document.getElementById('dVehicle').value=rid;}
+  syncAllMPTriggers();
   openM('mDispatch');
 }
 function editDisp(id){
@@ -1111,36 +2321,87 @@ function editDisp(id){
   document.getElementById('mDTitle').textContent='配車編集';
   document.getElementById('dCust').value=dp.customer||'';
   document.getElementById('dDate').value=dp.date||'';
+  document.getElementById('dDispatchDate').value=dp.dispatchDate||dp.date||''; // 旧データはdateを配車確定日として使用
   document.getElementById('dDeadline').value=dp.deadline||'';
   document.getElementById('dType').value=dp.isReg?'regular':'spot';
   document.getElementById('dStatus').value=dp.status||'pending';
   document.getElementById('dDriver').value=dp.driver||'';
   document.getElementById('dVehicle').value=dp.vehicle||'';
   document.getElementById('dNotes').value=dp.notes||'';
+  document.getElementById('dCaution').value=dp.caution||'';
   document.getElementById('dReceptionist').value=dp.receptionist||'';
+  document.getElementById('dCustContact').value=dp.custContact||'';
+  document.getElementById('dCustPhone').value=dp.custPhone||'';
+  document.getElementById('dSiteName').value=dp.siteName||'';
+  document.getElementById('dSiteContact').value=dp.siteContact||'';
+  document.getElementById('dSitePhone').value=dp.sitePhone||'';
+  document.getElementById('dSiteAddr').value=dp.siteAddr||'';
+  const ts=dp.timeSpec||{};
+  document.getElementById('dTimeEnabled').checked=!!ts.enabled;
+  document.getElementById('dTimeVal').value=ts.time||'';
+  document.getElementById('dTimeInput').style.display=ts.enabled?'flex':'none';
+  const as=dp.assistant||{};
+  document.getElementById('dAssistEnabled').checked=!!as.enabled;
+  document.getElementById('dAssistCount').value=as.count||1;
+  document.getElementById('dAssistInput').style.display=as.enabled?'flex':'none';
+  document.getElementById('dMeasure').checked=!!dp.measurement;
+  document.getElementById('dCarryIn').checked=!!dp.isCarryIn;
+  onCarryInChange();
+  const wt=dp.workType||{};
+  document.querySelectorAll('input[name="wkType"]').forEach(r=>{r.checked=r.value===(wt.type||'');});
+  const coEl=document.querySelector('input[name="wkContainerOp"][value="'+(wt.containerOp||'set')+'"]');
+  if(coEl)coEl.checked=true;
+  const csEl=document.querySelector('input[name="wkContainerSize"][value="'+(wt.containerSize||'1.5box')+'"]');
+  if(csEl)csEl.checked=true;
+  onWkTypeChange();
+  setMfst(dp.manifest||{needed:'no',type:'paper',sys:'jwnet'});
+  fillSiteSel();
+  document.getElementById('dSiteSelect').value='';
   document.getElementById('dDelBtn').classList.remove('hid');
+  document.getElementById('dPrintBtn').classList.remove('hid');
   document.getElementById('licWarn').classList.remove('show');
   updateDeadlineWarn();
+  syncAllMPTriggers();
+  onCustChange(); // T-PlannerCD表示 & 収集先絞り込み
   openM('mDispatch');
 }
 async function saveDispatch(){
   const cust=document.getElementById('dCust').value;
   if(!cust){alert('お客様を選択してください');return;}
   const date=document.getElementById('dDate').value||null;
+  const dispatchDate=document.getElementById('dDispatchDate').value||null;
   const deadline=document.getElementById('dDeadline').value||null;
   const isReg=document.getElementById('dType').value==='regular';
+  const isCarryIn=document.getElementById('dCarryIn').checked;
   const status=document.getElementById('dStatus').value;
-  const driver=document.getElementById('dDriver').value||null;
-  const vehicle=document.getElementById('dVehicle').value||null;
+  const driver=isCarryIn?null:document.getElementById('dDriver').value||null;
+  const vehicle=isCarryIn?null:document.getElementById('dVehicle').value||null;
   const notes=document.getElementById('dNotes').value.trim();
+  const caution=document.getElementById('dCaution').value.trim();
   const receptionist=document.getElementById('dReceptionist').value.trim();
+  const custContact=document.getElementById('dCustContact').value.trim();
+  const custPhone=document.getElementById('dCustPhone').value.trim();
+  const siteName=document.getElementById('dSiteName').value.trim();
+  const siteContact=document.getElementById('dSiteContact').value.trim();
+  const sitePhone=document.getElementById('dSitePhone').value.trim();
+  const siteAddr=document.getElementById('dSiteAddr').value.trim();
+  const manifest=getMfst();
+  const timeSpec={enabled:document.getElementById('dTimeEnabled').checked,time:document.getElementById('dTimeVal').value};
+  const assistant={enabled:document.getElementById('dAssistEnabled').checked,count:parseInt(document.getElementById('dAssistCount').value)||1};
+  const measurement=document.getElementById('dMeasure').checked;
+  const wt_type=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
+  const workType={type:wt_type,containerOp:'',containerSize:''};
+  if(wt_type==='container'){
+    workType.containerOp=(document.querySelector('input[name="wkContainerOp"]:checked')||{}).value||'set';
+    workType.containerSize=(document.querySelector('input[name="wkContainerSize"]:checked')||{}).value||'1.5box';
+  }
   const finalStatus=status;
   if(ST.editId){
     const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
-    if(dp)Object.assign(dp,{customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,receptionist,isReg,updated:new Date().toISOString()});
+    if(dp)Object.assign(dp,{customer:cust,date,dispatchDate,deadline,status:finalStatus,driver,vehicle,notes,caution,receptionist,custContact,custPhone,siteName,siteContact,sitePhone,siteAddr,manifest,timeSpec,assistant,measurement,workType,isReg,isCarryIn,updated:new Date().toISOString()});
   } else {
     const now=new Date().toISOString();
-    db.dispatches.push({id:uid(),customer:cust,date,deadline,status:finalStatus,driver,vehicle,notes,receptionist,isReg,created:now,updated:now});
+    db.dispatches.push({id:uid(),customer:cust,date,dispatchDate,deadline,status:finalStatus,driver,vehicle,notes,caution,receptionist,custContact,custPhone,siteName,siteContact,sitePhone,siteAddr,manifest,timeSpec,assistant,measurement,workType,isReg,isCarryIn,created:now,updated:now});
   }
   await save();closeM('mDispatch');render();
 }
@@ -1163,7 +2424,7 @@ function chkLic(){
 // ================================================================
 function openSettings(){updateUrlStatus();renderSLists();openM('mSettings');}
 function stab(name){
-  const ns=['google','drivers','vehicles','customers','data'];
+  const ns=['google','drivers','vehicles','customers','sites','data'];
   document.querySelectorAll('.stab').forEach((t,i)=>t.classList.toggle('on',ns[i]===name));
   document.querySelectorAll('.spane').forEach(p=>p.classList.remove('on'));
   document.getElementById(`sp-${name}`).classList.add('on');
@@ -1171,15 +2432,18 @@ function stab(name){
 function renderSLists(){
   document.getElementById('driverList').innerHTML=!(db.drivers||[]).length?
     '<div class="empty">ドライバーがいません</div>':
-    db.drivers.map(d=>`<div class="ditem">
+    db.drivers.map(d=>{
+      const grpTxt=[d.group,d.group2].filter(g=>g).join(' / ');
+      const usageLbl=(d.usageGroup||'frequent')==='infrequent'?'<span style="font-size:9px;color:#6b7280;margin-left:4px">あまり使わない</span>':'';
+      return`<div class="ditem">
       <div class="di-main">
-        <div class="di-name">${d.name}${d.group?`<span style="font-size:10px;color:#94a3b8;margin-left:6px">${d.group}</span>`:''}
-          ${d.type==='兼任'?'<span class="bdg bdg-o" style="font-size:9px">兼任</span>':'<span class="bdg bdg-g" style="font-size:9px">専任</span>'}
+        <div class="di-name">${d.name}${grpTxt?`<span style="font-size:10px;color:#94a3b8;margin-left:6px">${grpTxt}</span>`:''}
+          ${d.type==='兼任'?'<span class="bdg bdg-o" style="font-size:9px">兼任</span>':'<span class="bdg bdg-g" style="font-size:9px">専任</span>'}${usageLbl}
         </div>
         <div class="di-meta">${(d.license||[]).map(l=>`<span class="bdg bdg-b">${l}</span>`).join('')}</div>
       </div>
       <span class="di-del" onclick="startEditDriver('${d.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
-      <span class="di-del" onclick="delDriver('${d.id}')">🗑</span></div>`).join('');
+      <span class="di-del" onclick="delDriver('${d.id}')">🗑</span></div>`;}).join('');
   document.getElementById('vehicleList').innerHTML=!(db.vehicles||[]).length?
     '<div class="empty">車両がありません</div>':
     db.vehicles.map(v=>{const r=v.req,bc=r==='大型'?'bdg-r':r==='中型'?'bdg-o':r==='準中型'?'bdg-v':'bdg-g';
@@ -1190,17 +2454,39 @@ function renderSLists(){
       <span class="di-del" onclick="delVehicle('${v.id}')">🗑</span></div>`;}).join('');
   document.getElementById('customerList').innerHTML=!(db.customers||[]).length?
     '<div class="empty">お客様がいません</div>':
-    db.customers.map(c=>`<div class="ditem"><div class="di-main"><div class="di-name">${c.name}</div>
-    <div class="di-meta">${c.addr||''}${c.contact?' | '+c.contact:''}</div></div>
+    db.customers.map(c=>`<div class="ditem"><div class="di-main">
+      <div class="di-name">${c.name}${c.tpcd?`<span style="font-size:10px;color:#6366f1;margin-left:6px;font-family:monospace;font-weight:700">CD:${c.tpcd}</span>`:''}</div>
+      <div class="di-meta">${[c.addr,c.contact,c.phone].filter(x=>x).join(' | ')}</div></div>
     <span class="di-del" onclick="startEditCustomer('${c.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
     <span class="di-del" onclick="delCustomer('${c.id}')">🗑</span></div>`).join('');
+  // 収集先リスト（お客様名も表示）
+  const siteListEl=document.getElementById('siteList');
+  if(siteListEl){
+    siteListEl.innerHTML=!(db.sites||[]).length?
+      '<div class="empty">収集先が登録されていません</div>':
+      (db.sites||[]).map(s=>{
+        const custName2=s.customerId?(db.customers||[]).find(c=>c.id===s.customerId)?.name||'?':'共通';
+        return`<div class="ditem"><div class="di-main">
+          <div class="di-name">${s.name}<span class="bdg ${s.customerId?'bdg-b':'bdg-g'}" style="margin-left:6px;font-size:9px">${custName2}</span></div>
+          <div class="di-meta">${[s.addr,s.contact,s.phone].filter(x=>x).join(' | ')}${s.caution?'<span class="bdg bdg-o" style="margin-left:4px;font-size:9px">⚠ '+s.caution+'</span>':''}</div>
+        </div>
+        <span class="di-del" onclick="startEditSite('${s.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
+        <span class="di-del" onclick="delSite('${s.id}')">🗑</span></div>`;}).join('');
+  }
+  // 収集先設定フォームのお客様ドロップダウンを更新
+  const sSiteCustEl=document.getElementById('sSiteCustId');
+  if(sSiteCustEl){
+    sSiteCustEl.innerHTML='<option value="">（共通・全お客様）</option>'+
+      (db.customers||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  }
 }
-let editDriverId=null,editVehicleId=null,editCustomerId=null;
+let editDriverId=null,editVehicleId=null,editCustomerId=null,editSiteId=null;
 
 function resetDriverForm(){
   editDriverId=null;
   document.getElementById('sDriverName').value='';
   document.getElementById('sDriverGroup').value='';
+  document.getElementById('sDriverGroup2').value='';
   document.getElementById('sDriverType').value='専任';
   document.querySelectorAll('#sDriverLic input').forEach(e=>e.checked=false);
   document.getElementById('driverAddBtn').textContent='追加';
@@ -1211,6 +2497,7 @@ function startEditDriver(id){
   editDriverId=id;
   document.getElementById('sDriverName').value=d.name;
   document.getElementById('sDriverGroup').value=d.group||'';
+  document.getElementById('sDriverGroup2').value=d.group2||'';
   document.getElementById('sDriverType').value=d.type||'専任';
   document.querySelectorAll('#sDriverLic input').forEach(e=>e.checked=(d.license||[]).includes(e.value));
   document.getElementById('driverAddBtn').textContent='更新';
@@ -1221,13 +2508,14 @@ async function addDriver(){
   const name=document.getElementById('sDriverName').value.trim();
   const lic=[...document.querySelectorAll('#sDriverLic input:checked')].map(e=>e.value);
   const group=document.getElementById('sDriverGroup').value.trim();
+  const group2=document.getElementById('sDriverGroup2').value.trim();
   const type=document.getElementById('sDriverType').value;
   if(!name){alert('ドライバー名を入力してください');return;}
   if(editDriverId){
     const d=db.drivers.find(x=>x.id===editDriverId);
-    if(d)Object.assign(d,{name,license:lic.length?lic:['普通'],group,type});
+    if(d)Object.assign(d,{name,license:lic.length?lic:['普通'],group,group2,type});
   } else {
-    db.drivers.push({id:uid(),name,license:lic.length?lic:['普通'],group,type});
+    db.drivers.push({id:uid(),name,license:lic.length?lic:['普通'],group,group2,type,usageGroup:'frequent'});
   }
   await save();resetDriverForm();renderSLists();render();
 }
@@ -1272,7 +2560,7 @@ async function delVehicle(id){
 }
 function resetCustomerForm(){
   editCustomerId=null;
-  ['sCName','sCAddr','sCContact'].forEach(i=>document.getElementById(i).value='');
+  ['sCName','sCTpcd','sCAddr','sCContact','sCPhone'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('customerAddBtn').textContent='追加';
   document.getElementById('customerCancelBtn').style.display='none';
 }
@@ -1280,8 +2568,10 @@ function startEditCustomer(id){
   const c=db.customers.find(x=>x.id===id);if(!c)return;
   editCustomerId=id;
   document.getElementById('sCName').value=c.name;
+  document.getElementById('sCTpcd').value=c.tpcd||'';
   document.getElementById('sCAddr').value=c.addr||'';
   document.getElementById('sCContact').value=c.contact||'';
+  document.getElementById('sCPhone').value=c.phone||'';
   document.getElementById('customerAddBtn').textContent='更新';
   document.getElementById('customerCancelBtn').style.display='inline-flex';
   document.getElementById('sCName').focus();
@@ -1289,7 +2579,7 @@ function startEditCustomer(id){
 async function addCustomer(){
   const name=document.getElementById('sCName').value.trim();
   if(!name){alert('お客様名を入力してください');return;}
-  const cdata={name,addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim()};
+  const cdata={name,tpcd:document.getElementById('sCTpcd').value.trim(),addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim(),phone:document.getElementById('sCPhone').value.trim()};
   if(editCustomerId){
     const c=db.customers.find(x=>x.id===editCustomerId);
     if(c)Object.assign(c,cdata);
@@ -1301,6 +2591,46 @@ async function addCustomer(){
 async function delCustomer(id){
   if(!confirm('このお客様を削除しますか？'))return;
   db.customers=db.customers.filter(x=>x.id!==id);await save();renderSLists();
+}
+
+// 収集先マスタ CRUD
+function resetSiteForm(){
+  editSiteId=null;
+  ['sSiteName','sSiteContact','sSitePhone','sSiteAddr','sSiteCaution'].forEach(i=>document.getElementById(i).value='');
+  const sc=document.getElementById('sSiteCustId');if(sc)sc.value='';
+  document.getElementById('siteAddBtn').textContent='追加';
+  document.getElementById('siteCancelBtn').style.display='none';
+}
+function startEditSite(id){
+  const s=(db.sites||[]).find(x=>x.id===id);if(!s)return;
+  editSiteId=id;
+  document.getElementById('sSiteName').value=s.name||'';
+  document.getElementById('sSiteContact').value=s.contact||'';
+  document.getElementById('sSitePhone').value=s.phone||'';
+  document.getElementById('sSiteAddr').value=s.addr||'';
+  document.getElementById('sSiteCaution').value=s.caution||'';
+  const sc=document.getElementById('sSiteCustId');if(sc)sc.value=s.customerId||'';
+  document.getElementById('siteAddBtn').textContent='更新';
+  document.getElementById('siteCancelBtn').style.display='inline-flex';
+  document.getElementById('sSiteName').focus();
+}
+async function addSite(){
+  const name=document.getElementById('sSiteName').value.trim();
+  if(!name){alert('収集先名称を入力してください');return;}
+  if(!db.sites)db.sites=[];
+  const sc=document.getElementById('sSiteCustId');
+  const sdata={name,customerId:sc?sc.value:'',contact:document.getElementById('sSiteContact').value.trim(),phone:document.getElementById('sSitePhone').value.trim(),addr:document.getElementById('sSiteAddr').value.trim(),caution:document.getElementById('sSiteCaution').value.trim()};
+  if(editSiteId){
+    const s=db.sites.find(x=>x.id===editSiteId);
+    if(s)Object.assign(s,sdata);
+  } else {
+    db.sites.push({id:uid(),...sdata});
+  }
+  await save();resetSiteForm();renderSLists();fillSiteSel();
+}
+async function delSite(id){
+  if(!confirm('この収集先を削除しますか？'))return;
+  db.sites=(db.sites||[]).filter(x=>x.id!==id);await save();renderSLists();fillSiteSel();
 }
 
 // ================================================================
@@ -1425,16 +2755,301 @@ function copyGasCode(){
 // MODAL HELPERS
 // ================================================================
 function openM(id){document.getElementById(id).classList.remove('hid');}
-function closeM(id){document.getElementById(id).classList.add('hid');}
+function closeM(id){
+  const ovl=document.getElementById(id);if(!ovl)return;
+  ovl.classList.add('hid');
+  // ドラッグ位置をリセット
+  const box=ovl.querySelector('.mbox');
+  if(box&&box.style.position==='fixed'){
+    box.style.position='';box.style.left='';box.style.top='';
+    box.style.margin='';box.style.maxHeight='';
+    ovl.style.alignItems='';ovl.style.justifyContent='';
+  }
+}
 document.querySelectorAll('.ovl').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)closeM(o.id);}));
-document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.ovl:not(.hid)').forEach(o=>closeM(o.id));});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.ovl:not(.hid)').forEach(o=>closeM(o.id));closeMP();}});
+
+// ================================================================
+// DRAGGABLE MODALS（mhdrをドラッグして移動）
+// ================================================================
+(function(){
+  let dragging=false,ox=0,oy=0,activeBox=null,activeOvl=null;
+  document.querySelectorAll('.ovl').forEach(function(ovl){
+    const box=ovl.querySelector('.mbox');
+    const hdr=ovl.querySelector('.mhdr');
+    if(!box||!hdr)return;
+    hdr.addEventListener('mousedown',function(e){
+      if(e.target.closest('.mcls'))return;
+      const r=box.getBoundingClientRect();
+      if(box.style.position!=='fixed'){
+        box.style.position='fixed';
+        box.style.left=r.left+'px';
+        box.style.top=r.top+'px';
+        box.style.margin='0';
+        ovl.style.alignItems='flex-start';
+        ovl.style.justifyContent='flex-start';
+      }
+      ox=e.clientX-parseFloat(box.style.left);
+      oy=e.clientY-parseFloat(box.style.top);
+      activeBox=box;activeOvl=ovl;dragging=true;
+      e.preventDefault();
+    });
+  });
+  document.addEventListener('mousemove',function(e){
+    if(!dragging||!activeBox)return;
+    const nx=Math.max(0,Math.min(e.clientX-ox,window.innerWidth-activeBox.offsetWidth));
+    const ny=Math.max(0,Math.min(e.clientY-oy,window.innerHeight-48));
+    activeBox.style.left=nx+'px';
+    activeBox.style.top=ny+'px';
+  });
+  document.addEventListener('mouseup',function(){dragging=false;});
+})();
+
+// ================================================================
+// MASTER PICKER（お客様・ドライバー・車両 選択ポップアップ）
+// ================================================================
+const MP={type:null,targetSel:null,triggerBtn:null};
+
+function openMP(type,triggerBtn,selId){
+  closeMP();
+  MP.type=type;
+  MP.targetSel=document.getElementById(selId);
+  MP.triggerBtn=triggerBtn;
+  const titles={customer:'🏢 お客様を選択',driver:'👤 ドライバーを選択',vehicle:'🚛 車両を選択'};
+  document.getElementById('mpHeadTxt').textContent=titles[type]||'選択';
+  document.getElementById('mpSrch').value='';
+  document.getElementById('mpNewName').value='';
+  const picker=document.getElementById('masterPicker');
+  picker.classList.remove('hid');
+  // 位置をトリガーの下に
+  const r=triggerBtn.getBoundingClientRect();
+  let left=r.left;
+  let top=r.bottom+6;
+  if(left+370>window.innerWidth)left=window.innerWidth-374;
+  if(top+440>window.innerHeight)top=Math.max(10,r.top-446);
+  picker.style.left=left+'px';
+  picker.style.top=top+'px';
+  filterMP();
+  setTimeout(()=>document.getElementById('mpSrch').focus(),50);
+}
+
+function closeMP(){
+  document.getElementById('masterPicker').classList.add('hid');
+}
+
+function getMPItems(){
+  if(MP.type==='customer')return(db.customers||[]).map(c=>({id:c.id,name:c.name,sub:[c.addr,c.contact].filter(x=>x).join(' | ')}));
+  if(MP.type==='driver')return(db.drivers||[]).map(d=>({id:d.id,name:d.name,sub:[[d.group,d.group2].filter(x=>x).join('/'),d.type].filter(x=>x).join(' · ')}));
+  if(MP.type==='vehicle')return(db.vehicles||[]).map(v=>({id:v.id,name:v.name,sub:(v.type||'')+(v.req?' | '+v.req+'以上':'')}));
+  return[];
+}
+
+function filterMP(){
+  const q=document.getElementById('mpSrch').value.toLowerCase();
+  const curVal=MP.targetSel?MP.targetSel.value:'';
+  const items=getMPItems().filter(i=>!q||i.name.toLowerCase().includes(q)||(i.sub||'').toLowerCase().includes(q));
+  const list=document.getElementById('mpList');
+  // 先頭に「クリア」行を常に表示
+  const clearLabels={customer:'— 未選択（クリア）',driver:'— 未定（クリア）',vehicle:'— 未定（クリア）'};
+  const clearLabel=clearLabels[MP.type]||'— クリア';
+  const clearRow=`<div class="mp-item${!curVal?' active':''}" onclick="selectMP('')" style="border-bottom:2px solid #e2e8f0">
+    <div class="mp-item-name" style="color:#94a3b8;font-weight:400;font-style:italic">${clearLabel}</div>
+  </div>`;
+  if(!items.length){
+    list.innerHTML=clearRow+'<div class="mp-empty">一致する項目がありません</div>';
+    return;
+  }
+  list.innerHTML=clearRow+items.map(i=>`<div class="mp-item${i.id===curVal?' active':''}" onclick="selectMP('${i.id}')">
+    <div class="mp-item-name">${i.name}</div>
+    ${i.sub?`<div class="mp-item-sub">${i.sub}</div>`:''}
+  </div>`).join('');
+}
+
+function selectMP(id){
+  if(!MP.targetSel)return;
+  MP.targetSel.value=id;
+  MP.targetSel.dispatchEvent(new Event('change'));
+  syncMPTrigger(MP.targetSel.id);
+  closeMP();
+}
+
+async function addFromMP(){
+  const name=document.getElementById('mpNewName').value.trim();
+  if(!name){alert('名前を入力してください');return;}
+  const newId=uid();
+  if(MP.type==='customer'){
+    db.customers.push({id:newId,name,addr:'',contact:'',phone:''});
+  }else if(MP.type==='driver'){
+    db.drivers.push({id:newId,name,license:['普通'],group:'',group2:'',type:'専任',usageGroup:'frequent'});
+  }else if(MP.type==='vehicle'){
+    db.vehicles.push({id:newId,name,plate:'',type:'',req:'普通'});
+  }else return;
+  await save();
+  fillDSel();
+  renderSLists();
+  selectMP(newId);
+  document.getElementById('mpNewName').value='';
+}
+
+// ピッカー外クリックで閉じる
+document.addEventListener('mousedown',function(e){
+  const picker=document.getElementById('masterPicker');
+  if(picker&&!picker.classList.contains('hid')&&!picker.contains(e.target)){
+    if(!e.target.closest('.mp-trigger'))closeMP();
+  }
+});
+
+// ================================================================
+// MASTER CSV IMPORT / EXPORT
+// ================================================================
+function exportMasterCSV(type){
+  let headers=[],rows=[];
+  if(type==='customers'){
+    headers=['id','T-PlannerCD','name','address','contact','phone'];
+    rows=(db.customers||[]).map(c=>[c.id,c.tpcd||'',c.name,c.addr||'',c.contact||'',c.phone||'']);
+  }else if(type==='sites'){
+    headers=['id','customerId','name','contact','phone','address','caution'];
+    rows=(db.sites||[]).map(s=>[s.id,s.customerId||'',s.name,s.contact||'',s.phone||'',s.addr||'',s.caution||'']);
+  }else if(type==='drivers'){
+    headers=['id','name','group','group2','type','licenses'];
+    rows=(db.drivers||[]).map(d=>[d.id,d.name,d.group||'',d.group2||'',d.type||'専任',(d.license||[]).join('|')]);
+  }else if(type==='vehicles'){
+    headers=['id','name','plate','vehicleType','requiredLicense'];
+    rows=(db.vehicles||[]).map(v=>[v.id,v.name,v.plate||'',v.type||'',v.req||'普通']);
+  }
+  const csv=[headers,...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=type+'_'+fmt(new Date()).replace(/-/g,'')+'.csv';
+  a.click();URL.revokeObjectURL(a.href);
+}
+
+async function importMasterCSV(event,type){
+  const file=event.target.files[0];if(!file)return;
+  event.target.value='';
+  try{
+    const buf=await file.arrayBuffer();
+    const bytes=new Uint8Array(buf);
+    let text,encUsed;
+    // UTF-8 BOM (EF BB BF) 判定
+    if(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF){
+      text=new TextDecoder('utf-8').decode(buf).slice(1); // BOMを除去
+      encUsed='UTF-8(BOM)';
+    }else{
+      // UTF-8で仮デコード → 置換文字(U+FFFD)があればShift-JIS
+      const utf8=new TextDecoder('utf-8',{fatal:false}).decode(buf);
+      const hasReplacement=utf8.indexOf('�')!==-1;
+      if(hasReplacement){
+        text=new TextDecoder('shift-jis').decode(buf);
+        encUsed='Shift-JIS';
+      }else{
+        text=utf8;
+        encUsed='UTF-8';
+      }
+    }
+    const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
+    if(lines.length<2){alert('データ行がありません');return;}
+    const headers=parseCSVLine(lines[0]).map(h=>h.trim().toLowerCase());
+    if(!headers.includes('name')){
+      alert('❌ インポートエラー\n\n「name」列が見つかりません。\n\n検出されたヘッダー：\n'+headers.join(', ')+'\n\nこのシステムのCSVエクスポート機能でダウンロードしたファイルをインポートしてください。');
+      return;
+    }
+    if(!db.customers)db.customers=[];
+    if(!db.drivers)db.drivers=[];
+    if(!db.vehicles)db.vehicles=[];
+    if(!db.sites)db.sites=[];
+    let added=0,updated=0,skipped=0;
+    for(let i=1;i<lines.length;i++){
+      const vals=parseCSVLine(lines[i]);
+      const row={};
+      headers.forEach((h,j)=>row[h]=(vals[j]||'').trim());
+      if(!row.name){skipped++;continue;}
+      const existingId=row.id||'';
+      if(type==='customers'){
+        const cdata={name:row.name,tpcd:row['t-plannercd']||row.tpcd||'',addr:row.address||row.addr||'',contact:row.contact||'',phone:row.phone||''};
+        const ex=existingId?db.customers.find(x=>x.id===existingId):null;
+        if(ex){Object.assign(ex,cdata);updated++;}
+        else{db.customers.push({id:existingId||uid(),...cdata});added++;}
+      }else if(type==='sites'){
+        const sdata={name:row.name,customerId:row.customerid||row.customerId||'',contact:row.contact||'',phone:row.phone||'',addr:row.address||row.addr||'',caution:row.caution||''};
+        const ex=existingId?db.sites.find(x=>x.id===existingId):null;
+        if(ex){Object.assign(ex,sdata);updated++;}
+        else{db.sites.push({id:existingId||uid(),...sdata});added++;}
+      }else if(type==='drivers'){
+        const lics=(row.licenses||row.license||'').split('|').map(l=>l.trim()).filter(l=>l);
+        const ddata={name:row.name,group:row.group||'',group2:row.group2||'',type:row.type||'専任',license:lics.length?lics:['普通'],usageGroup:'frequent'};
+        const ex=existingId?db.drivers.find(x=>x.id===existingId):null;
+        if(ex){Object.assign(ex,ddata);updated++;}
+        else{db.drivers.push({id:existingId||uid(),...ddata});added++;}
+      }else if(type==='vehicles'){
+        const vdata={name:row.name,plate:row.plate||'',type:row.vehicletype||row.type||'',req:row.requiredlicense||row.req||'普通'};
+        const ex=existingId?db.vehicles.find(x=>x.id===existingId):null;
+        if(ex){Object.assign(ex,vdata);updated++;}
+        else{db.vehicles.push({id:existingId||uid(),...vdata});added++;}
+      }
+    }
+    await save();renderSLists();fillSiteSel();render();
+    let msg=`インポート完了！（${encUsed}）\n✅ 追加: ${added}件　✏️ 更新: ${updated}件`;
+    if(skipped)msg+=`　⏭ スキップ: ${skipped}件`;
+    if(added===0&&updated===0)msg+='\n\n⚠ 0件でした。CSVのヘッダーや内容を確認してください。';
+    alert(msg);
+  }catch(e){
+    alert('❌ インポート中にエラーが発生しました\n\n'+e.message);
+    console.error('importMasterCSV error',e);
+  }
+}
+
+function parseCSVLine(line){
+  const result=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(inQ){
+      if(c==='"'&&line[i+1]==='"'){cur+='"';i++;}
+      else if(c==='"'){inQ=false;}
+      else cur+=c;
+    }else{
+      if(c==='"'){inQ=true;}
+      else if(c===','){result.push(cur);cur='';}
+      else cur+=c;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+// ================================================================
+// 祝日データ（内閣府 APIキャッシュ）
+// ================================================================
+let HOLIDAYS={};
+async function loadHolidays(){
+  // localStorageキャッシュを確認（月1回更新）
+  try{
+    const cached=localStorage.getItem('jp_hol_data');
+    const cachedMonth=localStorage.getItem('jp_hol_month');
+    const thisMonth=new Date().toISOString().slice(0,7); // "2026-05"
+    if(cached&&cachedMonth===thisMonth){
+      HOLIDAYS=JSON.parse(cached);return;
+    }
+    const res=await fetch('https://holidays-jp.github.io/api/v1/date.json',{signal:AbortSignal.timeout(4000)});
+    if(res.ok){
+      const data=await res.json();
+      HOLIDAYS=data;
+      localStorage.setItem('jp_hol_data',JSON.stringify(data));
+      localStorage.setItem('jp_hol_month',thisMonth);
+      return;
+    }
+  }catch(e){}
+  // フォールバック：ローカルキャッシュがあれば使用
+  try{const c=localStorage.getItem('jp_hol_data');if(c)HOLIDAYS=JSON.parse(c);}catch(e){}
+}
 
 // ================================================================
 // INIT
 // ================================================================
 window.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('loadOvl').classList.remove('hid');
-  await loadDB();
+  await Promise.all([loadDB(),loadHolidays()]);
   for(const rs of db.regulars)genRegDisps(rs);
   document.getElementById('loadOvl').classList.add('hid');
   setView('week');
