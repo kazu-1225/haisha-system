@@ -229,10 +229,11 @@ hr{border:none;border-top:1px solid #e2e8f0}
 <header class="app-header">
   <div class="app-title">🚛 廃棄物収集・運搬 配車管理システム</div>
   <div class="hsp"></div>
-  <div class="sync-badge" id="syncBadge" onclick="manualSync()" title="クリックで手動同期">
+  <div class="sync-badge" id="syncBadge" title="同期ステータス">
     <div class="sync-dot none" id="syncDot"></div>
     <span id="syncTxt">未設定</span>
   </div>
+  <button class="hbtn" style="background:#2563eb;font-size:12px;padding:6px 12px;" onclick="manualSync()">☁️ 今すぐ同期</button>
   <button class="hbtn" onclick="exportCSV()">📊 CSV</button>
   <button class="hbtn" onclick="exportJSON()">💾 バックアップ</button>
   <button class="hbtn" onclick="document.getElementById('fi-json').click()">📂 復元</button>
