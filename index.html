@@ -1224,14 +1224,14 @@ async function save(){
   if(!GAS_URL)return;
   setSyncStatus('saving');
   try{
-    const res=await fetch(GAS_URL,{
+    // no-cors mode: CORSブロックを回避してPOST送信（レスポンスは読まない）
+    await fetch(GAS_URL,{
       method:'POST',
+      mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=UTF-8'},
-      body:JSON.stringify(db),
-      redirect:'follow'
+      body:JSON.stringify(db)
     });
-    const result=await res.json();
-    setSyncStatus(result.ok!==false?'ok':'error');
+    setSyncStatus('ok');
   }catch(e){
     setSyncStatus('error','保存エラー（ローカルには保存済み）');
     console.warn('GAS save error:',e);
