@@ -19,7 +19,7 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .sync-dot.ok{background:#4ade80}.sync-dot.loading{background:#fbbf24;animation:pulse .8s infinite}
 .sync-dot.error{background:#f87171}.sync-dot.none{background:#94a3b8}
-.sync-dot.saving{background:#60a5fa;animation:pulse .5s infinite}
+.sync-dot.saving{background:#60a5fa;animation:pulse .5s infinite}.sync-dot.pending{background:#f97316}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .hbtn{background:rgba(255,255,255,.15);color:#fff;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;transition:background .2s;white-space:nowrap}
 .hbtn:hover{background:rgba(255,255,255,.28)}
@@ -416,21 +416,30 @@ const SHEET_NAME = 'DB_JSON';
 
 function doGet(e) {
   try {
-    const data = readData();
-    return respond(data);
+    // チャンク送信モード: ?chunk=N&total=N&data=... で呼ばれた場合
+    if (e && e.parameter && e.parameter.chunk !== undefined) {
+      const idx   = parseInt(e.parameter.chunk);
+      const total = parseInt(e.parameter.total);
+      const props = PropertiesService.getScriptProperties();
+      props.setProperty('c' + idx, e.parameter.data || '');
+      // 全チャンク揃ったか確認
+      let full = '';
+      for (let i = 0; i < total; i++) {
+        const c = props.getProperty('c' + i);
+        if (c === null) return respond({ ok: 'waiting', got: idx });
+        full += c;
+      }
+      // 全チャンク揃った → 組み立て・保存
+      for (let i = 0; i < total; i++) props.deleteProperty('c' + i);
+      const data = JSON.parse(full);
+      writeData(data);
+      writeReadableSheets(data);
+      return respond({ ok: true });
+    }
+    // 通常モード: データ読み込み
+    return respond(readData());
   } catch(err) {
     return respond({ error: err.message });
-  }
-}
-
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    writeData(data);
-    writeReadableSheets(data);
-    return respond({ ok: true });
-  } catch(err) {
-    return respond({ ok: false, error: err.message });
   }
 }
 
@@ -703,7 +712,8 @@ function setSyncStatus(s,msg){
   const dot=document.getElementById('syncDot');
   const txt=document.getElementById('syncTxt');
   const map={ok:{cls:'ok',t:'同期済み'},loading:{cls:'loading',t:'読込中...'},
-    saving:{cls:'saving',t:'保存中...'},error:{cls:'error',t:'同期エラー'},none:{cls:'none',t:'未設定（ローカル）'}};
+    saving:{cls:'saving',t:'保存中...'},error:{cls:'error',t:'同期エラー'},none:{cls:'none',t:'未設定（ローカル）'},
+    pending:{cls:'pending',t:'未送信（↑同期ボタンで送信）'}};
   const m=map[s]||map.none;
   dot.className='sync-dot '+m.cls;
   txt.textContent=msg||m.t;
@@ -776,31 +786,29 @@ async function loadDB(){
 
 async function save(){
   localStorage.setItem('haishaDB2',JSON.stringify(db));
-  if(!GAS_URL)return;
-  setSyncStatus('saving');
-  try{
-    const res=await fetch(GAS_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=UTF-8'},
-      body:JSON.stringify(db),
-      redirect:'follow'
-    });
-    const result=await res.json();
-    setSyncStatus(result.ok!==false?'ok':'error');
-  }catch(e){
-    setSyncStatus('error','保存エラー（ローカルには保存済み）');
-    console.warn('GAS save error:',e);
-  }
+  if(GAS_URL) setSyncStatus('pending');
 }
 
 async function manualSync(){
   if(!GAS_URL){openSettings();stab('google');return;}
-  document.getElementById('loadMsg').textContent='Googleスプレッドシートと同期中...';
-  document.getElementById('loadOvl').classList.remove('hid');
-  await loadDB();
-  document.getElementById('loadOvl').classList.add('hid');
-  for(const rs of db.regulars)genRegDisps(rs);
-  render();
+  setSyncStatus('saving','送信準備中...');
+  try{
+    const json=JSON.stringify(db);
+    const CHUNK=6000;
+    const chunks=[];
+    for(let i=0;i<json.length;i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    for(let i=0;i<chunks.length;i++){
+      setSyncStatus('saving',`送信中... ${i+1}/${chunks.length}`);
+      const url=GAS_URL+'?chunk='+i+'&total='+chunks.length+'&data='+encodeURIComponent(chunks[i]);
+      const res=await fetch(url,{redirect:'follow'});
+      const result=await res.json();
+      if(result.error) throw new Error(result.error);
+    }
+    setSyncStatus('ok');
+  }catch(e){
+    setSyncStatus('error','同期エラー（ローカルには保存済み）');
+    console.warn('manualSync error:',e);
+  }
 }
 
 // ================================================================
