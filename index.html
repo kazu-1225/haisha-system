@@ -2153,13 +2153,15 @@ function onDrop(e,cell){
   e.preventDefault();cell.classList.remove('drag-over');
   if(!ST.drag)return;
   const date=cell.dataset.date,rid=cell.dataset.rid;
+  if(!rid)return; // 持込み行・定期便ヘッダーへのドロップは無視（ドライバー・車両消去防止）
   const dp=(db.dispatches||[]).find(x=>x.id===ST.drag.id);
   if(!dp)return;
   const newDriver=ST.res==='driver'?rid:dp.driver;
   const newVehicle=ST.res==='vehicle'?rid:dp.vehicle;
   const dr=db.drivers.find(x=>x.id===newDriver);
   const ve=db.vehicles.find(x=>x.id===newVehicle);
-  const det=`お客様　　: ${custName(dp.customer)}\n移動先　　: ${date}（${DOW_JP[pd(date).getDay()]}）\nドライバー: ${dr?dr.name:'未定'}\n車両　　　: ${ve?ve.name:'未定'}`;
+  const nameLabel=dp.dispatchType==='shipment'?(dp.destName||'出荷'):custName(dp.customer);
+  const det=`案件　　　: ${nameLabel}\n移動先　　: ${date}（${DOW_JP[pd(date).getDay()]}）\nドライバー: ${dr?dr.name:'未定'}\n車両　　　: ${ve?ve.name:'未定'}`;
   document.getElementById('cDet').textContent=det;
   document.getElementById('cLicWarn').classList.toggle('show',!!(dr&&ve&&!canDrive(dr,ve)));
   ST.drop={date,id:dp.id,newDriver,newVehicle};
@@ -2408,9 +2410,8 @@ function showDispPopup(e,id){
   const isShip=dp.dispatchType==='shipment';
   const dr=db.drivers.find(x=>x.id===dp.driver);
   const ve=db.vehicles.find(x=>x.id===dp.vehicle);
-  const DOW2=['日','月','火','水','木','金','土'];
   const wDate=dp.dispatchDate||dp.date;
-  const dispDateStr=wDate?(()=>{const d=pd(wDate);return`${wDate}（${DOW2[d.getDay()]}）`;})():'未定';
+  const dispDateStr=wDate?(()=>{const d=pd(wDate);return`${wDate}（${DOW_JP[d.getDay()]}）`;})():'未定';
   const statusStr=dp.status==='confirmed'?'✅ 確定':'🔴 保留中';
   let rows;
   if(isShip){
@@ -2478,10 +2479,9 @@ function printWorkOrder(id,mode){
   const dr=db.drivers.find(x=>x.id===dp.driver);
   const ve=db.vehicles.find(x=>x.id===dp.vehicle);
   const cu=db.customers.find(x=>x.id===dp.customer);
-  const DOW_JP2=['日','月','火','水','木','金','土'];
-  const dateStr=dp.date?(()=>{const d=pd(dp.date);return`${dp.date}（${DOW_JP2[d.getDay()]}）`;})():'未定';
+  const dateStr=dp.date?(()=>{const d=pd(dp.date);return`${dp.date}（${DOW_JP[d.getDay()]}）`;})():'未定';
   const dispDate=dp.dispatchDate||dp.date;
-  const dispDateStr=dispDate?(()=>{const d=pd(dispDate);return`${dispDate}（${DOW_JP2[d.getDay()]}）`;})():'未定';
+  const dispDateStr=dispDate?(()=>{const d=pd(dispDate);return`${dispDate}（${DOW_JP[d.getDay()]}）`;})():'未定';
   const dlStr=dp.deadline||'—';
   const statusStr=dp.status==='confirmed'?'✅ 確定':'🔴 保留中';
   const typeStr=dp.isReg?'定期便':'スポット（単発）';
@@ -2615,6 +2615,7 @@ ${custSec}${siteSec}${drvSec}${collectSec}${condSec}${notesSec}${cautionSec}${si
   else bodyContent=buildPage('作業指示書（収集用）',false)+`<div style="page-break-after:always"></div>`+buildPage('作業指示書（お客様控え）',true);
 
   const w=window.open('','_blank','width=860,height=1200');
+  if(!w){alert('ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。');return;}
   w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>作業指示書</title>
 <style>
@@ -3282,7 +3283,7 @@ async function saveShipment(){
   const status=document.getElementById('sStatus').value;
   const notes=document.getElementById('sNotes').value.trim();
   const caution=document.getElementById('sCaution').value.trim();
-  const finalStatus=isCarryIn?'confirmed':(driver&&vehicle?status:status);
+  const finalStatus=isCarryIn?'confirmed':status;
   const now=new Date().toISOString();
   if(ST.editId){
     const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
@@ -3357,7 +3358,7 @@ function genRegDisps(rs){
         const exists=(db.dispatches||[]).some(x=>x.date===ds&&x.customer===rs.cust&&x.isReg&&x.regId===rs.id);
         if(!exists){
           const now=new Date().toISOString();
-          db.dispatches.push({id:uid(),customer:rs.cust,date:ds,status:(rs.driver&&rs.vehicle)?'confirmed':'pending',driver:rs.driver,vehicle:rs.vehicle,notes:rs.notes,isReg:true,regId:rs.id,created:now,updated:now});
+          db.dispatches.push({id:uid(),customer:rs.cust,date:ds,dispatchDate:ds,status:(rs.driver&&rs.vehicle)?'confirmed':'pending',driver:rs.driver,vehicle:rs.vehicle,notes:rs.notes,isReg:true,regId:rs.id,created:now,updated:now});
         }
       }
     }
@@ -3396,7 +3397,7 @@ function exportCSV(){
   dl('﻿'+[hdr,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n'),'配車管理_'+fmt(new Date())+'.csv','text/csv;charset=utf-8');
 }
 function exportJSON(){dl(JSON.stringify(db,null,2),'配車バックアップ_'+fmt(new Date())+'.json','application/json');}
-function dl(content,name,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();}
+function dl(content,name,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
 function importJSON(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
