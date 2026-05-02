@@ -750,6 +750,7 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.chunk !== undefined) {
       const idx   = parseInt(e.parameter.chunk);
       const total = parseInt(e.parameter.total);
+      const enc   = e.parameter.enc || 'url'; // 'b64' or 'url'
       const props = PropertiesService.getScriptProperties();
       props.setProperty('c' + idx, e.parameter.data || '');
       let full = '';
@@ -759,7 +760,12 @@ function doGet(e) {
         full += c;
       }
       for (let i = 0; i < total; i++) props.deleteProperty('c' + i);
-      const data = JSON.parse(full);
+      // base64デコード（日本語対応）
+      let jsonStr = full;
+      if (enc === 'b64') {
+        jsonStr = Utilities.newBlob(Utilities.base64Decode(full)).getDataAsString('UTF-8');
+      }
+      const data = JSON.parse(jsonStr);
       writeData(data);
       writeReadableSheets(data);
       return respond({ ok: true });
@@ -1233,15 +1239,17 @@ async function save(){
 
 async function manualSync(){
   if(!GAS_URL){openSettings();stab('google');return;}
-  setSyncStatus('saving','送信準備中...');
+  setSyncStatus('saving','エンコード中...');
   try{
     const json=JSON.stringify(db);
-    const CHUNK=6000;
+    // 日本語対応：UTF-8→base64（URLを短く安全に保つ）
+    const b64=btoa(unescape(encodeURIComponent(json)));
+    const CHUNK=3000; // base64チャンク（URLを~3200字に抑える）
     const chunks=[];
-    for(let i=0;i<json.length;i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    for(let i=0;i<b64.length;i+=CHUNK) chunks.push(b64.slice(i,i+CHUNK));
     for(let i=0;i<chunks.length;i++){
       setSyncStatus('saving',`送信中... ${i+1}/${chunks.length}`);
-      const url=GAS_URL+'?chunk='+i+'&total='+chunks.length+'&data='+encodeURIComponent(chunks[i]);
+      const url=GAS_URL+'?chunk='+i+'&total='+chunks.length+'&enc=b64&data='+encodeURIComponent(chunks[i]);
       const res=await fetch(url,{redirect:'follow'});
       const result=await res.json();
       if(result.error) throw new Error(result.error);
