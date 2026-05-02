@@ -68,8 +68,25 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .add-btn:hover{background:#15803d}
 .reg-btn{padding:5px 11px;border-radius:8px;background:#d97706;color:#fff;font-size:12px;font-weight:600}
 .reg-btn:hover{background:#b45309}
+.plan-btn{padding:5px 11px;border-radius:8px;background:#0891b2;color:#fff;font-size:12px;font-weight:600}
+.plan-btn:hover{background:#0e7490}
 .set-btn{padding:5px 11px;border-radius:8px;background:#6366f1;color:#fff;font-size:12px;font-weight:600}
 .set-btn:hover{background:#4f46e5}
+/* ===== PLANNER ===== */
+.plan-mbox{max-width:1000px;width:96vw;max-height:92vh;display:flex;flex-direction:column}
+.plan-mbox .mbdy{flex:1;overflow:hidden;display:flex;flex-direction:column;padding-bottom:0}
+.plan-scroll{flex:1;overflow-y:auto;overflow-x:auto}
+.plan-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.plan-tbl th{background:#f1f5f9;color:#475569;font-weight:700;padding:7px 8px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap;position:sticky;top:0;z-index:2}
+.plan-tbl td{padding:5px 6px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.plan-tbl tr:hover td{background:#f8fafc}
+.plan-we td{background:#fef9c3}.plan-we:hover td{background:#fef08a}
+.plan-sel{border:1.5px solid #cbd5e1;border-radius:5px;padding:3px 5px;font-size:11px;width:100%;min-width:80px}
+.plan-inp{border:1.5px solid #cbd5e1;border-radius:5px;padding:3px 5px;font-size:11px;width:90px}
+.ai-tag{background:#eff6ff;color:#2563eb;border-radius:3px;padding:1px 4px;font-size:9px;font-weight:700;margin-right:3px}
+.reg-tag{background:#dcfce7;color:#15803d;border-radius:3px;padding:1px 4px;font-size:9px;font-weight:700}
+.man-tag{background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 4px;font-size:9px;font-weight:700}
+.plan-foot{padding:10px 0 2px;border-top:1px solid #e2e8f0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
 /* ===== CALENDAR ===== */
 .cal-area{flex:1;overflow:auto;position:relative}
@@ -141,7 +158,8 @@ input,select,textarea{font-family:inherit;font-size:inherit}
   .view-btn{padding:4px 7px;font-size:11px}
   .today-btn{padding:4px 7px;font-size:11px}
   .dt-label{font-size:11px;min-width:100px}
-  .add-btn,.reg-btn,.set-btn{font-size:11px;padding:5px 8px}
+  .add-btn,.reg-btn,.plan-btn,.set-btn{font-size:11px;padding:5px 8px}
+  .plan-mbox{width:100vw;max-width:100vw;border-radius:0}
   .filter-search{flex:1;min-width:0}
   .res-cell,.res-hd{min-width:78px;max-width:78px}
   .res-name{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62px}
@@ -444,6 +462,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <div class="dt-label" id="dtLabel"></div>
     <div class="tsp"></div>
     <button class="reg-btn" onclick="openRegular()">🔁 定期設定</button>
+    <button class="plan-btn" onclick="openPlanner()">📅 配車プランナー</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
     <button class="add-btn" onclick="openAddDispatch()">＋ 配車追加</button>
   </div>
@@ -1085,6 +1104,59 @@ function writeSheet(name, headers, rows) {
       </div>
 
     </div><!-- /mbdy -->
+  </div>
+</div>
+
+<!-- ===== MODAL: PLANNER ===== -->
+<div class="ovl hid" id="mPlanner">
+  <div class="mbox plan-mbox">
+    <div class="mhdr"><h2>📅 配車プランナー <span style="font-size:11px;font-weight:400;color:#94a3b8">― 定期便＋AI提案で一括配車計画</span></h2><span class="mcls" onclick="closeM('mPlanner')">×</span></div>
+    <div class="mbdy">
+      <!-- 期間設定バー -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-bottom:12px;border-bottom:1px solid #e2e8f0;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:12px;font-weight:700;color:#475569;white-space:nowrap">開始日</label>
+          <input type="date" id="plStart" style="border:1.5px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:12px">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:12px;font-weight:700;color:#475569;white-space:nowrap">期間</label>
+          <select id="plPeriod" style="border:1.5px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:12px">
+            <option value="7">1週間</option>
+            <option value="14">2週間</option>
+            <option value="30">1ヶ月</option>
+          </select>
+        </div>
+        <button onclick="generatePlan()" style="background:#0891b2;color:white;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700">🤖 プラン生成</button>
+        <span id="plStatus" style="font-size:11px;color:#64748b"></span>
+      </div>
+      <!-- プラン一覧 -->
+      <div class="plan-scroll">
+        <div id="planEmpty" style="text-align:center;color:#94a3b8;padding:40px 20px;font-size:13px">
+          📅 開始日と期間を選択して「🤖 プラン生成」を押してください<br>
+          <span style="font-size:11px;color:#cbd5e1;margin-top:6px;display:block">定期便設定から自動展開し、AIが最適なドライバー・車両を提案します</span>
+        </div>
+        <table class="plan-tbl" id="planTable" style="display:none">
+          <thead><tr>
+            <th style="width:90px">日付</th>
+            <th style="width:32px">曜日</th>
+            <th>お客様</th>
+            <th>収集先名称</th>
+            <th>ドライバー</th>
+            <th>車両</th>
+            <th style="width:50px">種別</th>
+            <th style="width:26px"></th>
+          </tr></thead>
+          <tbody id="planTbody"></tbody>
+        </table>
+      </div>
+      <!-- フッター -->
+      <div class="plan-foot">
+        <button onclick="addManualPlanRow()" style="background:#16a34a;color:white;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700">＋ 手動追加</button>
+        <div style="flex:1"></div>
+        <span id="planCount" style="font-size:11px;color:#64748b"></span>
+        <button onclick="applyPlan()" id="planApplyBtn" style="display:none;background:#2563eb;color:white;border-radius:8px;padding:8px 22px;font-size:13px;font-weight:700">✅ 全件を配車表に登録</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2724,6 +2796,148 @@ async function delSite(id){
   if(!confirm('この収集先を削除しますか？'))return;
   db.sites=(db.sites||[]).filter(x=>x.id!==id);await save();renderSLists();fillSiteSel();
 }
+
+// ================================================================
+// AUTO-DISPATCH PLANNER
+// ================================================================
+let planItems=[];
+
+function openPlanner(){
+  const d=new Date();
+  document.getElementById('plStart').value=fmt(d);
+  planItems=[];
+  renderPlanTable();
+  openM('mPlanner');
+}
+
+/* AI提案：サイト名・お客様名でパターン検索 */
+function aiSuggestBySite(siteName,custId){
+  const cust=(db.customers||[]).find(c=>c.id===custId);
+  const cn=cust?cust.name:'';
+  // 試行順：収集先名→お客様名（前4文字）
+  const qs=[siteName,cn].filter(Boolean).map(s=>s.toLowerCase());
+  for(const q of qs){
+    if(q.length<2)continue;
+    const hits=AI_PATTERNS.filter(p=>{const s=p.site.toLowerCase();return s.includes(q)||q.includes(s.slice(0,Math.min(s.length,4)));}).sort((a,b)=>b.count-a.count);
+    if(hits.length)return hits[0];
+  }
+  return null;
+}
+function _findDrvId(name){if(!name)return'';return((db.drivers||[]).find(d=>d.name&&(d.name.includes(name)||name.includes(d.name.split(/[\s　]/)[0])))||{}).id||'';}
+function _findVehId(num){if(!num)return'';return((db.vehicles||[]).find(v=>v.name&&(v.name.includes(num)||num.includes(v.name)))||{}).id||'';}
+
+function generatePlan(){
+  const sv=document.getElementById('plStart').value;
+  if(!sv){alert('開始日を選択してください');return;}
+  const days=parseInt(document.getElementById('plPeriod').value)||7;
+  const start=new Date(sv+'T00:00:00');
+  const end=new Date(start);end.setDate(end.getDate()+days-1);
+  planItems=[];
+  const regulars=db.regulars||[];
+  const cur=new Date(start);
+  while(cur<=end){
+    const dow=cur.getDay(),ds=fmt(cur);
+    for(const rs of regulars){
+      if(!rs.dows||!rs.dows.includes(dow))continue;
+      let ok=true;
+      if(rs.freq==='monthly'&&rs.wom!=null){const w=getWOM(cur),lw=getWOM(new Date(cur.getFullYear(),cur.getMonth()+1,0));ok=rs.wom===-1?w===lw:w===rs.wom;}
+      if(rs.freq==='biweekly')ok=getWOM(cur)%2===1;
+      if(!ok)continue;
+      /* AI提案 */
+      const aiSug=aiSuggestBySite(rs.site||'',rs.cust);
+      let drvId=rs.driver||'',vehId=rs.vehicle||'',aiUsed=false;
+      if((!drvId||!vehId)&&aiSug){
+        if(!drvId)drvId=_findDrvId(aiSug.driver);
+        if(!vehId)vehId=_findVehId(aiSug.vehicle);
+        if(drvId||vehId)aiUsed=true;
+      }
+      planItems.push({id:uid(),date:ds,custId:rs.cust,site:rs.site||'',notes:rs.notes||'',driver:drvId,vehicle:vehId,aiSuggested:aiUsed,aiPattern:aiSug,source:'regular',regId:rs.id,isReg:true});
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  planItems.sort((a,b)=>a.date.localeCompare(b.date));
+  const el=document.getElementById('plStatus');
+  el.textContent=planItems.length?`${planItems.length}件の配車予定を生成（AIが自動でドライバー・車両を提案）`:'この期間に定期便の予定がありません。手動追加できます。';
+  renderPlanTable();
+}
+
+function renderPlanTable(){
+  const table=document.getElementById('planTable');
+  const empty=document.getElementById('planEmpty');
+  const tbody=document.getElementById('planTbody');
+  const applyBtn=document.getElementById('planApplyBtn');
+  const countEl=document.getElementById('planCount');
+  if(!planItems.length){table.style.display='none';empty.style.display='';applyBtn.style.display='none';countEl.textContent='';return;}
+  table.style.display='';empty.style.display='none';applyBtn.style.display='';
+  const conf=planItems.filter(p=>p.driver&&p.vehicle).length;
+  countEl.textContent=`合計 ${planItems.length}件（確定予定: ${conf}件 / 未定: ${planItems.length-conf}件）`;
+  const DW=['日','月','火','水','木','金','土'];
+  tbody.innerHTML=planItems.map(item=>{
+    const d=new Date(item.date+'T00:00:00'),dow=d.getDay(),isWE=dow===0||dow===6;
+    const custObj=(db.customers||[]).find(c=>c.id===item.custId);
+    const custNm=custObj?custObj.name:'';
+    const drvOpts='<option value="">-- 未定 --</option>'+(db.drivers||[]).map(dr=>`<option value="${dr.id}"${dr.id===item.driver?' selected':''}>${dr.name}</option>`).join('');
+    const vehOpts='<option value="">-- 未定 --</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}"${v.id===item.vehicle?' selected':''}>${v.name}</option>`).join('');
+    const aiBadge=item.aiSuggested?'<span class="ai-tag">AI</span>':'';
+    const srcBadge=item.source==='regular'?'<span class="reg-tag">定期</span>':'<span class="man-tag">手動</span>';
+    const custCell=item.source==='regular'
+      ?`<td style="white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis" title="${escH(custNm)}">${escH(custNm)}</td>`
+      :`<td><select class="plan-sel" onchange="updPlan('${item.id}','custId',this.value)"><option value="">--選択--</option>${(db.customers||[]).map(c=>`<option value="${c.id}"${c.id===item.custId?' selected':''}>${c.name}</option>`).join('')}</select></td>`;
+    return`<tr${isWE?' class="plan-we"':''} data-id="${item.id}">
+      <td style="white-space:nowrap;font-weight:700;font-size:11px"><input type="date" value="${item.date}" onchange="updPlan('${item.id}','date',this.value)" style="border:1px solid #e2e8f0;border-radius:4px;padding:2px 4px;font-size:11px;width:108px"></td>
+      <td style="text-align:center;font-weight:700;color:${dow===0?'#dc2626':dow===6?'#2563eb':'#374151'}">${DW[dow]}</td>
+      ${custCell}
+      <td><input type="text" class="plan-inp" value="${escH(item.site)}" placeholder="収集先名" onchange="updPlan('${item.id}','site',this.value)"></td>
+      <td>${aiBadge}<select class="plan-sel" onchange="updPlan('${item.id}','driver',this.value)">${drvOpts}</select></td>
+      <td><select class="plan-sel" onchange="updPlan('${item.id}','vehicle',this.value)">${vehOpts}</select></td>
+      <td>${srcBadge}</td>
+      <td><span onclick="delPlanItem('${item.id}')" title="この行を削除" style="cursor:pointer;color:#dc2626;font-size:15px;padding:0 3px">🗑</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function updPlan(id,field,val){
+  const it=planItems.find(p=>p.id===id);if(!it)return;
+  it[field]=val;
+  if(field==='driver'||field==='vehicle'){
+    const countEl=document.getElementById('planCount');
+    if(countEl){const conf=planItems.filter(p=>p.driver&&p.vehicle).length;countEl.textContent=`合計 ${planItems.length}件（確定予定: ${conf}件 / 未定: ${planItems.length-conf}件）`;}
+  }
+}
+function delPlanItem(id){planItems=planItems.filter(p=>p.id!==id);renderPlanTable();}
+
+function addManualPlanRow(){
+  const sv=document.getElementById('plStart').value||fmt(new Date());
+  planItems.push({id:uid(),date:sv,custId:'',site:'',notes:'',driver:'',vehicle:'',aiSuggested:false,source:'manual',isReg:false});
+  renderPlanTable();
+  /* 末尾にスクロール */
+  const scr=document.querySelector('#mPlanner .plan-scroll');
+  if(scr)setTimeout(()=>{scr.scrollTop=scr.scrollHeight;},50);
+}
+
+async function applyPlan(){
+  const valid=planItems.filter(p=>p.custId||p.site);
+  if(!valid.length){alert('登録できる行がありません（お客様か収集先が未入力です）');return;}
+  if(!confirm(`${valid.length}件を配車表に登録しますか？\n（同じ定期便が既に登録済みの日は重複スキップされます）`))return;
+  let added=0;
+  const now=new Date().toISOString();
+  for(const item of valid){
+    /* 定期便の重複チェック */
+    if(item.isReg&&item.regId){
+      const dup=(db.dispatches||[]).some(x=>x.date===item.date&&x.customer===item.custId&&x.isReg&&x.regId===item.regId);
+      if(dup)continue;
+    }
+    const dp={id:uid(),customer:item.custId||null,date:item.date,dispatchDate:item.date,siteName:item.site||'',driver:item.driver||null,vehicle:item.vehicle||null,notes:item.notes||'',status:(item.driver&&item.vehicle)?'confirmed':'pending',isReg:item.isReg||false,regId:item.regId||null,created:now,updated:now};
+    (db.dispatches||(db.dispatches=[])).push(dp);
+    added++;
+  }
+  await save();render();
+  closeM('mPlanner');
+  alert(`✅ ${added}件を配車表に登録しました！`);
+  if(planItems.length){const d=new Date(planItems[0].date+'T00:00:00');ST.date=d;setView('week');}
+}
+
+function escH(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ================================================================
 // REGULAR SCHEDULES
