@@ -123,6 +123,10 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .ecard.ec-reg{background:#dbeafe;border-left-color:#2563eb;color:#1e3a8a}
 .ecard.ec-spot{background:#dcfce7;border-left-color:#16a34a;color:#14532d}
 .ecard.ec-pend{background:#fee2e2;border-left-color:#dc2626;color:#7f1d1d}
+.ecard.ec-ship{background:#fff7ed;border-left-color:#ea580c;color:#7c2d12}
+.ecard.ec-ship-pend{background:#ffedd5;border-left-color:#dc2626;color:#7c2d12}
+.ship-add-btn{padding:5px 11px;border-radius:8px;background:#ea580c;color:#fff;font-size:12px;font-weight:600}
+.ship-add-btn:hover{background:#c2410c}
 /* 祝日カード */
 .ecard.ec-hol{outline:1.5px solid #fca5a5;outline-offset:-1px}
 .ec-hol-badge{display:inline-block;font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle;line-height:1.5;white-space:nowrap}
@@ -464,6 +468,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <button class="reg-btn" onclick="openRegular()">🔁 定期設定</button>
     <button class="plan-btn" onclick="openPlanner()">📅 配車プランナー</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
+    <button class="ship-add-btn" onclick="openAddShipment()">📦 出荷追加</button>
     <button class="add-btn" onclick="openAddDispatch()">＋ 配車追加</button>
   </div>
 
@@ -867,8 +872,8 @@ function writeReadableSheets(data) {
     return isNaN(d.getTime()) ? '' : DOW[d.getDay()];
   }
 
-  // ===== 📋 配車一覧（全件） =====
-  const dispAll = (data.dispatches||[]).map(dp => {
+  // ===== 📋 配車一覧（収集のみ、出荷を除く） =====
+  const dispAll = (data.dispatches||[]).filter(dp => dp.dispatchType !== 'shipment').map(dp => {
     const wDate = dp.dispatchDate || dp.date || '';
     const wt = dp.workType || {};
     const wtStr = wt.type === 'container' ? 'コンテナ(' + (wt.containerOp||'') + '/' + (wt.containerSize||'') + ')' : wt.type === 'manual' ? '手積み' : '';
@@ -895,9 +900,9 @@ function writeReadableSheets(data) {
     dispAll
   );
 
-  // ===== ✅ 配車実績（確定済みのみ） =====
+  // ===== ✅ 配車実績（収集・確定済みのみ） =====
   const dispDone = (data.dispatches||[]).filter(dp =>
-    dp.status === 'confirmed' && (dp.dispatchDate || dp.date)
+    dp.dispatchType !== 'shipment' && dp.status === 'confirmed' && (dp.dispatchDate || dp.date)
   ).map(dp => {
     const wDate = dp.dispatchDate || dp.date || '';
     return [
@@ -913,6 +918,44 @@ function writeReadableSheets(data) {
     ['配車日','曜日','お客様名','お客様担当者','担当者電話','収集先名称','収集先担当者','収集先電話',
      'ドライバー','車両','種別','備考','受付担当者','受付日'],
     dispDone
+  );
+
+  // ===== 📦 出荷一覧 =====
+  const shipAll = (data.dispatches||[]).filter(dp => dp.dispatchType === 'shipment').map(dp => {
+    const wDate = dp.dispatchDate || dp.date || '';
+    return [
+      fmtDate(wDate), dow(wDate),
+      dp.destName || '', dp.destContact || '', dp.destPhone || '', dp.destAddr || '',
+      drvName(dp.driver), vehName(dp.vehicle),
+      dp.isCarryIn ? '持込み' : '出荷',
+      dp.status === 'confirmed' ? '確定' : '保留',
+      dp.notes || '', dp.caution || '', dp.receptionist || '',
+      (dp.deadline || ''), (dp.created||'').slice(0,10)
+    ];
+  });
+  writeSheet('📦出荷一覧',
+    ['出荷日','曜日','出荷先名称','出荷先担当者','出荷先電話','出荷先住所',
+     'ドライバー','車両','種別','ステータス','備考・出荷内容','注意事項','担当者','期限','登録日'],
+    shipAll
+  );
+
+  // ===== ✅ 出荷実績（確定済みのみ） =====
+  const shipDone = (data.dispatches||[]).filter(dp =>
+    dp.dispatchType === 'shipment' && dp.status === 'confirmed' && (dp.dispatchDate || dp.date)
+  ).map(dp => {
+    const wDate = dp.dispatchDate || dp.date || '';
+    return [
+      fmtDate(wDate), dow(wDate),
+      dp.destName || '', dp.destContact || '', dp.destPhone || '', dp.destAddr || '',
+      drvName(dp.driver), vehName(dp.vehicle),
+      dp.isCarryIn ? '持込み' : '出荷',
+      dp.notes || '', dp.receptionist || ''
+    ];
+  });
+  writeSheet('✅出荷実績',
+    ['出荷日','曜日','出荷先名称','出荷先担当者','出荷先電話','出荷先住所',
+     'ドライバー','車両','種別','備考・出荷内容','担当者'],
+    shipDone
   );
 
   // ===== 🏢 お客様マスタ =====
@@ -1104,6 +1147,81 @@ function writeSheet(name, headers, rows) {
       </div>
 
     </div><!-- /mbdy -->
+  </div>
+</div>
+
+<!-- ===== MODAL: SHIPMENT（出荷） ===== -->
+<div class="ovl hid" id="mShipment">
+  <div class="mbox">
+    <div class="mhdr" style="background:linear-gradient(135deg,#ea580c 0%,#c2410c 100%)">
+      <h2 id="mSTitle">📦 出荷追加</h2>
+      <span class="mcls" onclick="closeM('mShipment')">×</span>
+    </div>
+    <div class="mbdy">
+      <!-- 出荷先情報 -->
+      <div style="font-size:11px;font-weight:700;color:#9a3412;margin-bottom:6px;background:#ffedd5;padding:4px 8px;border-radius:4px">📦 出荷先情報</div>
+      <div class="r2">
+        <div class="fr"><label>出荷先 名称 *</label><input type="text" id="sDestName" placeholder="例: 〇〇工場 / 〇〇倉庫"></div>
+        <div class="fr"><label>出荷先 担当者名</label><input type="text" id="sDestContact" placeholder="例: 山田 部長"></div>
+      </div>
+      <div class="r2">
+        <div class="fr"><label>出荷先 電話番号</label><input type="tel" id="sDestPhone" placeholder="例: 082-000-0000"></div>
+        <div class="fr"><label>出荷先 住所</label><input type="text" id="sDestAddr" placeholder="例: 広島市〇〇区〇〇1-2-3"></div>
+      </div>
+      <hr style="margin:10px 0">
+      <!-- 日程 -->
+      <div class="r2">
+        <div class="fr"><label>🚛 配車確定日 <span style="font-size:9px;color:#ea580c;font-weight:400">※出荷日</span></label><input type="date" id="sDispDate"></div>
+        <div class="fr"><label>期限（いつまでに）</label><input type="date" id="sDeadline"></div>
+      </div>
+      <!-- 持込み -->
+      <div style="margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;font-size:13px;font-weight:700;color:#c2410c">
+          <input type="checkbox" id="sCarryIn" onchange="onSCarryInChange()" style="width:16px;height:16px;accent-color:#ea580c">
+          🏭 持込み（ドライバー・車両 不要）
+        </label>
+      </div>
+      <!-- ドライバー・車両 -->
+      <div class="r2" id="sDriverVehicleRow">
+        <div class="fr"><label>ドライバー</label>
+          <button type="button" class="mp-trigger" id="sDriverTrigger" onclick="openMP('driver',this,'sDriver')">
+            <span class="mp-trigger-txt" id="sDriverTxt">-- 未定 --</span>
+            <span class="mp-trigger-arr">▼</span>
+          </button>
+          <select id="sDriver" style="display:none" onchange="chkSLic()"><option value="">-- 未定 --</option></select>
+        </div>
+        <div class="fr"><label>車両</label>
+          <button type="button" class="mp-trigger" id="sVehicleTrigger" onclick="openMP('vehicle',this,'sVehicle')">
+            <span class="mp-trigger-txt" id="sVehicleTxt">-- 未定 --</span>
+            <span class="mp-trigger-arr">▼</span>
+          </button>
+          <select id="sVehicle" style="display:none" onchange="chkSLic()"><option value="">-- 未定 --</option></select>
+        </div>
+      </div>
+      <div class="warn-txt" id="sLicWarn">⚠ このドライバーは選択車両の必要免許を持っていない可能性があります。</div>
+      <!-- ステータス・受付担当 -->
+      <div class="r2">
+        <div class="fr"><label>受付担当者</label><input type="text" id="sReceptionist" placeholder="担当者名"></div>
+        <div class="fr"><label>ステータス</label>
+          <select id="sStatus"><option value="pending">🔴 保留中</option><option value="confirmed">✅ 確定</option></select>
+        </div>
+      </div>
+      <hr style="margin:10px 0">
+      <!-- 備考 -->
+      <div class="fr"><label>備考・出荷内容</label>
+        <textarea id="sNotes" rows="2" style="width:100%;resize:vertical;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px;font-size:13px;box-sizing:border-box" placeholder="出荷品目・数量・特記事項など"></textarea>
+      </div>
+      <div class="fr" style="margin-top:6px"><label>注意事項</label>
+        <textarea id="sCaution" rows="1" style="width:100%;resize:vertical;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px;font-size:13px;box-sizing:border-box" placeholder="取扱注意など"></textarea>
+      </div>
+      <!-- ボタン -->
+      <div class="mftr">
+        <button class="btn btn-d hid" id="sDelBtn" onclick="delShipment()">削除</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-s" onclick="closeM('mShipment')">キャンセル</button>
+        <button class="btn btn-p" style="background:#ea580c" onclick="saveShipment()">💾 保存</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1784,6 +1902,7 @@ function initColResize(){
 
 function dayCardHTML(dp,seqNo){
   const isCarryIn=!!dp.isCarryIn;
+  const isShip=dp.dispatchType==='shipment';
   const wdate=workDate(dp)||'';
   const holName=HOLIDAYS[wdate]||'';
   const veh=!isCarryIn?(vehName(dp.vehicle)||'未定'):'';
@@ -1793,39 +1912,59 @@ function dayCardHTML(dp,seqNo){
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
+  const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
   let cls='ecard ec-day ';
   if(isCarryIn)cls+='ec-carry';
+  else if(isShip)cls+=(!dp.driver||!dp.vehicle)?'ec-ship-pend':'ec-ship';
   else if(!dp.driver||!dp.vehicle)cls+='ec-pend';
   else if(dp.isReg)cls+='ec-reg';
   else cls+='ec-spot';
   if(holName)cls+=' ec-hol';
+  const titleLine=isShip
+    ?`<div class="ec-day-cust">📦 ${statusMark}${escH(dp.destName)||'出荷'}${holBadge}</div>`
+    :`<div class="ec-day-seq">${statusMark}第${seqNo}業務${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div><div class="ec-day-cust">${custName(dp.customer)}</div>`;
   return`<div class="${cls}" draggable="true" data-did="${dp.id}"
     ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
-    onclick="event.stopPropagation();editDisp('${dp.id}')">
+    onclick="event.stopPropagation();${editFn}">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-    <div class="ec-day-seq">${statusMark}第${seqNo}業務${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div>
-    <div class="ec-day-cust">${custName(dp.customer)}</div>
+    ${titleLine}
     ${!isCarryIn?`<div class="ec-day-veh">🚛 ${veh}</div>`:`<div class="ec-day-veh">🏭 持込み</div>`}
-    ${dp.siteName?`<div class="ec-day-site">📍 ${dp.siteName}</div>`:''}
+    ${!isShip&&dp.siteName?`<div class="ec-day-site">📍 ${dp.siteName}</div>`:''}
+    ${isShip&&dp.destAddr?`<div class="ec-day-site">🏭 ${dp.destAddr.slice(0,20)}</div>`:''}
     ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:''}
     ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
   </div>`;
 }
 function cardHTML(dp){
   const isCarryIn=!!dp.isCarryIn;
+  const isShip=dp.dispatchType==='shipment';
   const isUnass=!isCarryIn&&(!dp.driver||!dp.vehicle);
   const wdate=workDate(dp)||'';
   const holName=HOLIDAYS[wdate]||'';
-  let cls='ecard '+(isCarryIn?'ec-carry':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
-  if(holName)cls+=' ec-hol';
   const statusMark=dp.status==='pending'?'🔴 ':'';
   const holBadge=holName?`<span class="ec-hol-badge">🎌 祝</span>`:'';
-  const sub=isCarryIn?'🏭 持込み':(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
   const dlHtml=dp.deadline?`<div class="ec-sub" style="font-size:10px;color:${dlOver?'#dc2626':dlSoon?'#d97706':'#64748b'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:'';
+  if(isShip){
+    const cls='ecard '+(isCarryIn?'ec-carry':isUnass?'ec-ship-pend':'ec-ship')+(holName?' ec-hol':'');
+    const sub=isCarryIn?'🏭 持込み':(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
+    return`<div class="${cls}" draggable="true" data-did="${dp.id}"
+      ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+      onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
+      onclick="event.stopPropagation();editShipment('${dp.id}')">
+      <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
+      <div class="ec-cust">📦 ${statusMark}${escH(dp.destName)||'出荷'}${holBadge}</div>
+      <div class="ec-sub">${sub}</div>
+      ${dlHtml}
+      ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.65">${dp.notes.slice(0,20)}</div>`:''}
+    </div>`;
+  }
+  let cls='ecard '+(isCarryIn?'ec-carry':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
+  if(holName)cls+=' ec-hol';
+  const sub=isCarryIn?'🏭 持込み':(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
   return`<div class="${cls}" draggable="true" data-did="${dp.id}"
     ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
@@ -1849,13 +1988,22 @@ function renderPending(){
   } else {
     const today=fmt(new Date());
     html+=pend.map(dp=>{
+      const isShip=dp.dispatchType==='shipment';
       const dlOver=dp.deadline&&dp.deadline<today;
       const dlHtml=dp.deadline?`<div class="pcrd-info" style="color:${dlOver?'#dc2626':'#d97706'};font-weight:700">⏰ 期限: ${dp.deadline}${dlOver?' ⚠過ぎています':''}</div>`:'';
-      return`<div class="pcrd" draggable="true"
+      const cardStyle=isShip?'border-color:#ea580c':'';
+      const nameHtml=isShip
+        ?`<div class="pcrd-name" style="color:#ea580c">📦 ${escH(dp.destName)||'出荷'}</div>`
+        :`<div class="pcrd-name">🔴 ${custName(dp.customer)}</div>`;
+      const infoHtml=isShip
+        ?`<div class="pcrd-info">${workDate(dp)?`🚛 出荷日: ${workDate(dp)}`:'🚛 出荷日: 未定'}</div>`
+        :`<div class="pcrd-info">${workDate(dp)?`🚛 配車日: ${workDate(dp)}`:'🚛 配車日: 未定'}${dp.date&&dp.date!==workDate(dp)?`<span style="font-size:9px;color:#94a3b8"> (受付: ${dp.date})</span>`:''}</div>`;
+      const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
+      return`<div class="pcrd" draggable="true" style="${cardStyle}"
         ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
-        onclick="editDisp('${dp.id}')">
-        <div class="pcrd-name">🔴 ${custName(dp.customer)}</div>
-        <div class="pcrd-info">${workDate(dp)?`🚛 配車日: ${workDate(dp)}`:'🚛 配車日: 未定'}${dp.date&&dp.date!==workDate(dp)?`<span style="font-size:9px;color:#94a3b8"> (受付: ${dp.date})</span>`:''}</div>
+        onclick="${editFn}">
+        ${nameHtml}
+        ${infoHtml}
         ${dlHtml}
         <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
       </div>`;}).join('');
@@ -2152,15 +2300,35 @@ function workTypeLabel(wt){
 // ================================================================
 function showDispPopup(e,id){
   const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
-  const cu=db.customers.find(x=>x.id===dp.customer);
+  const isShip=dp.dispatchType==='shipment';
   const dr=db.drivers.find(x=>x.id===dp.driver);
   const ve=db.vehicles.find(x=>x.id===dp.vehicle);
   const DOW2=['日','月','火','水','木','金','土'];
   const wDate=dp.dispatchDate||dp.date;
   const dispDateStr=wDate?(()=>{const d=pd(wDate);return`${wDate}（${DOW2[d.getDay()]}）`;})():'未定';
-  const rcvDateStr=dp.date||'—';
   const statusStr=dp.status==='confirmed'?'✅ 確定':'🔴 保留中';
-  let rows=`<div class="pop-title">${cu?cu.name:'（お客様未設定）'}</div>`;
+  let rows;
+  if(isShip){
+    rows=`<div class="pop-title" style="color:#c2410c">📦 ${escH(dp.destName)||'出荷'}</div>`;
+    rows+=`<div class="pop-row"><span class="pop-label" style="color:#ea580c;font-weight:800">出荷日</span><span class="pop-val" style="color:#ea580c;font-weight:700">${dispDateStr}</span></div>`;
+    if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">期限</span><span class="pop-val">${dp.deadline}</span></div>`;
+    rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
+    if(dp.isCarryIn){rows+=`<div class="pop-row"><span class="pop-label">種別</span><span class="pop-val">🏭 持込み</span></div>`;}
+    else{rows+=`<div class="pop-row"><span class="pop-label">ドライバー</span><span class="pop-val">${dr?dr.name:'未定'}</span></div>`;rows+=`<div class="pop-row"><span class="pop-label">車両</span><span class="pop-val">${ve?ve.name:'未定'}${ve&&ve.plate?` (${ve.plate})`:''}</span></div>`;}
+    if(dp.destAddr||dp.destContact||dp.destPhone){
+      rows+=`<div class="pop-section"><div class="pop-sec-title" style="color:#ea580c">📦 出荷先詳細</div>`;
+      if(dp.destContact)rows+=`<div class="pop-row"><span class="pop-label">担当者</span><span class="pop-val">${escH(dp.destContact)}</span></div>`;
+      if(dp.destPhone)rows+=`<div class="pop-row"><span class="pop-label">電話</span><span class="pop-val">${escH(dp.destPhone)}</span></div>`;
+      if(dp.destAddr)rows+=`<div class="pop-row"><span class="pop-label">住所</span><span class="pop-val">${escH(dp.destAddr)}</span></div>`;
+      rows+=`</div>`;
+    }
+    if(dp.notes){rows+=`<div class="pop-section"><div class="pop-sec-title">📝 出荷内容</div><div style="color:#475569;white-space:pre-wrap">${escH(dp.notes)}</div></div>`;}
+    if(dp.caution){rows+=`<div class="pop-section" style="background:#fff7ed;border-radius:6px;padding:6px 8px;margin-top:6px"><div class="pop-sec-title" style="color:#c2410c">⚠ 注意事項</div><div style="color:#9a3412;white-space:pre-wrap">${escH(dp.caution)}</div></div>`;}
+    if(dp.receptionist)rows+=`<div class="pop-row" style="margin-top:4px"><span class="pop-label">担当者</span><span class="pop-val">${escH(dp.receptionist)}</span></div>`;
+  } else {
+  const cu=db.customers.find(x=>x.id===dp.customer);
+  const rcvDateStr=dp.date||'—';
+  rows=`<div class="pop-title">${cu?cu.name:'（お客様未設定）'}</div>`;
   rows+=`<div class="pop-row"><span class="pop-label" style="color:#1e40af;font-weight:800">配車確定日</span><span class="pop-val" style="color:#1e40af;font-weight:700">${dispDateStr}</span></div>`;
   rows+=`<div class="pop-row"><span class="pop-label">受付日</span><span class="pop-val" style="font-size:10px;color:#94a3b8">${rcvDateStr}</span></div>`;
   if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">期限</span><span class="pop-val">${dp.deadline}</span></div>`;
@@ -2182,6 +2350,7 @@ function showDispPopup(e,id){
   if(dp.notes){rows+=`<div class="pop-section"><div class="pop-sec-title">📝 備考</div><div style="color:#475569;white-space:pre-wrap">${dp.notes}</div></div>`;}
   if(dp.caution){rows+=`<div class="pop-section" style="background:#fffbeb;border-radius:6px;padding:6px 8px;margin-top:6px"><div class="pop-sec-title" style="color:#b45309">⚠ 注意事項</div><div style="color:#92400e;white-space:pre-wrap">${dp.caution}</div></div>`;}
   if(dp.receptionist)rows+=`<div class="pop-row" style="margin-top:4px"><span class="pop-label">受付担当</span><span class="pop-val">${dp.receptionist}</span></div>`;
+  }
   const popup=document.getElementById('dispPopup');
   popup.innerHTML=rows;
   const rect=e.currentTarget.getBoundingClientRect();
@@ -2421,7 +2590,7 @@ function fillDSel(){
 function syncMPTrigger(selId){
   const sel=document.getElementById(selId);if(!sel)return;
   const opt=sel.options[sel.selectedIndex];
-  const map={dCust:'dCustTxt',dDriver:'dDriverTxt',dVehicle:'dVehicleTxt'};
+  const map={dCust:'dCustTxt',dDriver:'dDriverTxt',dVehicle:'dVehicleTxt',sDriver:'sDriverTxt',sVehicle:'sVehicleTxt'};
   const txtEl=document.getElementById(map[selId]);if(!txtEl)return;
   if(opt&&opt.value){txtEl.textContent=opt.text;txtEl.classList.add('filled');}
   else{txtEl.textContent=opt?opt.text:'-- 選択 --';txtEl.classList.remove('filled');}
@@ -2938,6 +3107,100 @@ async function applyPlan(){
 }
 
 function escH(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ================================================================
+// SHIPMENT CRUD（出荷）
+// ================================================================
+function fillSSel(){
+  document.getElementById('sDriver').innerHTML='<option value="">-- 未定 --</option>'+(db.drivers||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  document.getElementById('sVehicle').innerHTML='<option value="">-- 未定 --</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}">${v.name}（${v.req}以上）</option>`).join('');
+}
+function syncShipMPTriggers(){['sDriver','sVehicle'].forEach(syncMPTrigger);}
+function openAddShipment(date,rid){
+  ST.editId=null;fillSSel();
+  document.getElementById('mSTitle').textContent='📦 出荷追加';
+  document.getElementById('sDestName').value='';
+  document.getElementById('sDestContact').value='';
+  document.getElementById('sDestPhone').value='';
+  document.getElementById('sDestAddr').value='';
+  document.getElementById('sDispDate').value=date||'';
+  document.getElementById('sDeadline').value='';
+  document.getElementById('sCarryIn').checked=false;
+  document.getElementById('sDriver').value='';
+  document.getElementById('sVehicle').value='';
+  document.getElementById('sReceptionist').value='';
+  document.getElementById('sStatus').value='pending';
+  document.getElementById('sNotes').value='';
+  document.getElementById('sCaution').value='';
+  document.getElementById('sDelBtn').classList.add('hid');
+  document.getElementById('sLicWarn').classList.remove('show');
+  document.getElementById('sDriverVehicleRow').style.display='';
+  if(rid){if(ST.res==='driver')document.getElementById('sDriver').value=rid;else document.getElementById('sVehicle').value=rid;}
+  syncShipMPTriggers();
+  openM('mShipment');
+}
+function editShipment(id){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
+  ST.editId=id;fillSSel();
+  document.getElementById('mSTitle').textContent='📦 出荷編集';
+  document.getElementById('sDestName').value=dp.destName||'';
+  document.getElementById('sDestContact').value=dp.destContact||'';
+  document.getElementById('sDestPhone').value=dp.destPhone||'';
+  document.getElementById('sDestAddr').value=dp.destAddr||'';
+  document.getElementById('sDispDate').value=dp.dispatchDate||dp.date||'';
+  document.getElementById('sDeadline').value=dp.deadline||'';
+  document.getElementById('sCarryIn').checked=!!dp.isCarryIn;
+  document.getElementById('sDriver').value=dp.driver||'';
+  document.getElementById('sVehicle').value=dp.vehicle||'';
+  document.getElementById('sReceptionist').value=dp.receptionist||'';
+  document.getElementById('sStatus').value=dp.status||'pending';
+  document.getElementById('sNotes').value=dp.notes||'';
+  document.getElementById('sCaution').value=dp.caution||'';
+  document.getElementById('sDelBtn').classList.remove('hid');
+  document.getElementById('sLicWarn').classList.remove('show');
+  onSCarryInChange();
+  syncShipMPTriggers();
+  openM('mShipment');
+}
+async function saveShipment(){
+  const destName=document.getElementById('sDestName').value.trim();
+  if(!destName){alert('出荷先 名称を入力してください');return;}
+  const destContact=document.getElementById('sDestContact').value.trim();
+  const destPhone=document.getElementById('sDestPhone').value.trim();
+  const destAddr=document.getElementById('sDestAddr').value.trim();
+  const dispatchDate=document.getElementById('sDispDate').value||null;
+  const deadline=document.getElementById('sDeadline').value||null;
+  const isCarryIn=document.getElementById('sCarryIn').checked;
+  const driver=isCarryIn?null:document.getElementById('sDriver').value||null;
+  const vehicle=isCarryIn?null:document.getElementById('sVehicle').value||null;
+  const receptionist=document.getElementById('sReceptionist').value.trim();
+  const status=document.getElementById('sStatus').value;
+  const notes=document.getElementById('sNotes').value.trim();
+  const caution=document.getElementById('sCaution').value.trim();
+  const finalStatus=isCarryIn?'confirmed':(driver&&vehicle?status:status);
+  const now=new Date().toISOString();
+  if(ST.editId){
+    const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
+    if(dp)Object.assign(dp,{dispatchType:'shipment',destName,destContact,destPhone,destAddr,dispatchDate,date:dispatchDate,deadline,isCarryIn,driver,vehicle,receptionist,status:finalStatus,notes,caution,updated:now});
+  } else {
+    db.dispatches.push({id:uid(),dispatchType:'shipment',destName,destContact,destPhone,destAddr,dispatchDate,date:dispatchDate,deadline,isCarryIn,driver,vehicle,receptionist,status:finalStatus,notes,caution,created:now,updated:now});
+  }
+  await save();closeM('mShipment');render();renderPending();
+}
+async function delShipment(){
+  if(!ST.editId)return;if(!confirm('この出荷予定を削除しますか？'))return;
+  db.dispatches=db.dispatches.filter(x=>x.id!==ST.editId);await save();closeM('mShipment');render();renderPending();
+}
+function onSCarryInChange(){
+  const isCarryIn=document.getElementById('sCarryIn').checked;
+  document.getElementById('sDriverVehicleRow').style.display=isCarryIn?'none':'';
+  if(isCarryIn)document.getElementById('sLicWarn').classList.remove('show');
+}
+function chkSLic(){
+  const dr=(db.drivers||[]).find(x=>x.id===document.getElementById('sDriver').value);
+  const ve=(db.vehicles||[]).find(x=>x.id===document.getElementById('sVehicle').value);
+  document.getElementById('sLicWarn').classList.toggle('show',!!(dr&&ve&&!canDrive(dr,ve)));
+}
 
 // ================================================================
 // REGULAR SCHEDULES
