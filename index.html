@@ -1224,14 +1224,19 @@ async function save(){
   if(!GAS_URL)return;
   setSyncStatus('saving');
   try{
-    // no-cors mode: CORSブロックを回避してPOST送信（レスポンスは読まない）
-    await fetch(GAS_URL,{
+    // redirect:'manual' でGASがdoPostを実行後の302リダイレクトをブロックしCORSエラーを回避
+    const res=await fetch(GAS_URL,{
       method:'POST',
-      mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=UTF-8'},
-      body:JSON.stringify(db)
+      body:JSON.stringify(db),
+      redirect:'manual'
     });
-    setSyncStatus('ok');
+    // opaqueredirect = GASがdoPostを実行してリダイレクト応答 = 保存成功
+    if(res.type==='opaqueredirect'||res.ok){
+      setSyncStatus('ok');
+    }else{
+      setSyncStatus('error','保存エラー（ローカルには保存済み）');
+    }
   }catch(e){
     setSyncStatus('error','保存エラー（ローカルには保存済み）');
     console.warn('GAS save error:',e);
