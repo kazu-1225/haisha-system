@@ -997,6 +997,111 @@ function writeSheet(name, headers, rows) {
     sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
   }
   try { sheet.autoResizeColumns(1, headers.length); } catch(e) {}
+}
+
+// =====================================================
+// 📚 実績ログ自動アーカイブ（毎日タイマーで実行）
+// 確定済み＆当日以前の配車を追記専用シートへ保存
+// 同じIDは2度書かないため実績が上書きされない
+// =====================================================
+function archiveConfirmedDispatches() {
+  const data = readData();
+  const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+  const DOW = ['日','月','火','水','木','金','土'];
+
+  function fmtDate(s) {
+    if (!s) return '';
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? s
+      : d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
+  }
+  function dow(s) {
+    if (!s) return '';
+    try { return DOW[new Date(s).getDay()]; } catch(e) { return ''; }
+  }
+  function findName(arr, id, field) {
+    if (!id || !arr) return '';
+    const f = arr.find(x => x.id === id);
+    return f ? (f[field] || '') : '';
+  }
+
+  const SHEET_NAME = '📚実績ログ';
+  const HEADERS = [
+    '記録日時', '種別', '配車日/出荷日', '曜日',
+    'お客様名/出荷先名称', '収集先名称', '担当者', '電話', '住所',
+    'ドライバー', '車両', '備考', '注意事項',
+    '受付日/登録日', '期限', '配車ID'
+  ];
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    const hRow = sheet.getRange(1, 1, 1, HEADERS.length);
+    hRow.setValues([HEADERS]);
+    hRow.setFontWeight('bold');
+    hRow.setBackground('#1e3a5f');
+    hRow.setFontColor('white');
+    try { sheet.autoResizeColumns(1, HEADERS.length); } catch(e) {}
+  }
+
+  // 記録済みIDを収集（重複防止）
+  const lastRow = sheet.getLastRow();
+  const archivedIds = new Set();
+  if (lastRow >= 2) {
+    const idCol = sheet.getRange(2, HEADERS.length, lastRow - 1, 1).getValues();
+    idCol.forEach(r => { if (r[0]) archivedIds.add(String(r[0])); });
+  }
+
+  // 確定済み＆当日以前＆未記録の配車を抽出
+  const toArchive = (data.dispatches || []).filter(dp => {
+    const wDate = dp.dispatchDate || dp.date || '';
+    return dp.status === 'confirmed'
+      && wDate
+      && wDate <= today
+      && !archivedIds.has(String(dp.id));
+  });
+
+  if (toArchive.length === 0) return;
+
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
+
+  const rows = toArchive.map(dp => {
+    const isShip = dp.dispatchType === 'shipment';
+    const wDate = dp.dispatchDate || dp.date || '';
+    const drvName = dp.isCarryIn ? '持込み' : (findName(data.drivers, dp.driver, 'name') || '未定');
+    const vehName = dp.isCarryIn ? '—'      : (findName(data.vehicles, dp.vehicle, 'name') || '未定');
+
+    if (isShip) {
+      return [
+        nowStr, '出荷',
+        fmtDate(wDate), dow(wDate),
+        dp.destName || '',
+        '',
+        dp.destContact || '', dp.destPhone || '', dp.destAddr || '',
+        drvName, vehName,
+        dp.notes || '', dp.caution || '',
+        fmtDate(dp.dispatchDate || dp.date), dp.deadline || '', dp.id
+      ];
+    } else {
+      const custName = findName(data.customers, dp.customer, 'name');
+      return [
+        nowStr,
+        dp.isCarryIn ? '持込み' : dp.isReg ? '定期便' : 'スポット',
+        fmtDate(wDate), dow(wDate),
+        custName,
+        dp.siteName || '',
+        dp.siteContact || '', dp.sitePhone || '', dp.siteAddr || '',
+        drvName, vehName,
+        dp.notes || '', dp.caution || '',
+        fmtDate(dp.date), dp.deadline || '', dp.id
+      ];
+    }
+  });
+
+  if (rows.length > 0) {
+    sheet.getRange(lastRow + 1, 1, rows.length, HEADERS.length).setValues(rows);
+  }
 }</div>
           </div>
         </div>
