@@ -1219,7 +1219,11 @@ async function loadDB(){
   if(GAS_URL){
     try{
       setSyncStatus('loading');
-      const res=await fetch(GAS_URL+'?t='+Date.now(),{redirect:'follow'});
+      // 15秒タイムアウト：GASが応答しない場合はローカルにフォールバック
+      const ctrl=new AbortController();
+      const tid=setTimeout(()=>ctrl.abort(),15000);
+      const res=await fetch(GAS_URL+'?t='+Date.now(),{redirect:'follow',signal:ctrl.signal});
+      clearTimeout(tid);
       const data=await res.json();
       if(data&&Array.isArray(data.dispatches)){
         db=data;normalizeDB();
@@ -1227,8 +1231,12 @@ async function loadDB(){
         setSyncStatus('ok');return;
       }
     }catch(e){
+      if(e.name==='AbortError'){
+        setSyncStatus('error','GAS読込タイムアウト（ローカルを使用）');
+      }else{
+        setSyncStatus('error','サーバー接続失敗（ローカルを使用）');
+      }
       console.warn('GAS load failed:',e);
-      setSyncStatus('error','サーバー接続失敗（ローカルを使用）');
     }
   }
   try{const s=localStorage.getItem('haishaDB2');if(s){db=JSON.parse(s);normalizeDB();return;}}catch(e){}
