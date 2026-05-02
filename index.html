@@ -784,15 +784,30 @@ function respond(obj) {
 
 function readData() {
   const sheet = getSheet(SHEET_NAME);
-  const val = sheet.getRange('A1').getValue();
-  if (!val) return {
-    drivers: [], vehicles: [], customers: [], regulars: [], dispatches: []
-  };
-  return JSON.parse(val);
+  const lastRow = sheet.getLastRow();
+  if (lastRow === 0) return { drivers: [], vehicles: [], customers: [], regulars: [], dispatches: [] };
+  // 複数セルに分割して保存されているJSONを結合
+  const values = sheet.getRange(1, 1, lastRow, 1).getValues();
+  const json = values.map(r => r[0]).join('');
+  if (!json) return { drivers: [], vehicles: [], customers: [], regulars: [], dispatches: [] };
+  return JSON.parse(json);
 }
 
 function writeData(data) {
-  getSheet(SHEET_NAME).getRange('A1').setValue(JSON.stringify(data));
+  const sheet = getSheet(SHEET_NAME);
+  const json = JSON.stringify(data);
+  const LIMIT = 49000; // Sheetsの50000文字制限に余裕を持たせる
+  sheet.clearContents();
+  if (json.length <= LIMIT) {
+    sheet.getRange('A1').setValue(json);
+  } else {
+    // 大きなJSONを複数セルに分割して保存
+    const cells = [];
+    for (let i = 0; i < json.length; i += LIMIT) {
+      cells.push([json.slice(i, i + LIMIT)]);
+    }
+    sheet.getRange(1, 1, cells.length, 1).setValues(cells);
+  }
 }
 
 function getSheet(name) {
