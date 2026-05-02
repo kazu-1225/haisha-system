@@ -803,6 +803,7 @@ async function manualSync(){
       const res=await fetch(url,{redirect:'follow'});
       const result=await res.json();
       if(result.error) throw new Error(result.error);
+      if(result.ok!==true && result.ok!=='waiting') throw new Error('GASコードが古いです。Apps Scriptを更新・再デプロイしてください。');
     }
     setSyncStatus('ok');
   }catch(e){
