@@ -130,6 +130,10 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 /* 祝日カード */
 .ecard.ec-hol{outline:1.5px solid #fca5a5;outline-offset:-1px}
 .ec-hol-badge{display:inline-block;font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle;line-height:1.5;white-space:nowrap}
+/* クレーン（1.5BOX）専用カード */
+.ecard.ec-crane{background:repeating-linear-gradient(135deg,#fefce8,#fefce8 6px,#fef08a 6px,#fef08a 8px);border-left:4px solid #ca8a04;color:#713f12}
+.ecard.ec-crane:hover{box-shadow:0 2px 10px rgba(202,138,4,.35)}
+.ec-crane-badge{display:inline-block;font-size:9px;font-weight:800;color:#92400e;background:#fde68a;border-radius:3px;padding:0 4px;margin-left:3px;vertical-align:middle;line-height:1.5;border:1px solid #f59e0b;white-space:nowrap}
 .ec-cust{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
 .ec-sub{opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
 .ec-del{position:absolute;top:2px;right:4px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;display:none;line-height:1}
@@ -1392,7 +1396,7 @@ function archiveConfirmedDispatches() {
         💡 定期便を登録すると、<strong>今後3ヶ月分の配車予定</strong>が自動的にカレンダーに表示されます。
       </div>
       <div class="r2">
-        <div class="fr"><label>お客様 *</label><select id="rCust"></select></div>
+        <div class="fr"><label>お客様 *</label><input type="text" id="rCustSearch" placeholder="🔍 お客様名で絞り込み..." oninput="filterRCust(this.value)" style="margin-bottom:5px"><select id="rCust"></select></div>
         <div class="fr"><label>頻度</label>
           <select id="rFreq" onchange="onFreqChg()">
             <option value="weekly">毎週</option>
@@ -1421,6 +1425,7 @@ function archiveConfirmedDispatches() {
         <div class="fr"><label>固定車両（任意）</label><select id="rVehicle"><option value="">都度配車</option></select></div>
       </div>
       <div class="fr"><label>備考</label><textarea id="rNotes" rows="2" placeholder="収集品目、注意事項など"></textarea></div>
+      <div class="fr" style="margin-bottom:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 12px"><input type="checkbox" id="rCarryIn" style="width:auto;margin:0"><span>🏭 持込み（ドライバー・車両 不要）</span></label></div>
       <button class="btn btn-w" onclick="saveRegular()" style="margin-bottom:16px">🔁 定期便を登録する</button>
       <hr style="margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#475569">📋 登録済み定期便一覧</div>
@@ -2018,23 +2023,25 @@ function dayCardHTML(dp,seqNo){
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
   const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
+  const wt1=dp.workType||{};const isCrane=!isCarryIn&&!isShip&&wt1.type==='container'&&wt1.containerSize==='1.5box';
   let cls='ecard ec-day ';
   if(isCarryIn)cls+='ec-carry';
   else if(isShip)cls+=(!dp.driver||!dp.vehicle)?'ec-ship-pend':'ec-ship';
+  else if(isCrane)cls+='ec-crane';
   else if(!dp.driver||!dp.vehicle)cls+='ec-pend';
   else if(dp.isReg)cls+='ec-reg';
   else cls+='ec-spot';
   if(holName)cls+=' ec-hol';
   const titleLine=isShip
     ?`<div class="ec-day-cust">📦 ${statusMark}${escH(dp.destName)||'出荷'}${holBadge}</div>`
-    :`<div class="ec-day-seq">${statusMark}第${seqNo}業務${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div><div class="ec-day-cust">${custName(dp.customer)}</div>`;
+    :`<div class="ec-day-seq">${statusMark}第${seqNo}業務${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div><div class="ec-day-cust">${custName(dp.customer)}</div>`;
   return`<div class="${cls}" draggable="true" data-did="${dp.id}"
     ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();${editFn}">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
     ${titleLine}
-    ${!isCarryIn?`<div class="ec-day-veh">🚛 ${veh}</div>`:`<div class="ec-day-veh">🏭 持込み</div>`}
+    ${!isCarryIn?`<div class="ec-day-veh">🚛 ${veh}</div>`:`<div class="ec-day-veh">🏭 持込み${dp.isReg?'（定期）':''}</div>`}
     ${!isShip&&dp.siteName?`<div class="ec-day-site">📍 ${dp.siteName}</div>`:''}
     ${isShip&&dp.destAddr?`<div class="ec-day-site">🏭 ${dp.destAddr.slice(0,20)}</div>`:''}
     ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:''}
@@ -2067,15 +2074,16 @@ function cardHTML(dp){
       ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.65">${dp.notes.slice(0,20)}</div>`:''}
     </div>`;
   }
-  let cls='ecard '+(isCarryIn?'ec-carry':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
+  const wt2=dp.workType||{};const isCrane=!isCarryIn&&wt2.type==='container'&&wt2.containerSize==='1.5box';
+  let cls='ecard '+(isCarryIn?'ec-carry':isCrane?'ec-crane':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
   if(holName)cls+=' ec-hol';
-  const sub=isCarryIn?'🏭 持込み':(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
+  const sub=isCarryIn?(dp.isReg?'🏭 持込み（定期）':'🏭 持込み'):(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
   return`<div class="${cls}" draggable="true" data-did="${dp.id}"
     ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();editDisp('${dp.id}')">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-    <div class="ec-cust">${statusMark}${custName(dp.customer)}${holBadge}</div>
+    <div class="ec-cust">${statusMark}${custName(dp.customer)}${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${holBadge}</div>
     <div class="ec-sub">${sub}</div>
     ${holName?`<div class="ec-sub" style="font-size:9px;color:#dc2626;font-weight:700">🎌 ${holName}</div>`:''}
     ${dlHtml}
@@ -3313,9 +3321,17 @@ function chkSLic(){
 // ================================================================
 function openRegular(){fillRegForm();renderRegList();openM('mRegular');}
 function fillRegForm(){
+  document.getElementById('rCustSearch').value='';
   document.getElementById('rCust').innerHTML='<option value="">-- お客様を選択 --</option>'+(db.customers||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   document.getElementById('rDriver').innerHTML='<option value="">都度配車</option>'+(db.drivers||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
   document.getElementById('rVehicle').innerHTML='<option value="">都度配車</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  document.getElementById('rCarryIn').checked=false;
+}
+function filterRCust(q){
+  const cur=document.getElementById('rCust').value;
+  const custs=db.customers||[];
+  const filtered=q?custs.filter(c=>c.name.includes(q)):custs;
+  document.getElementById('rCust').innerHTML='<option value="">-- お客様を選択 --</option>'+filtered.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${c.name}</option>`).join('');
 }
 function onFreqChg(){
   document.getElementById('rWomRow').classList.toggle('hid',document.getElementById('rFreq').value!=='monthly');
@@ -3327,16 +3343,19 @@ async function saveRegular(){
   const dows=[...document.querySelectorAll('#rDow input:checked')].map(e=>parseInt(e.value));
   if(!dows.length){alert('曜日を選択してください');return;}
   const wom=freq==='monthly'?parseInt(document.getElementById('rWom').value):null;
-  const driver=document.getElementById('rDriver').value||null;
-  const vehicle=document.getElementById('rVehicle').value||null;
+  const isCarryIn=document.getElementById('rCarryIn').checked;
+  const driver=isCarryIn?null:(document.getElementById('rDriver').value||null);
+  const vehicle=isCarryIn?null:(document.getElementById('rVehicle').value||null);
   const notes=document.getElementById('rNotes').value.trim();
-  const rs={id:uid(),cust,freq,dows,wom,driver,vehicle,notes};
+  const rs={id:uid(),cust,freq,dows,wom,driver,vehicle,notes,isCarryIn};
   db.regulars.push(rs);
   genRegDisps(rs);
   await save();
+  document.getElementById('rCustSearch').value='';
   document.getElementById('rCust').value='';
   document.querySelectorAll('#rDow input').forEach(e=>e.checked=false);
   document.getElementById('rNotes').value='';
+  document.getElementById('rCarryIn').checked=false;
   renderRegList();render();
   alert('✅ 定期便を登録しました。今後3ヶ月分の配車予定を自動生成しました。');
 }
@@ -3358,7 +3377,7 @@ function genRegDisps(rs){
         const exists=(db.dispatches||[]).some(x=>x.date===ds&&x.customer===rs.cust&&x.isReg&&x.regId===rs.id);
         if(!exists){
           const now=new Date().toISOString();
-          db.dispatches.push({id:uid(),customer:rs.cust,date:ds,dispatchDate:ds,status:(rs.driver&&rs.vehicle)?'confirmed':'pending',driver:rs.driver,vehicle:rs.vehicle,notes:rs.notes,isReg:true,regId:rs.id,created:now,updated:now});
+          db.dispatches.push({id:uid(),customer:rs.cust,date:ds,dispatchDate:ds,status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.driver,vehicle:rs.vehicle,notes:rs.notes,isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,created:now,updated:now});
         }
       }
     }
@@ -3377,12 +3396,18 @@ function renderRegList(){
         <span class="bdg bdg-b">${fn[rs.freq]||rs.freq}${wLabel} ${rs.dows.map(d=>DOW_JP[d]).join('・')}曜</span>
         <span class="ritem-del" onclick="delRegular('${rs.id}')">🗑</span>
       </div>
-      <div style="font-size:11px;color:#64748b;margin-top:3px">ドライバー: ${drvName(rs.driver)} ／ 車両: ${vehName(rs.vehicle)}${rs.notes?' ／ '+rs.notes:''}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'🏭 持込み（ドライバー・車両不要）':`ドライバー: ${drvName(rs.driver)} ／ 車両: ${vehName(rs.vehicle)}`}${rs.notes?' ／ '+rs.notes:''}</div>
     </div>`;}).join('');
 }
 async function delRegular(id){
-  if(!confirm('この定期便設定を削除しますか？（生成済みの配車予定は残ります）'))return;
-  db.regulars=db.regulars.filter(x=>x.id!==id);await save();renderRegList();
+  if(!confirm('この定期便設定を削除しますか？'))return;
+  const withDisps=confirm('生成済みの配車予定（今日以降の分）も一緒に削除しますか？\n\n【OK】設定＋未来の配車予定を削除\n【キャンセル】設定のみ削除（カレンダー上の予定は残す）');
+  db.regulars=db.regulars.filter(x=>x.id!==id);
+  if(withDisps){
+    const today=fmt(new Date());
+    db.dispatches=db.dispatches.filter(x=>!(x.isReg&&x.regId===id&&(x.dispatchDate||x.date||'')>=today));
+  }
+  await save();renderRegList();render();
 }
 
 // ================================================================
