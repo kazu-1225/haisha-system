@@ -2102,11 +2102,14 @@ function renderPending(){
     const today=fmt(new Date());
     html+=pend.map(dp=>{
       const isShip=dp.dispatchType==='shipment';
+      const wtp=dp.workType||{};const isCrane=!isShip&&wtp.type==='container'&&wtp.containerSize==='1.5box';
       const dlOver=dp.deadline&&dp.deadline<today;
       const dlHtml=dp.deadline?`<div class="pcrd-info" style="color:${dlOver?'#dc2626':'#d97706'};font-weight:700">⏰ 期限: ${dp.deadline}${dlOver?' ⚠過ぎています':''}</div>`:'';
-      const cardStyle=isShip?'border-color:#ea580c':'';
+      const cardStyle=isShip?'border-color:#ea580c':isCrane?'background:repeating-linear-gradient(135deg,#fefce8,#fefce8 6px,#fef08a 6px,#fef08a 8px);border-color:#ca8a04':'';
       const nameHtml=isShip
         ?`<div class="pcrd-name" style="color:#ea580c">📦 ${escH(dp.destName)||'出荷'}</div>`
+        :isCrane
+        ?`<div class="pcrd-name" style="color:#78350f">🔴 ${custName(dp.customer)}<span class="ec-crane-badge">🏗 クレーン</span></div>`
         :`<div class="pcrd-name">🔴 ${custName(dp.customer)}</div>`;
       const infoHtml=isShip
         ?`<div class="pcrd-info">${workDate(dp)?`🚛 出荷日: ${workDate(dp)}`:'🚛 出荷日: 未定'}</div>`
