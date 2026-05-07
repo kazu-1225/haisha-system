@@ -984,8 +984,8 @@ function writeReadableSheets(data) {
 
   // ===== 🏢 お客様マスタ =====
   writeSheet('🏢お客様',
-    ['ID','T-PlannerCD','お客様名','住所','担当者名','電話番号'],
-    (data.customers||[]).map(c => [c.id, c.tpcd||'', c.name, c.addr||'', c.contact||'', c.phone||''])
+    ['ID','T-PlannerCD','お客様名','フリガナ','住所','担当者名','電話番号'],
+    (data.customers||[]).map(c => [c.id, c.tpcd||'', c.name, c.kana||'', c.addr||'', c.contact||'', c.phone||''])
   );
 
   // ===== 📍 収集先マスタ =====
@@ -2772,7 +2772,7 @@ function updateDeadlineWarn(){
   else el.textContent='';
 }
 function openAddDispatch(date,rid,pending){
-  ST.editId=null;fillDSel();
+  ST.editId=null;closeMP();fillDSel();
   document.getElementById('mDTitle').textContent='配車追加';
   document.getElementById('dCust').value='';
   document.getElementById('dDate').value=fmt(new Date()); // 受付日は常に今日
@@ -3512,6 +3512,7 @@ function openM(id){document.getElementById(id).classList.remove('hid');}
 function closeM(id){
   const ovl=document.getElementById(id);if(!ovl)return;
   ovl.classList.add('hid');
+  closeMP(); // モーダルを閉じる時は必ずピッカーも閉じる
   // ドラッグ位置をリセット
   const box=ovl.querySelector('.mbox');
   if(box&&box.style.position==='fixed'){
@@ -3572,7 +3573,7 @@ function openMP(type,triggerBtn,selId){
   const titles={customer:'🏢 お客様を選択',driver:'👤 ドライバーを選択',vehicle:'🚛 車両を選択'};
   document.getElementById('mpHeadTxt').textContent=titles[type]||'選択';
   document.getElementById('mpSrch').value='';
-  document.getElementById('mpNewName').value='';
+  const _nn=document.getElementById('mpNewName');if(_nn)_nn.value='';
   const picker=document.getElementById('masterPicker');
   picker.classList.remove('hid');
   // 位置をトリガーの下に
@@ -3666,8 +3667,8 @@ document.addEventListener('mousedown',function(e){
 function exportMasterCSV(type){
   let headers=[],rows=[];
   if(type==='customers'){
-    headers=['id','T-PlannerCD','name','address','contact','phone'];
-    rows=(db.customers||[]).map(c=>[c.id,c.tpcd||'',c.name,c.addr||'',c.contact||'',c.phone||'']);
+    headers=['id','T-PlannerCD','name','kana','address','contact','phone'];
+    rows=(db.customers||[]).map(c=>[c.id,c.tpcd||'',c.name,c.kana||'',c.addr||'',c.contact||'',c.phone||'']);
   }else if(type==='sites'){
     headers=['id','customerId','name','contact','phone','address','caution'];
     rows=(db.sites||[]).map(s=>[s.id,s.customerId||'',s.name,s.contact||'',s.phone||'',s.addr||'',s.caution||'']);
@@ -3728,7 +3729,7 @@ async function importMasterCSV(event,type){
       if(!row.name){skipped++;continue;}
       const existingId=row.id||'';
       if(type==='customers'){
-        const cdata={name:row.name,tpcd:row['t-plannercd']||row.tpcd||'',addr:row.address||row.addr||'',contact:row.contact||'',phone:row.phone||''};
+        const cdata={name:row.name,tpcd:row['t-plannercd']||row.tpcd||'',kana:row.kana||'',addr:row.address||row.addr||'',contact:row.contact||'',phone:row.phone||''};
         const ex=existingId?db.customers.find(x=>x.id===existingId):null;
         if(ex){Object.assign(ex,cdata);updated++;}
         else{db.customers.push({id:existingId||uid(),...cdata});added++;}
