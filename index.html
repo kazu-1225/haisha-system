@@ -1212,6 +1212,7 @@ function archiveConfirmedDispatches() {
         </div>
         <button class="btn btn-p" id="customerAddBtn" onclick="addCustomer()" style="margin-bottom:10px">追加</button>
         <button class="btn btn-s" id="customerCancelBtn" onclick="resetCustomerForm()" style="margin-bottom:10px;display:none">キャンセル</button>
+        <button class="btn btn-d" onclick="clearAllCustomers()" style="margin-bottom:10px;margin-left:8px;background:#dc2626;color:#fff">🗑 全件クリア</button>
         <div class="dlist" id="customerList"></div>
       </div>
 
@@ -3092,6 +3093,16 @@ async function addCustomer(){
 async function delCustomer(id){
   if(!confirm('このお客様を削除しますか？'))return;
   db.customers=db.customers.filter(x=>x.id!==id);await save();renderSLists();
+}
+async function clearAllCustomers(){
+  const cnt=(db.customers||[]).length;
+  if(!cnt){alert('お客様データはありません。');return;}
+  if(!confirm(`⚠ お客様マスタを全件削除します。\n\n現在の件数：${cnt}件\n\nこの操作は元に戻せません。\nよろしいですか？`))return;
+  db.customers=[];
+  await save();
+  renderSLists();
+  fillDSel();
+  alert(`✅ お客様マスタを全件クリアしました（${cnt}件削除）。\n新しいCSVをインポートしてください。`);
 }
 
 // 収集先マスタ CRUD
