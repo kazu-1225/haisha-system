@@ -44,6 +44,14 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .pending-body{display:flex;gap:8px;padding:7px 14px;overflow-x:auto;max-height:100px}
 .pending-panel.collapsed .pending-body{display:none}
 .pending-panel.collapsed .p-toggle{transform:rotate(-90deg)}
+/* crane pending panel */
+.crane-pending-hdr{display:flex;align-items:center;gap:8px;padding:7px 14px;background:repeating-linear-gradient(135deg,#fefce8,#fefce8 10px,#fef08a 10px,#fef08a 12px);cursor:pointer;border-bottom:1px solid #fde68a;user-select:none}
+.crane-pending-hdr h3{font-size:12px;font-weight:700;color:#92400e}
+.crane-p-cnt{background:#ca8a04;color:#fff;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;min-width:20px;text-align:center}
+.crane-p-toggle{margin-left:auto;font-size:11px;color:#92400e;transition:transform .2s}
+#cranePendingPanel.collapsed .pending-body{display:none}
+#cranePendingPanel.collapsed .crane-p-toggle{transform:rotate(-90deg)}
+#cranePendingPanel{border-bottom:2px solid #fde68a}
 .pcrd{flex-shrink:0;background:#fff;border:1.5px solid #dc2626;border-radius:6px;padding:3px 8px;min-width:130px;cursor:grab;transition:box-shadow .15s}
 .pcrd:active{cursor:grabbing}
 .pcrd:hover{box-shadow:0 2px 8px rgba(220,38,38,.22)}
@@ -451,6 +459,18 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     </div>
   </div>
 
+  <!-- CRANE PENDING PANEL -->
+  <div class="pending-panel hid" id="cranePendingPanel">
+    <div class="crane-pending-hdr" onclick="toggleCranePending()">
+      <span style="font-size:14px">🏗</span>
+      <h3>クレーン車両専用 未割当・新規依頼</h3>
+      <span class="crane-p-cnt" id="cranePCnt">0</span>
+      <span class="crane-p-toggle" id="cranePToggle">▼</span>
+    </div>
+    <div class="pending-body" id="cranePendingBody">
+    </div>
+  </div>
+
   <!-- TOOLBAR -->
   <div class="toolbar">
     <div class="btn-grp">
@@ -512,7 +532,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <input type="text" id="mpSrch" class="mp-srch" placeholder="🔍 名前で検索..." oninput="filterMP()">
   </div>
   <div id="mpList" class="mp-list"></div>
-  <div class="mp-add-sec">
+  <div class="mp-add-sec" id="mpAddSec">
     <div class="mp-add-lbl">＋ 新規追加してすぐ選択</div>
     <div class="mp-add-row">
       <input type="text" id="mpNewName" class="mp-add-inp" placeholder="新しい名前を入力...">
@@ -1180,15 +1200,15 @@ function archiveConfirmedDispatches() {
       <div class="spane" id="sp-customers">
         <div class="r2" style="margin-bottom:6px">
           <div class="fr" style="margin:0"><label>お客様名</label><input type="text" id="sCName" placeholder="例: 株式会社〇〇"></div>
-          <div class="fr" style="margin:0"><label>T-PlannerCD <span style="font-size:9px;color:#94a3b8;font-weight:400">（販売管理ソフトの得意先CD）</span></label><input type="text" id="sCTpcd" placeholder="例: T001234"></div>
+          <div class="fr" style="margin:0"><label>フリガナ <span style="font-size:9px;color:#94a3b8;font-weight:400">（半角カタカナ）</span></label><input type="text" id="sCKana" placeholder="例: ｶﾌﾞｼｷｶﾞｲｼｬ〇〇" inputmode="katakana"></div>
         </div>
         <div class="r2" style="margin-bottom:6px">
-          <div class="fr" style="margin:0"><label>住所</label><input type="text" id="sCAddr" placeholder="例: 東京都〇〇区..."></div>
-          <div class="fr" style="margin:0"><label>担当者名</label><input type="text" id="sCContact" placeholder="例: 山田様"></div>
+          <div class="fr" style="margin:0"><label>T-PlannerCD <span style="font-size:9px;color:#94a3b8;font-weight:400">（販売管理ソフトの得意先CD）</span></label><input type="text" id="sCTpcd" placeholder="例: T001234"></div>
+          <div class="fr" style="margin:0"><label>住所</label><input type="text" id="sCAddr" placeholder="例: 広島市〇〇区..."></div>
         </div>
         <div class="r2" style="margin-bottom:10px">
+          <div class="fr" style="margin:0"><label>担当者名</label><input type="text" id="sCContact" placeholder="例: 山田様"></div>
           <div class="fr" style="margin:0"><label>担当者 電話番号</label><input type="tel" id="sCPhone" placeholder="例: 082-000-0000"></div>
-          <div class="fr" style="margin:0"></div>
         </div>
         <button class="btn btn-p" id="customerAddBtn" onclick="addCustomer()" style="margin-bottom:10px">追加</button>
         <button class="btn btn-s" id="customerCancelBtn" onclick="resetCustomerForm()" style="margin-bottom:10px;display:none">キャンセル</button>
@@ -1610,9 +1630,14 @@ function normalizeDB(){
   (db.drivers||[]).forEach(d=>{if(!d.usageGroup)d.usageGroup='frequent';if(!d.group2)d.group2='';});
 }
 
+let _autoSyncTimer=null;
 async function save(){
   localStorage.setItem('haishaDB2',JSON.stringify(db));
-  if(GAS_URL) setSyncStatus('pending');
+  if(GAS_URL){
+    setSyncStatus('pending');
+    clearTimeout(_autoSyncTimer);
+    _autoSyncTimer=setTimeout(()=>manualSync(),2000);
+  }
 }
 
 async function manualSync(){
@@ -1728,8 +1753,12 @@ function cellDisps(ds,rid){
     return ST.res==='driver'?dp.driver===rid:dp.vehicle===rid;
   });
 }
+function isCraneDisp(dp){const wtp=dp.workType||{};return!dp.dispatchType&&wtp.type==='container'&&wtp.containerSize==='1.5box';}
 function pendingDisps(){
-  return(db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&(!workDate(dp)||(!dp.driver&&!dp.vehicle)));
+  return(db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&!isCraneDisp(dp)&&(!workDate(dp)||(!dp.driver&&!dp.vehicle)));
+}
+function craneDisps(){
+  return(db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&isCraneDisp(dp)&&(!workDate(dp)||(!dp.driver&&!dp.vehicle)));
 }
 function regularDispsForDate(ds){
   return(db.dispatches||[]).filter(dp=>dp.isReg&&workDate(dp)===ds);
@@ -2091,6 +2120,31 @@ function cardHTML(dp){
   </div>`;
 }
 
+function makePcrdHtml(dp){
+  const isShip=dp.dispatchType==='shipment';
+  const crane=isCraneDisp(dp);
+  const today=fmt(new Date());
+  const dlOver=dp.deadline&&dp.deadline<today;
+  const dlHtml=dp.deadline?`<div class="pcrd-info" style="color:${dlOver?'#dc2626':'#d97706'};font-weight:700">⏰ 期限: ${dp.deadline}${dlOver?' ⚠過ぎています':''}</div>`:'';
+  const cardStyle=isShip?'border-color:#ea580c':crane?'background:repeating-linear-gradient(135deg,#fefce8,#fefce8 6px,#fef08a 6px,#fef08a 8px);border-color:#ca8a04':'';
+  const nameHtml=isShip
+    ?`<div class="pcrd-name" style="color:#ea580c">📦 ${escH(dp.destName)||'出荷'}</div>`
+    :crane
+    ?`<div class="pcrd-name" style="color:#78350f">🔴 ${custName(dp.customer)}<span class="ec-crane-badge">🏗 クレーン</span></div>`
+    :`<div class="pcrd-name">🔴 ${custName(dp.customer)}</div>`;
+  const infoHtml=isShip
+    ?`<div class="pcrd-info">${workDate(dp)?`🚛 出荷日: ${workDate(dp)}`:'🚛 出荷日: 未定'}</div>`
+    :`<div class="pcrd-info">${workDate(dp)?`🚛 配車日: ${workDate(dp)}`:'🚛 配車日: 未定'}${dp.date&&dp.date!==workDate(dp)?`<span style="font-size:9px;color:#94a3b8"> (受付: ${dp.date})</span>`:''}</div>`;
+  const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
+  return`<div class="pcrd" draggable="true" style="${cardStyle}"
+    ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+    onclick="${editFn}">
+    ${nameHtml}
+    ${infoHtml}
+    ${dlHtml}
+    <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
+  </div>`;
+}
 function renderPending(){
   const pend=pendingDisps();
   document.getElementById('pCnt').textContent=pend.length;
@@ -2099,32 +2153,23 @@ function renderPending(){
   if(!pend.length){
     html+=`<div style="display:flex;align-items:center;color:#94a3b8;font-size:12px;padding:8px">未割当の案件はありません ✅</div>`;
   } else {
-    const today=fmt(new Date());
-    html+=pend.map(dp=>{
-      const isShip=dp.dispatchType==='shipment';
-      const wtp=dp.workType||{};const isCrane=!isShip&&wtp.type==='container'&&wtp.containerSize==='1.5box';
-      const dlOver=dp.deadline&&dp.deadline<today;
-      const dlHtml=dp.deadline?`<div class="pcrd-info" style="color:${dlOver?'#dc2626':'#d97706'};font-weight:700">⏰ 期限: ${dp.deadline}${dlOver?' ⚠過ぎています':''}</div>`:'';
-      const cardStyle=isShip?'border-color:#ea580c':isCrane?'background:repeating-linear-gradient(135deg,#fefce8,#fefce8 6px,#fef08a 6px,#fef08a 8px);border-color:#ca8a04':'';
-      const nameHtml=isShip
-        ?`<div class="pcrd-name" style="color:#ea580c">📦 ${escH(dp.destName)||'出荷'}</div>`
-        :isCrane
-        ?`<div class="pcrd-name" style="color:#78350f">🔴 ${custName(dp.customer)}<span class="ec-crane-badge">🏗 クレーン</span></div>`
-        :`<div class="pcrd-name">🔴 ${custName(dp.customer)}</div>`;
-      const infoHtml=isShip
-        ?`<div class="pcrd-info">${workDate(dp)?`🚛 出荷日: ${workDate(dp)}`:'🚛 出荷日: 未定'}</div>`
-        :`<div class="pcrd-info">${workDate(dp)?`🚛 配車日: ${workDate(dp)}`:'🚛 配車日: 未定'}${dp.date&&dp.date!==workDate(dp)?`<span style="font-size:9px;color:#94a3b8"> (受付: ${dp.date})</span>`:''}</div>`;
-      const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
-      return`<div class="pcrd" draggable="true" style="${cardStyle}"
-        ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
-        onclick="${editFn}">
-        ${nameHtml}
-        ${infoHtml}
-        ${dlHtml}
-        <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
-      </div>`;}).join('');
+    html+=pend.map(makePcrdHtml).join('');
   }
   body.innerHTML=html;
+
+  // crane panel
+  const crane=craneDisps();
+  const cranePanel=document.getElementById('cranePendingPanel');
+  document.getElementById('cranePCnt').textContent=crane.length;
+  cranePanel.classList.toggle('hid',crane.length===0);
+  const craneBody=document.getElementById('cranePendingBody');
+  let chtml=`<div class="p-add-btn" onclick="openAddDispatch(null,null,true)" title="クレーン案件の新規依頼を追加">＋</div>`;
+  if(!crane.length){
+    chtml+=`<div style="display:flex;align-items:center;color:#94a3b8;font-size:12px;padding:8px">クレーン案件はありません ✅</div>`;
+  } else {
+    chtml+=crane.map(makePcrdHtml).join('');
+  }
+  craneBody.innerHTML=chtml;
 }
 
 // ================================================================
@@ -2151,6 +2196,11 @@ function togglePending(){
   ST.pendCollapsed=!ST.pendCollapsed;
   document.getElementById('pendingPanel').classList.toggle('collapsed',ST.pendCollapsed);
   document.getElementById('pToggle').textContent=ST.pendCollapsed?'▶':'▼';
+}
+function toggleCranePending(){
+  ST.cranePendCollapsed=!ST.cranePendCollapsed;
+  document.getElementById('cranePendingPanel').classList.toggle('collapsed',ST.cranePendCollapsed);
+  document.getElementById('cranePToggle').textContent=ST.cranePendCollapsed?'▶':'▼';
 }
 
 // ================================================================
@@ -2905,7 +2955,7 @@ function renderSLists(){
   document.getElementById('customerList').innerHTML=!(db.customers||[]).length?
     '<div class="empty">お客様がいません</div>':
     db.customers.map(c=>`<div class="ditem"><div class="di-main">
-      <div class="di-name">${c.name}${c.tpcd?`<span style="font-size:10px;color:#6366f1;margin-left:6px;font-family:monospace;font-weight:700">CD:${c.tpcd}</span>`:''}</div>
+      <div class="di-name">${c.name}${c.kana?`<span style="font-size:10px;color:#94a3b8;margin-left:6px;font-weight:400">${c.kana}</span>`:''}${c.tpcd?`<span style="font-size:10px;color:#6366f1;margin-left:6px;font-family:monospace;font-weight:700">CD:${c.tpcd}</span>`:''}</div>
       <div class="di-meta">${[c.addr,c.contact,c.phone].filter(x=>x).join(' | ')}</div></div>
     <span class="di-del" onclick="startEditCustomer('${c.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
     <span class="di-del" onclick="delCustomer('${c.id}')">🗑</span></div>`).join('');
@@ -3010,7 +3060,7 @@ async function delVehicle(id){
 }
 function resetCustomerForm(){
   editCustomerId=null;
-  ['sCName','sCTpcd','sCAddr','sCContact','sCPhone'].forEach(i=>document.getElementById(i).value='');
+  ['sCName','sCKana','sCTpcd','sCAddr','sCContact','sCPhone'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('customerAddBtn').textContent='追加';
   document.getElementById('customerCancelBtn').style.display='none';
 }
@@ -3018,6 +3068,7 @@ function startEditCustomer(id){
   const c=db.customers.find(x=>x.id===id);if(!c)return;
   editCustomerId=id;
   document.getElementById('sCName').value=c.name;
+  document.getElementById('sCKana').value=c.kana||'';
   document.getElementById('sCTpcd').value=c.tpcd||'';
   document.getElementById('sCAddr').value=c.addr||'';
   document.getElementById('sCContact').value=c.contact||'';
@@ -3029,7 +3080,7 @@ function startEditCustomer(id){
 async function addCustomer(){
   const name=document.getElementById('sCName').value.trim();
   if(!name){alert('お客様名を入力してください');return;}
-  const cdata={name,tpcd:document.getElementById('sCTpcd').value.trim(),addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim(),phone:document.getElementById('sCPhone').value.trim()};
+  const cdata={name,kana:document.getElementById('sCKana').value.trim(),tpcd:document.getElementById('sCTpcd').value.trim(),addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim(),phone:document.getElementById('sCPhone').value.trim()};
   if(editCustomerId){
     const c=db.customers.find(x=>x.id===editCustomerId);
     if(c)Object.assign(c,cdata);
@@ -3532,6 +3583,13 @@ function openMP(type,triggerBtn,selId){
   if(top+440>window.innerHeight)top=Math.max(10,r.top-446);
   picker.style.left=left+'px';
   picker.style.top=top+'px';
+  // お客様の場合は「新規追加」を設定画面へのリンクに変更
+  const addSec=document.getElementById('mpAddSec');
+  if(type==='customer'){
+    addSec.innerHTML=`<div style="font-size:11px;font-weight:700;color:#1d4ed8;cursor:pointer;padding:2px 0" onclick="closeMP();openSettings();stab('customers')">⚙ 新規お客様の追加は「設定 ＞ お客様マスタ」から →</div>`;
+  } else {
+    addSec.innerHTML=`<div class="mp-add-lbl">＋ 新規追加してすぐ選択</div><div class="mp-add-row"><input type="text" id="mpNewName" class="mp-add-inp" placeholder="新しい名前を入力..."><button class="mp-add-btn2" onclick="addFromMP()">追加</button></div>`;
+  }
   filterMP();
   setTimeout(()=>document.getElementById('mpSrch').focus(),50);
 }
@@ -3541,7 +3599,7 @@ function closeMP(){
 }
 
 function getMPItems(){
-  if(MP.type==='customer')return(db.customers||[]).map(c=>({id:c.id,name:c.name,sub:[c.addr,c.contact].filter(x=>x).join(' | ')}));
+  if(MP.type==='customer')return(db.customers||[]).map(c=>({id:c.id,name:c.name,sub:[c.kana,c.addr,c.contact].filter(x=>x).join(' | ')}));
   if(MP.type==='driver')return(db.drivers||[]).map(d=>({id:d.id,name:d.name,sub:[[d.group,d.group2].filter(x=>x).join('/'),d.type].filter(x=>x).join(' · ')}));
   if(MP.type==='vehicle')return(db.vehicles||[]).map(v=>({id:v.id,name:v.name,sub:(v.type||'')+(v.req?' | '+v.req+'以上':'')}));
   return[];
