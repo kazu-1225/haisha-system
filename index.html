@@ -799,8 +799,23 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 
 const SHEET_NAME = 'DB_JSON';
 
+// チャンクプロパティを全削除するユーティリティ
+function _cleanChunkProps() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const keys = Object.keys(props.getProperties()).filter(k => /^c\d+$/.test(k));
+    keys.forEach(k => props.deleteProperty(k));
+    return keys.length;
+  } catch(e) { return 0; }
+}
+
 function doGet(e) {
   try {
+    // 手動クリーンアップ用エンドポイント（?action=cleanup）
+    if (e && e.parameter && e.parameter.action === 'cleanup') {
+      const n = _cleanChunkProps();
+      return respond({ ok: true, cleaned: n });
+    }
     if (e && e.parameter && e.parameter.chunk !== undefined) {
       const idx   = parseInt(e.parameter.chunk);
       const total = parseInt(e.parameter.total);
@@ -813,7 +828,8 @@ function doGet(e) {
         if (c === null) return respond({ ok: 'waiting', got: idx });
         full += c;
       }
-      for (let i = 0; i < total; i++) props.deleteProperty('c' + i);
+      // 全チャンク揃ったら先にプロパティを削除（エラー時の残骸防止）
+      _cleanChunkProps();
       // base64デコード（日本語対応）
       let jsonStr = full;
       if (enc === 'b64') {
@@ -826,6 +842,7 @@ function doGet(e) {
     }
     return respond(readData());
   } catch(err) {
+    _cleanChunkProps(); // エラー時も必ずプロパティをクリーンアップ
     return respond({ error: err.message });
   }
 }
