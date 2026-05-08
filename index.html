@@ -703,11 +703,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <div class="mftr" style="flex-wrap:wrap;gap:6px">
       <button class="btn btn-s" onclick="closeM('mDispatch')">キャンセル</button>
       <button class="btn btn-d hid" id="dDelBtn" onclick="delDispatch()">🗑 削除</button>
-      <button class="btn hid" id="dPrintBtn" style="background:#7c3aed;color:#fff;gap:0">
-        <span onclick="printWorkOrder(ST.editId,'collect')" style="padding:0 8px;border-right:1px solid rgba(255,255,255,.4)" title="収集用を印刷">🖨 収集用</span>
-        <span onclick="printWorkOrder(ST.editId,'customer')" style="padding:0 8px;border-right:1px solid rgba(255,255,255,.4)" title="お客様控えを印刷">お客様控え</span>
-        <span onclick="printWorkOrder(ST.editId,'both')" style="padding:0 8px" title="2部まとめて印刷">2部</span>
-      </button>
+      <button class="btn hid" id="dPrintBtn" style="background:#7c3aed;color:#fff" onclick="printWorkOrder(ST.editId,'all3')" title="作業指示書を3部まとめて印刷">🖨 指示書印刷（3部）</button>
       <button class="btn btn-p" onclick="saveDispatch()">💾 保存</button>
     </div>
   </div>
@@ -2554,7 +2550,7 @@ function printWorkOrder(id,mode){
   if(!id){alert('保存後に印刷できます');return;}
   const dp=(db.dispatches||[]).find(x=>x.id===id);
   if(!dp){alert('データが見つかりません');return;}
-  const printMode=mode||'collect'; // 'collect' | 'customer' | 'both'
+  const printMode=mode||'collect'; // 'collect' | 'customer' | 'office' | 'both' | 'all3'
   const dr=db.drivers.find(x=>x.id===dp.driver);
   const ve=db.vehicles.find(x=>x.id===dp.vehicle);
   const cu=db.customers.find(x=>x.id===dp.customer);
@@ -2572,7 +2568,9 @@ function printWorkOrder(id,mode){
   const condStr=condItems.length?condItems.join('　／　'):'なし';
 
   // 1ページ分のHTML生成関数
-  function buildPage(title,isCustomer){
+  function buildPage(title,copyType){
+    // copyType: 'collect' | 'customer' | 'office'
+    const isCustomer=copyType==='customer';
     const custSec=`<div class="section">
   <div class="sec-hdr">🏢 お客様情報</div>
   <div class="sec-body">
@@ -2604,49 +2602,6 @@ function printWorkOrder(id,mode){
     </div>
   </div>
 </div>`;
-    // 収集内容：手書き記入用の固定フォーム（印刷専用）
-    const collectSec=`<div class="section">
-  <div class="sec-hdr">📦 収集内容　― ドライバー記入欄</div>
-  <div class="sec-body" style="padding:0">
-    <table style="width:100%;border-collapse:collapse;font-size:10px">
-      <tr style="background:#fef3c7">
-        <th style="text-align:left;padding:3px 8px;border:1px solid #fde68a;font-size:9px;color:#92400e;font-weight:700;width:90px">産廃品目</th>
-        <th style="padding:3px 8px;border:1px solid #fde68a;text-align:center;font-size:9px;color:#92400e;font-weight:700;width:85px">m³</th>
-        <th style="padding:3px 8px;border:1px solid #fde68a;text-align:center;font-size:9px;color:#92400e;font-weight:700;width:85px">kg</th>
-      </tr>
-      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">廃プラ</td><td style="border:1px solid #e2e8f0;background:#fffdf0;min-height:20px;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
-      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">金属くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
-      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">木くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
-      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">紙くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
-      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">ガラス陶磁器</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
-      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">石膏ボード</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
-      <tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">がれき類</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px 8px"></td></tr>
-      <tr style="background:#f0fdf4">
-        <td style="padding:5px 8px;border:2px solid #86efac;font-weight:800;color:#15803d;font-size:10px">合　計</td>
-        <td style="border:2px solid #86efac;background:#f0fdf4;padding:5px 8px"></td>
-        <td style="border:2px solid #86efac;background:#f0fdf4;padding:5px 8px"></td>
-      </tr>
-    </table>
-    <div style="background:#e0f2fe;border:1px solid #7dd3fc;border-top:none;padding:5px 8px">
-      <div style="font-size:9px;font-weight:700;color:#0369a1;margin-bottom:4px">家電・特定品目</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:10px">
-        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">TV</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
-        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">冷蔵庫</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
-        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">洗濯機</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
-        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">AC</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 台</span></div>
-        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">タイヤ</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 本</span></div>
-        <div style="display:flex;align-items:center;gap:3px"><span style="font-weight:700;min-width:32px;color:#1e3a5f">蛍光灯</span><div style="flex:1;border-bottom:1.5px solid #475569;min-height:16px"></div><span style="font-size:9px;color:#475569;white-space:nowrap"> 本</span></div>
-      </div>
-    </div>
-  </div>
-</div>`;
-    const condSec=`<div class="section">
-  <div class="sec-hdr">⚙ 作業条件　＆　📋 マニフェスト</div>
-  <div class="sec-body row2">
-    <div class="field"><div class="field-label">作業条件</div><div class="field-val" style="font-size:10px">${condStr}</div></div>
-    <div class="field"><div class="field-label">マニフェスト</div><div class="field-val" style="font-weight:700">${mfstLabel(dp.manifest)}</div></div>
-  </div>
-</div>`;
     const notesSec=`<div class="section">
   <div class="sec-hdr">📝 作業内容・備考</div>
   <div class="sec-body"><div class="notes-box">${dp.notes||'（記載なし）'}</div></div>
@@ -2655,12 +2610,61 @@ function printWorkOrder(id,mode){
   <div class="sec-hdr" style="background:#fffbeb;color:#92400e">⚠ 注意事項</div>
   <div class="sec-body"><div class="notes-box warn">${dp.caution}</div></div>
 </div>`:'';
+    // 収集内容：産廃品目（左）＋家電・特定品目（右）を横並び
+    const collectSec=`<div class="section">
+  <div class="sec-hdr">📦 収集内容　― ドライバー記入欄</div>
+  <div class="sec-body" style="padding:0">
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <tr style="background:#fef3c7">
+        <th style="text-align:left;padding:3px 6px;border:1px solid #fde68a;font-size:9px;color:#92400e;font-weight:700;width:60px">産廃品目</th>
+        <th style="padding:3px 4px;border:1px solid #fde68a;text-align:center;font-size:9px;color:#92400e;font-weight:700;width:40px">m³</th>
+        <th style="padding:3px 4px;border:1px solid #fde68a;text-align:center;font-size:9px;color:#92400e;font-weight:700;width:40px">kg</th>
+        <th style="width:6px;background:#cbd5e1;border:none;padding:0"></th>
+        <th style="text-align:left;padding:3px 6px;border:1px solid #bfdbfe;font-size:9px;color:#1e40af;font-weight:700;width:60px">家電・特定品目</th>
+        <th style="padding:3px 4px;border:1px solid #bfdbfe;text-align:center;font-size:9px;color:#1e40af;font-weight:700;width:44px">数量</th>
+        <th style="padding:3px 4px;border:1px solid #bfdbfe;text-align:center;font-size:9px;color:#1e40af;font-weight:700;width:28px">単位</th>
+      </tr>
+      <tr><td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">廃プラ</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="background:#cbd5e1;border:none;padding:0"></td><td style="padding:4px 6px;border:1px solid #dbeafe;font-weight:700;font-size:10px;color:#1e3a5f">TV</td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px"></td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px;text-align:center;font-size:9px;color:#475569">台</td></tr>
+      <tr><td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">金属くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="background:#cbd5e1;border:none;padding:0"></td><td style="padding:4px 6px;border:1px solid #dbeafe;font-weight:700;font-size:10px;color:#1e3a5f">冷蔵庫</td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px"></td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px;text-align:center;font-size:9px;color:#475569">台</td></tr>
+      <tr><td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">木くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="background:#cbd5e1;border:none;padding:0"></td><td style="padding:4px 6px;border:1px solid #dbeafe;font-weight:700;font-size:10px;color:#1e3a5f">洗濯機</td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px"></td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px;text-align:center;font-size:9px;color:#475569">台</td></tr>
+      <tr><td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">紙くず</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="background:#cbd5e1;border:none;padding:0"></td><td style="padding:4px 6px;border:1px solid #dbeafe;font-weight:700;font-size:10px;color:#1e3a5f">AC</td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px"></td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px;text-align:center;font-size:9px;color:#475569">台</td></tr>
+      <tr><td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">ガラス陶磁器</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="background:#cbd5e1;border:none;padding:0"></td><td style="padding:4px 6px;border:1px solid #dbeafe;font-weight:700;font-size:10px;color:#1e3a5f">タイヤ</td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px"></td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px;text-align:center;font-size:9px;color:#475569">本</td></tr>
+      <tr><td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">石膏ボード</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="background:#cbd5e1;border:none;padding:0"></td><td style="padding:4px 6px;border:1px solid #dbeafe;font-weight:700;font-size:10px;color:#1e3a5f">蛍光灯</td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px"></td><td style="border:1px solid #dbeafe;background:#f0f7ff;padding:4px;text-align:center;font-size:9px;color:#475569">本</td></tr>
+      <tr><td style="padding:4px 6px;border:1px solid #e2e8f0;font-weight:700;font-size:10px">がれき類</td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="border:1px solid #e2e8f0;background:#fffdf0;padding:4px"></td><td style="background:#cbd5e1;border:none;padding:0"></td><td style="border:1px solid #dbeafe;padding:4px"></td><td style="border:1px solid #dbeafe;padding:4px"></td><td style="border:1px solid #dbeafe;padding:4px"></td></tr>
+      <tr style="background:#f0fdf4">
+        <td style="padding:5px 6px;border:2px solid #86efac;font-weight:800;color:#15803d;font-size:10px">合　計</td>
+        <td style="border:2px solid #86efac;background:#f0fdf4;padding:5px 4px"></td>
+        <td style="border:2px solid #86efac;background:#f0fdf4;padding:5px 4px"></td>
+        <td style="background:#cbd5e1;border:none;padding:0"></td>
+        <td colspan="3" style="border:1px solid #dbeafe;padding:4px"></td>
+      </tr>
+    </table>
+  </div>
+</div>`;
     const signSec=`<div class="sign-row">
-  <div class="sign-box"><div class="sign-label">${isCustomer?'受取確認':'確認（管理者）'}</div></div>
+  <div class="sign-box"><div class="sign-label">${isCustomer?'受取確認':copyType==='office'?'確認（事務所）':'確認（管理者）'}</div></div>
   <div class="sign-box"><div class="sign-label">ドライバー確認</div></div>
   <div class="sign-box"><div class="sign-label">${isCustomer?'担当者サイン':'完了確認'}</div></div>
 </div>`;
-    return`<div class="page-wrap" id="${isCustomer?'wrap2':'wrap1'}">
+    const metaTop=`<div class="meta-top">
+  <div class="meta-date-big">
+    <div class="meta-date-label">🚛 配車確定日</div>
+    <div class="meta-date-val">${dispDateStr}</div>
+  </div>
+  <div class="meta-cond-big">
+    <div class="meta-cond-row"><span class="meta-cond-label">📋 マニフェスト</span><span class="meta-cond-val">${mfstLabel(dp.manifest)}</span></div>
+    <div class="meta-cond-row"><span class="meta-cond-label">⚙ 作業条件</span><span class="meta-cond-val" style="font-size:10px">${condStr}</span></div>
+  </div>
+</div>
+<div class="meta-row">
+  <div class="meta-item"><span class="meta-label">受付日:</span><span class="meta-val" style="color:#64748b">${dateStr}</span></div>
+  <div class="meta-item"><span class="meta-label">期限:</span><span class="meta-val" style="color:${dp.deadline&&dp.deadline<fmt(new Date())?'#dc2626':'#1e293b'}">${dlStr}</span></div>
+  <div class="meta-item"><span class="meta-label">種別:</span><span class="meta-val">${typeStr}</span></div>
+  ${dp.receptionist&&!isCustomer?`<div class="meta-item"><span class="meta-label">受付担当:</span><span class="meta-val">${dp.receptionist}</span></div>`:''}
+</div>`;
+    const footerLabel=isCustomer?'【お客様控え】':copyType==='office'?'【事務所控え】':'【収集用】';
+    const wrapId=copyType==='collect'?'wrap1':copyType==='customer'?'wrap2':'wrap3';
+    return`<div class="page-wrap" id="${wrapId}">
 <div class="header">
   <div>
     <div class="company">廃棄物収集・運搬</div>
@@ -2672,26 +2676,22 @@ function printWorkOrder(id,mode){
     <div style="margin-top:4px"><span class="status-badge">${statusStr}</span></div>
   </div>
 </div>
-<div class="meta-row">
-  <div class="meta-item"><span class="meta-label" style="color:#1e40af;font-weight:800">🚛 配車確定日:</span><span class="meta-val" style="color:#1e40af;font-weight:800;font-size:11px">${dispDateStr}</span></div>
-  <div class="meta-item"><span class="meta-label">受付日:</span><span class="meta-val" style="font-size:9px;color:#64748b">${dateStr}</span></div>
-  <div class="meta-item"><span class="meta-label">期限:</span><span class="meta-val" style="color:${dp.deadline&&dp.deadline<fmt(new Date())?'#dc2626':'#1e293b'}">${dlStr}</span></div>
-  <div class="meta-item"><span class="meta-label">種別:</span><span class="meta-val">${typeStr}</span></div>
-  ${dp.receptionist&&!isCustomer?`<div class="meta-item"><span class="meta-label">受付担当:</span><span class="meta-val">${dp.receptionist}</span></div>`:''}
-</div>
+${metaTop}
 ${dp.workType&&dp.workType.type?`<div style="background:#ede9fe;border:1px solid #ddd6fe;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10px;font-weight:700;color:#6d28d9">🔧 作業種別：${workTypeLabel(dp.workType)}</div>`:''}
-${custSec}${siteSec}${drvSec}${collectSec}${condSec}${notesSec}${cautionSec}${signSec}
+${custSec}${siteSec}${drvSec}${notesSec}${cautionSec}${collectSec}${signSec}
 <div class="footer">
-  <span>廃棄物収集・運搬 配車管理システム　${isCustomer?'【お客様控え】':'【収集用】'}</span>
+  <span>廃棄物収集・運搬 配車管理システム　${footerLabel}</span>
   <span>印刷日時: ${new Date().toLocaleString('ja-JP')}</span>
 </div>
 </div>`;
   }
 
   let bodyContent='';
-  if(printMode==='collect') bodyContent=buildPage('作業指示書（収集用）',false);
-  else if(printMode==='customer') bodyContent=buildPage('作業指示書（お客様控え）',true);
-  else bodyContent=buildPage('作業指示書（収集用）',false)+`<div style="page-break-after:always"></div>`+buildPage('作業指示書（お客様控え）',true);
+  if(printMode==='collect') bodyContent=buildPage('作業指示書（収集用）','collect');
+  else if(printMode==='customer') bodyContent=buildPage('作業指示書（お客様控え）','customer');
+  else if(printMode==='office') bodyContent=buildPage('作業指示書（事務所控え）','office');
+  else if(printMode==='both') bodyContent=buildPage('作業指示書（収集用）','collect')+`<div style="page-break-after:always"></div>`+buildPage('作業指示書（お客様控え）','customer');
+  else bodyContent=buildPage('作業指示書（収集用）','collect')+`<div style="page-break-after:always"></div>`+buildPage('作業指示書（お客様控え）','customer')+`<div style="page-break-after:always"></div>`+buildPage('作業指示書（事務所控え）','office');
 
   const w=window.open('','_blank','width=860,height=1200');
   if(!w){alert('ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。');return;}
@@ -2707,6 +2707,14 @@ body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:11px;color:#1e293b}
 .title{font-size:17px;font-weight:900;color:#1e3a5f;letter-spacing:.06em}
 .doc-no{font-size:9px;color:#94a3b8;text-align:right;line-height:1.7}
 .status-badge{display:inline-block;padding:1px 8px;border-radius:3px;font-size:9px;font-weight:700;background:${dp.status==='confirmed'?'#dcfce7':'#fee2e2'};color:${dp.status==='confirmed'?'#15803d':'#dc2626'}}
+.meta-top{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.meta-date-big{background:#dbeafe;border:1.5px solid #93c5fd;border-radius:5px;padding:5px 10px;text-align:center}
+.meta-date-label{font-size:9px;font-weight:700;color:#1e40af;margin-bottom:2px}
+.meta-date-val{font-size:16px;font-weight:900;color:#1e3a5f;letter-spacing:.02em}
+.meta-cond-big{background:#fef3c7;border:1.5px solid #fde68a;border-radius:5px;padding:5px 10px;display:flex;flex-direction:column;justify-content:center}
+.meta-cond-row{display:flex;gap:6px;align-items:baseline;margin-bottom:3px}.meta-cond-row:last-child{margin-bottom:0}
+.meta-cond-label{font-size:8px;font-weight:700;color:#92400e;min-width:72px;white-space:nowrap}
+.meta-cond-val{font-size:11px;font-weight:800;color:#1e293b}
 .meta-row{display:flex;gap:12px;margin-bottom:7px;font-size:10px;flex-wrap:wrap;background:#f8fafc;padding:4px 8px;border-radius:4px}
 .meta-item{display:flex;gap:4px;align-items:center}
 .meta-label{color:#94a3b8;white-space:nowrap}
