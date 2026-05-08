@@ -2648,7 +2648,7 @@ function printWorkOrder(id,mode){
 </div>`;
     // 作業条件を個別カラムで表示（条件2・3はチェックあり時のみ）
     const cond1Col=dp.timeSpec&&dp.timeSpec.enabled
-      ?`<div class="cond-col"><div class="cond-label">作業条件1</div><div class="cond-name">時間指定</div><div class="cond-val">${dp.timeSpec.time||'—'}</div></div>`
+      ?`<div class="cond-col"><div class="cond-label">作業条件1</div><div class="cond-inline"><span class="cond-name">時間指定</span><span class="cond-sep">：</span><span class="cond-val">${dp.timeSpec.time||'—'}</span></div></div>`
       :`<div class="cond-col"><div class="cond-label">作業条件1</div><div class="cond-name">時間指定</div><div class="cond-write">AM中・PM</div></div>`;
     const cond2Col=(dp.assistant&&dp.assistant.enabled)
       ?`<div class="cond-col"><div class="cond-label">作業条件2</div><div class="cond-name">作業助手</div><div class="cond-val">${dp.assistant.count||1}名</div></div>`:'';
@@ -2662,9 +2662,7 @@ function printWorkOrder(id,mode){
   ${cond1Col}${cond2Col}${cond3Col}
 </div>
 <div class="meta-row">
-  <div class="meta-item"><span class="meta-label">📋 マニフェスト:</span><span class="meta-val">${mfstLabel(dp.manifest)}</span></div>
-  <div class="meta-item"><span class="meta-label">受付日:</span><span class="meta-val" style="color:#64748b">${dateStr}</span></div>
-  <div class="meta-item"><span class="meta-label">期限:</span><span class="meta-val" style="color:${dp.deadline&&dp.deadline<fmt(new Date())?'#dc2626':'#1e293b'}">${dlStr}</span></div>
+  <div class="meta-item"><span class="meta-label">📋 マニフェスト:</span><span class="meta-val" style="font-size:13px;font-weight:800;color:#1e293b">${mfstLabel(dp.manifest)}</span></div>
   <div class="meta-item"><span class="meta-label">種別:</span><span class="meta-val">${typeStr}</span></div>
   ${dp.receptionist&&!isCustomer?`<div class="meta-item"><span class="meta-label">受付担当:</span><span class="meta-val">${dp.receptionist}</span></div>`:''}
 </div>`;
@@ -2714,12 +2712,14 @@ body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:11px;color:#1e293b}
 .doc-no{font-size:9px;color:#94a3b8;text-align:right;line-height:1.7}
 .status-badge{display:inline-block;padding:1px 8px;border-radius:3px;font-size:9px;font-weight:700;background:${dp.status==='confirmed'?'#dcfce7':'#fee2e2'};color:${dp.status==='confirmed'?'#15803d':'#dc2626'}}
 .meta-top{display:flex;gap:0;margin-bottom:6px;border:1.5px solid #93c5fd;border-radius:5px;overflow:hidden}
-.meta-date-big{background:#dbeafe;padding:6px 12px;text-align:center;min-width:150px;max-width:195px;display:flex;flex-direction:column;justify-content:center}
-.meta-date-label{font-size:9px;font-weight:700;color:#1e40af;margin-bottom:2px}
-.meta-date-val{font-size:14px;font-weight:900;color:#1e3a5f;letter-spacing:.01em}
-.cond-col{flex:1;border-left:1.5px solid #93c5fd;padding:5px 8px;text-align:center;background:#fff;min-width:80px}
-.cond-label{font-size:8px;font-weight:700;color:#94a3b8;margin-bottom:2px}
+.meta-date-big{background:#dbeafe;padding:6px 14px;text-align:center;min-width:220px;max-width:260px;display:flex;flex-direction:column;justify-content:center}
+.meta-date-label{font-size:9px;font-weight:700;color:#1e40af;margin-bottom:3px}
+.meta-date-val{font-size:15px;font-weight:900;color:#1e3a5f;letter-spacing:.01em}
+.cond-col{flex:1;border-left:1.5px solid #93c5fd;padding:5px 8px;text-align:center;background:#fff;min-width:90px}
+.cond-label{font-size:8px;font-weight:700;color:#94a3b8;margin-bottom:3px}
 .cond-name{font-size:12px;font-weight:800;color:#1e293b}
+.cond-inline{display:flex;align-items:baseline;justify-content:center;gap:1px;flex-wrap:nowrap}
+.cond-sep{font-size:13px;font-weight:900;color:#1e40af}
 .cond-val{font-size:15px;font-weight:900;color:#1e40af;margin-top:3px;letter-spacing:.04em}
 .cond-write{font-size:9px;color:#94a3b8;border-bottom:1px solid #cbd5e1;min-height:20px;margin-top:5px;text-align:left;padding-left:2px}
 .meta-row{display:flex;gap:12px;margin-bottom:7px;font-size:10px;flex-wrap:wrap;background:#f8fafc;padding:4px 8px;border-radius:4px}
