@@ -2646,17 +2646,23 @@ function printWorkOrder(id,mode){
   <div class="sign-box"><div class="sign-label">ドライバー確認</div></div>
   <div class="sign-box"><div class="sign-label">${isCustomer?'担当者サイン':'完了確認'}</div></div>
 </div>`;
+    // 作業条件を個別カラムで表示（条件2・3はチェックあり時のみ）
+    const cond1Col=dp.timeSpec&&dp.timeSpec.enabled
+      ?`<div class="cond-col"><div class="cond-label">作業条件1</div><div class="cond-name">時間指定</div><div class="cond-val">${dp.timeSpec.time||'—'}</div></div>`
+      :`<div class="cond-col"><div class="cond-label">作業条件1</div><div class="cond-name">時間指定</div><div class="cond-write">AM中・PM</div></div>`;
+    const cond2Col=(dp.assistant&&dp.assistant.enabled)
+      ?`<div class="cond-col"><div class="cond-label">作業条件2</div><div class="cond-name">作業助手</div><div class="cond-val">${dp.assistant.count||1}名</div></div>`:'';
+    const cond3Col=dp.measurement
+      ?`<div class="cond-col"><div class="cond-label">作業条件3</div><div class="cond-name">要計量</div></div>`:'';
     const metaTop=`<div class="meta-top">
   <div class="meta-date-big">
     <div class="meta-date-label">🚛 配車確定日</div>
     <div class="meta-date-val">${dispDateStr}</div>
   </div>
-  <div class="meta-cond-big">
-    <div class="meta-cond-row"><span class="meta-cond-label">📋 マニフェスト</span><span class="meta-cond-val">${mfstLabel(dp.manifest)}</span></div>
-    <div class="meta-cond-row"><span class="meta-cond-label">⚙ 作業条件</span><span class="meta-cond-val" style="font-size:10px">${condStr}</span></div>
-  </div>
+  ${cond1Col}${cond2Col}${cond3Col}
 </div>
 <div class="meta-row">
+  <div class="meta-item"><span class="meta-label">📋 マニフェスト:</span><span class="meta-val">${mfstLabel(dp.manifest)}</span></div>
   <div class="meta-item"><span class="meta-label">受付日:</span><span class="meta-val" style="color:#64748b">${dateStr}</span></div>
   <div class="meta-item"><span class="meta-label">期限:</span><span class="meta-val" style="color:${dp.deadline&&dp.deadline<fmt(new Date())?'#dc2626':'#1e293b'}">${dlStr}</span></div>
   <div class="meta-item"><span class="meta-label">種別:</span><span class="meta-val">${typeStr}</span></div>
@@ -2707,14 +2713,15 @@ body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:11px;color:#1e293b}
 .title{font-size:17px;font-weight:900;color:#1e3a5f;letter-spacing:.06em}
 .doc-no{font-size:9px;color:#94a3b8;text-align:right;line-height:1.7}
 .status-badge{display:inline-block;padding:1px 8px;border-radius:3px;font-size:9px;font-weight:700;background:${dp.status==='confirmed'?'#dcfce7':'#fee2e2'};color:${dp.status==='confirmed'?'#15803d':'#dc2626'}}
-.meta-top{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
-.meta-date-big{background:#dbeafe;border:1.5px solid #93c5fd;border-radius:5px;padding:5px 10px;text-align:center}
+.meta-top{display:flex;gap:0;margin-bottom:6px;border:1.5px solid #93c5fd;border-radius:5px;overflow:hidden}
+.meta-date-big{background:#dbeafe;padding:6px 12px;text-align:center;min-width:150px;max-width:195px;display:flex;flex-direction:column;justify-content:center}
 .meta-date-label{font-size:9px;font-weight:700;color:#1e40af;margin-bottom:2px}
-.meta-date-val{font-size:16px;font-weight:900;color:#1e3a5f;letter-spacing:.02em}
-.meta-cond-big{background:#fef3c7;border:1.5px solid #fde68a;border-radius:5px;padding:5px 10px;display:flex;flex-direction:column;justify-content:center}
-.meta-cond-row{display:flex;gap:6px;align-items:baseline;margin-bottom:3px}.meta-cond-row:last-child{margin-bottom:0}
-.meta-cond-label{font-size:8px;font-weight:700;color:#92400e;min-width:72px;white-space:nowrap}
-.meta-cond-val{font-size:11px;font-weight:800;color:#1e293b}
+.meta-date-val{font-size:14px;font-weight:900;color:#1e3a5f;letter-spacing:.01em}
+.cond-col{flex:1;border-left:1.5px solid #93c5fd;padding:5px 8px;text-align:center;background:#fff;min-width:80px}
+.cond-label{font-size:8px;font-weight:700;color:#94a3b8;margin-bottom:2px}
+.cond-name{font-size:12px;font-weight:800;color:#1e293b}
+.cond-val{font-size:15px;font-weight:900;color:#1e40af;margin-top:3px;letter-spacing:.04em}
+.cond-write{font-size:9px;color:#94a3b8;border-bottom:1px solid #cbd5e1;min-height:20px;margin-top:5px;text-align:left;padding-left:2px}
 .meta-row{display:flex;gap:12px;margin-bottom:7px;font-size:10px;flex-wrap:wrap;background:#f8fafc;padding:4px 8px;border-radius:4px}
 .meta-item{display:flex;gap:4px;align-items:center}
 .meta-label{color:#94a3b8;white-space:nowrap}
