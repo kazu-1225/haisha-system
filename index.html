@@ -703,7 +703,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <div class="mftr" style="flex-wrap:wrap;gap:6px">
       <button class="btn btn-s" onclick="closeM('mDispatch')">キャンセル</button>
       <button class="btn btn-d hid" id="dDelBtn" onclick="delDispatch()">🗑 削除</button>
-      <button class="btn hid" id="dPrintBtn" style="background:#7c3aed;color:#fff" onclick="printWorkOrder(ST.editId,'all3')" title="作業指示書を3部まとめて印刷">🖨 指示書印刷（3部）</button>
+      <button class="btn hid" id="dPrintBtn" style="background:#7c3aed;color:#fff" onclick="openPrintConfirm(ST.editId,'all3')" title="作業指示書を3部まとめて印刷（印刷担当者を記録）">🖨 指示書印刷（3部）</button>
       <button class="btn btn-p" onclick="saveDispatch()">💾 保存</button>
     </div>
   </div>
@@ -741,6 +741,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
       <div class="stab" onclick="stab('vehicles')">🚛 車両</div>
       <div class="stab" onclick="stab('customers')">🏢 お客様</div>
       <div class="stab" onclick="stab('sites')">📍 収集先</div>
+      <div class="stab" onclick="stab('staff')">🧑‍💼 スタッフ</div>
       <div class="stab" onclick="stab('data')">💾 データ</div>
     </div>
     <div class="mbdy">
@@ -1255,6 +1256,20 @@ function archiveConfirmedDispatches() {
         <div class="dlist" id="siteList"></div>
       </div>
 
+      <!-- STAFF MASTER -->
+      <div class="spane" id="sp-staff">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#1e40af;line-height:1.7">
+          💡 印刷時に「印刷担当者」として選択できるスタッフを登録します。印刷ログに記録されます。
+        </div>
+        <div class="r2" style="margin-bottom:6px">
+          <div class="fr" style="margin:0"><label>スタッフ名 <span style="color:#dc2626">*</span></label><input type="text" id="sStaffName" placeholder="例: 香川 太郎"></div>
+          <div class="fr" style="margin:0"><label>役職・備考</label><input type="text" id="sStaffRole" placeholder="例: 配車係"></div>
+        </div>
+        <button class="btn btn-p" id="staffAddBtn" onclick="addStaff()" style="margin-bottom:10px">追加</button>
+        <button class="btn btn-s" id="staffCancelBtn" onclick="resetStaffForm()" style="margin-bottom:10px;display:none">キャンセル</button>
+        <div class="dlist" id="staffList"></div>
+      </div>
+
       <!-- DATA -->
       <div class="spane" id="sp-data">
         <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:10px">
@@ -1282,6 +1297,11 @@ function archiveConfirmedDispatches() {
           <button class="btn btn-p" onclick="exportCSV()" style="margin:3px">配車データ CSV出力</button>
           <button class="btn btn-v" onclick="exportJSON()" style="margin:3px">全データ バックアップ(JSON)</button>
         </div>
+        <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">🖨 印刷ログ</div>
+          <button class="btn btn-v" onclick="openPrintLog()" style="margin:3px">🖨 印刷ログを表示</button>
+          <button class="btn btn-g" onclick="exportPrintLog()" style="margin:3px">📥 印刷ログ CSV出力</button>
+        </div>
         <div style="background:#f8fafc;border-radius:8px;padding:12px">
           <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📂 復元・リセット</div>
           <button class="btn btn-g" onclick="document.getElementById('fi-json').click()" style="margin:3px">JSONから復元</button>
@@ -1290,6 +1310,50 @@ function archiveConfirmedDispatches() {
       </div>
 
     </div><!-- /mbdy -->
+  </div>
+</div>
+
+<!-- ===== MODAL: 印刷確認（担当者選択） ===== -->
+<div class="ovl hid" id="mPrintConfirm">
+  <div class="mbox" style="max-width:420px">
+    <div class="mhdr" style="background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%)">
+      <h2 style="color:#fff">🖨 作業指示書 印刷確認</h2>
+      <span class="mcls" onclick="closeM('mPrintConfirm')" style="color:#fff">×</span>
+    </div>
+    <div style="padding:16px">
+      <div id="printConfirmInfo" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;line-height:1.8"></div>
+      <div class="fr" style="margin-bottom:12px">
+        <label style="font-weight:700;font-size:13px">印刷担当者を選択 <span style="color:#dc2626">*</span></label>
+        <select id="printStaffSel" style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:9px 10px;font-size:13px;margin-top:4px">
+          <option value="">-- 選択してください --</option>
+        </select>
+        <div id="printStaffWarn" style="color:#dc2626;font-size:11px;margin-top:4px;display:none">⚠ 印刷担当者を選択してください</div>
+      </div>
+      <div style="font-size:11px;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:7px 10px">
+        📋 印刷日時・担当者・案件情報がログに自動記録されます
+      </div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-s" onclick="closeM('mPrintConfirm')">キャンセル</button>
+      <button class="btn btn-p" onclick="executePrint()" style="background:#7c3aed;color:#fff;font-weight:700">🖨 印刷実行</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: 印刷ログ ===== -->
+<div class="ovl hid" id="mPrintLog">
+  <div class="mbox lg">
+    <div class="mhdr">
+      <h2>🖨 印刷ログ一覧</h2>
+      <span class="mcls" onclick="closeM('mPrintLog')">×</span>
+    </div>
+    <div style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:11px;color:#64748b">直近500件まで保存 ／ 古いものから自動削除</div>
+        <button class="btn btn-g" onclick="exportPrintLog()" style="font-size:12px">📥 CSVダウンロード</button>
+      </div>
+      <div id="printLogTable" style="overflow-y:auto;max-height:460px;border:1px solid #e2e8f0;border-radius:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -1641,6 +1705,8 @@ function normalizeDB(){
   if(!db.drivers)db.drivers=[];
   if(!db.vehicles)db.vehicles=[];
   if(!db.dispatches)db.dispatches=[];
+  if(!db.staffs)db.staffs=[];
+  if(!db.printLogs)db.printLogs=[];
   (db.drivers||[]).forEach(d=>{if(!d.usageGroup)d.usageGroup='frequent';if(!d.group2)d.group2='';});
 }
 
@@ -3012,6 +3078,8 @@ function renderSLists(){
     sSiteCustEl.innerHTML='<option value="">（共通・全お客様）</option>'+
       (db.customers||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   }
+  // スタッフリスト
+  renderStaffList();
 }
 let editDriverId=null,editVehicleId=null,editCustomerId=null,editSiteId=null;
 
@@ -3135,6 +3203,149 @@ async function clearAllCustomers(){
   renderSLists();
   fillDSel();
   alert(`✅ お客様マスタを全件クリアしました（${cnt}件削除）。\n新しいCSVをインポートしてください。`);
+}
+
+// ================================================================
+// STAFF MASTER CRUD
+// ================================================================
+function renderStaffList(){
+  const list=document.getElementById('staffList');if(!list)return;
+  const staffs=db.staffs||[];
+  if(!staffs.length){list.innerHTML='<div style="color:#94a3b8;font-size:12px;padding:12px">スタッフが登録されていません。上のフォームから追加してください。</div>';return;}
+  list.innerHTML=staffs.map(s=>`<div class="ditem">
+    <div><div class="dname">${s.name}</div><div class="dsub">${s.role||'—'}</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-s" onclick="editStaff('${s.id}')" style="font-size:11px;padding:3px 8px">✏ 編集</button>
+      <button class="btn btn-d" onclick="deleteStaff('${s.id}')" style="font-size:11px;padding:3px 8px">🗑</button>
+    </div>
+  </div>`).join('');
+}
+function resetStaffForm(){
+  document.getElementById('sStaffName').value='';
+  document.getElementById('sStaffRole').value='';
+  const btn=document.getElementById('staffAddBtn');
+  btn.textContent='追加';btn.onclick=addStaff;
+  document.getElementById('staffCancelBtn').style.display='none';
+}
+async function addStaff(){
+  const name=document.getElementById('sStaffName').value.trim();
+  if(!name){alert('スタッフ名を入力してください');return;}
+  const role=document.getElementById('sStaffRole').value.trim();
+  if(!db.staffs)db.staffs=[];
+  db.staffs.push({id:'sf'+Date.now(),name,role});
+  await save();resetStaffForm();renderStaffList();
+}
+function editStaff(id){
+  const s=(db.staffs||[]).find(x=>x.id===id);if(!s)return;
+  document.getElementById('sStaffName').value=s.name;
+  document.getElementById('sStaffRole').value=s.role||'';
+  const btn=document.getElementById('staffAddBtn');
+  btn.textContent='更新';
+  btn.onclick=async function(){
+    const name=document.getElementById('sStaffName').value.trim();
+    if(!name){alert('スタッフ名を入力してください');return;}
+    s.name=name;s.role=document.getElementById('sStaffRole').value.trim();
+    await save();resetStaffForm();renderStaffList();
+  };
+  document.getElementById('staffCancelBtn').style.display='';
+  document.getElementById('sStaffName').focus();
+}
+async function deleteStaff(id){
+  if(!confirm('このスタッフを削除しますか？'))return;
+  db.staffs=(db.staffs||[]).filter(x=>x.id!==id);
+  await save();renderStaffList();
+}
+
+// ================================================================
+// PRINT CONFIRM DIALOG & LOG
+// ================================================================
+let _printPending={id:null,mode:null};
+
+function openPrintConfirm(id,mode){
+  if(!id){alert('保存後に印刷できます');return;}
+  const dp=(db.dispatches||[]).find(x=>x.id===id);
+  if(!dp){alert('データが見つかりません');return;}
+  const cu=(db.customers||[]).find(x=>x.id===dp.customer);
+  const dispDate=dp.dispatchDate||dp.date||'未定';
+  // 案件情報表示
+  document.getElementById('printConfirmInfo').innerHTML=`
+    <div style="font-weight:700;font-size:13px;color:#1e293b;margin-bottom:4px">🏢 ${cu?cu.name:'（お客様未設定）'}</div>
+    <div style="color:#64748b;font-size:11px">🚛 配車確定日：${dispDate}　｜　🖨 3部印刷（収集用・お客様控え・事務所控え）</div>`;
+  // スタッフリスト更新
+  const sel=document.getElementById('printStaffSel');
+  const staffs=db.staffs||[];
+  if(!staffs.length){
+    sel.innerHTML='<option value="">⚠ スタッフが未登録です（設定＞スタッフから登録）</option>';
+  } else {
+    sel.innerHTML='<option value="">-- 選択してください --</option>'+
+      staffs.map(s=>`<option value="${s.id}">${s.name}${s.role?' （'+s.role+'）':''}</option>`).join('');
+  }
+  document.getElementById('printStaffWarn').style.display='none';
+  _printPending={id,mode:mode||'all3'};
+  document.getElementById('mPrintConfirm').classList.remove('hid');
+}
+async function executePrint(){
+  const staffId=document.getElementById('printStaffSel').value;
+  if(!staffId){
+    document.getElementById('printStaffWarn').style.display='';
+    return;
+  }
+  const staff=(db.staffs||[]).find(x=>x.id===staffId);
+  const {id,mode}=_printPending;
+  const dp=(db.dispatches||[]).find(x=>x.id===id);
+  const cu=dp?(db.customers||[]).find(x=>x.id===dp.customer):null;
+  // ログ記録
+  if(!db.printLogs)db.printLogs=[];
+  db.printLogs.unshift({
+    id:'pl'+Date.now(),
+    datetime:new Date().toLocaleString('ja-JP'),
+    staffId,staffName:staff?staff.name:'不明',
+    dispatchId:id,
+    customerName:cu?cu.name:'—',
+    dispatchDate:dp?(dp.dispatchDate||dp.date||'—'):'—',
+    printType:mode==='all3'?'3部（収集用・お客様控え・事務所控え）':mode
+  });
+  if(db.printLogs.length>500)db.printLogs=db.printLogs.slice(0,500);
+  await save();
+  closeM('mPrintConfirm');
+  printWorkOrder(id,mode);
+}
+function openPrintLog(){
+  renderPrintLog();
+  document.getElementById('mPrintLog').classList.remove('hid');
+}
+function renderPrintLog(){
+  const logs=db.printLogs||[];
+  const el=document.getElementById('printLogTable');
+  if(!logs.length){
+    el.innerHTML='<div style="color:#94a3b8;font-size:12px;padding:24px;text-align:center">印刷ログがありません</div>';return;
+  }
+  el.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#f1f5f9;position:sticky;top:0;z-index:1">
+      <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap">印刷日時</th>
+      <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap">印刷担当者</th>
+      <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0">お客様名</th>
+      <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap">配車確定日</th>
+      <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e2e8f0">印刷種別</th>
+    </tr></thead>
+    <tbody>${logs.map((l,i)=>`<tr style="background:${i%2===0?'#fff':'#f8fafc'}">
+      <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;color:#64748b">${l.datetime}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;font-weight:700;color:#1e293b">${l.staffName}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9">${l.customerName}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap">${l.dispatchDate}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;font-size:11px;color:#7c3aed">${l.printType}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+function exportPrintLog(){
+  const logs=db.printLogs||[];
+  if(!logs.length){alert('印刷ログがありません');return;}
+  const rows=logs.map(l=>[l.datetime,l.staffName,l.customerName,l.dispatchDate,l.printType]);
+  const csv=[['印刷日時','印刷担当者','お客様名','配車確定日','印刷種別'],...rows]
+    .map(r=>r.map(v=>`"${(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));
+  a.download=`印刷ログ_${new Date().toISOString().slice(0,10)}.csv`;a.click();
 }
 
 // 収集先マスタ CRUD
