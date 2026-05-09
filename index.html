@@ -1911,10 +1911,11 @@ function render(){
   if(ST.view==='day'){
     lbl=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）`;
   }else if(ST.view==='week'){
-    if(ST.rolling){const e=addD(d,6);lbl=`📅 今日起点 ${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）〜 ${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;}
-    else{const s=sow(d),e=addD(s,6);lbl=`${s.getFullYear()}年${s.getMonth()+1}月${s.getDate()}日 〜 ${e.getMonth()+1}月${e.getDate()}日`;}
+    // ローリング：今日起点／通常：暦週。ラベル形式は同じ（オレンジボタンで判別）
+    const s=ST.rolling?d:sow(d),e=addD(s,6);
+    lbl=`${s.getFullYear()}年${s.getMonth()+1}月${s.getDate()}日 〜 ${e.getMonth()+1}月${e.getDate()}日`;
   }else{
-    if(ST.rolling){const e=addD(d,29);lbl=`📅 今日起点 ${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 〜 ${e.getMonth()+1}月${e.getDate()}日（30日間）`;}
+    if(ST.rolling){const e=addD(d,29);lbl=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 〜 ${e.getMonth()+1}月${e.getDate()}日`;}
     else lbl=`${d.getFullYear()}年${d.getMonth()+1}月`;
   }
   document.getElementById('dtLabel').textContent=lbl;
