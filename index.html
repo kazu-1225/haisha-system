@@ -813,10 +813,11 @@ function doGet(e) {
       const n = _cleanChunkProps();
       return respond({ ok: true, cleaned: n });
     }
+    // 旧チャンク方式（後方互換）
     if (e && e.parameter && e.parameter.chunk !== undefined) {
       const idx   = parseInt(e.parameter.chunk);
       const total = parseInt(e.parameter.total);
-      const enc   = e.parameter.enc || 'url'; // 'b64' or 'url'
+      const enc   = e.parameter.enc || 'url';
       const props = PropertiesService.getScriptProperties();
       props.setProperty('c' + idx, e.parameter.data || '');
       let full = '';
@@ -825,9 +826,7 @@ function doGet(e) {
         if (c === null) return respond({ ok: 'waiting', got: idx });
         full += c;
       }
-      // 全チャンク揃ったら先にプロパティを削除（エラー時の残骸防止）
       _cleanChunkProps();
-      // base64デコード（日本語対応）
       let jsonStr = full;
       if (enc === 'b64') {
         jsonStr = Utilities.newBlob(Utilities.base64Decode(full)).getDataAsString('UTF-8');
@@ -839,7 +838,21 @@ function doGet(e) {
     }
     return respond(readData());
   } catch(err) {
-    _cleanChunkProps(); // エラー時も必ずプロパティをクリーンアップ
+    _cleanChunkProps();
+    return respond({ error: err.message });
+  }
+}
+
+// POST送信対応（新方式：1回の通信で完結・高速）
+function doPost(e) {
+  try {
+    const json = e.postData.contents;
+    const data = JSON.parse(json);
+    _cleanChunkProps();
+    writeData(data);
+    writeReadableSheets(data);
+    return respond({ ok: true, method: 'post' });
+  } catch(err) {
     return respond({ error: err.message });
   }
 }
@@ -1720,28 +1733,34 @@ async function save(){
   }
 }
 
+// 同期中フラグ（重複防止）
+let _syncLock=false;
+let _syncNeeded=false;
+
 async function manualSync(){
   if(!GAS_URL){openSettings();stab('google');return;}
-  setSyncStatus('saving','エンコード中...');
+  // 同期中なら「完了後に再実行」フラグを立てて終了
+  if(_syncLock){_syncNeeded=true;return;}
+  _syncLock=true;_syncNeeded=false;
+  setSyncStatus('saving','同期中...');
   try{
     const json=JSON.stringify(db);
-    // 日本語対応：UTF-8→base64（URLを短く安全に保つ）
-    const b64=btoa(unescape(encodeURIComponent(json)));
-    const CHUNK=3000; // base64チャンク（URLを~3200字に抑える）
-    const chunks=[];
-    for(let i=0;i<b64.length;i+=CHUNK) chunks.push(b64.slice(i,i+CHUNK));
-    for(let i=0;i<chunks.length;i++){
-      setSyncStatus('saving',`送信中... ${i+1}/${chunks.length}`);
-      const url=GAS_URL+'?chunk='+i+'&total='+chunks.length+'&enc=b64&data='+encodeURIComponent(chunks[i]);
-      const res=await fetch(url,{redirect:'follow'});
-      const result=await res.json();
-      if(result.error) throw new Error(result.error);
-      if(result.ok!==true && result.ok!=='waiting') throw new Error('GASコードが古いです。Apps Scriptを更新・再デプロイしてください。');
-    }
+    // POST方式：1回の通信で完結（高速）
+    const res=await fetch(GAS_URL,{method:'POST',redirect:'follow',body:json});
+    const result=await res.json();
+    if(result.error) throw new Error(result.error);
+    if(result.ok!==true) throw new Error('GASが古いバージョンです。Apps Scriptのコードを更新・再デプロイしてください。');
     setSyncStatus('ok');
   }catch(e){
     setSyncStatus('error',e.message||'同期エラー（ローカルには保存済み）');
     console.warn('manualSync error:',e);
+  }finally{
+    _syncLock=false;
+    // 同期中に変更があった場合は再同期
+    if(_syncNeeded){
+      _syncNeeded=false;
+      setTimeout(()=>manualSync(),800);
+    }
   }
 }
 
