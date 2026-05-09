@@ -1853,11 +1853,21 @@ function cellDisps(ds,rid){
   });
 }
 function isCraneDisp(dp){const wtp=dp.workType||{};return!dp.dispatchType&&wtp.type==='container'&&wtp.containerSize==='1.5box';}
+// 未割当カードのソート：①期限が近い順（なしは最後）②配車確定日が近い順（なしは最後）③登録順
+function _sortPending(list){
+  return list.sort((a,b)=>{
+    const dlA=a.deadline||'9999-99-99', dlB=b.deadline||'9999-99-99';
+    if(dlA!==dlB) return dlA<dlB?-1:1;
+    const wA=a.dispatchDate||a.date||'9999-99-99', wB=b.dispatchDate||b.date||'9999-99-99';
+    if(wA!==wB) return wA<wB?-1:1;
+    return (a.created||'')<(b.created||'')?-1:1;
+  });
+}
 function pendingDisps(){
-  return(db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&!isCraneDisp(dp)&&(!workDate(dp)||(!dp.driver&&!dp.vehicle)));
+  return _sortPending((db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&!isCraneDisp(dp)&&(!workDate(dp)||(!dp.driver&&!dp.vehicle))));
 }
 function craneDisps(){
-  return(db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&isCraneDisp(dp)&&(!workDate(dp)||(!dp.driver&&!dp.vehicle)));
+  return _sortPending((db.dispatches||[]).filter(dp=>!dp.isReg&&!dp.isCarryIn&&isCraneDisp(dp)&&(!workDate(dp)||(!dp.driver&&!dp.vehicle))));
 }
 function regularDispsForDate(ds){
   return(db.dispatches||[]).filter(dp=>dp.isReg&&workDate(dp)===ds);
