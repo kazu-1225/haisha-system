@@ -70,6 +70,8 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .nav-btn:hover{background:#e2e8f0}
 .today-btn{padding:4px 10px;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;font-weight:600}
 .today-btn:hover{background:#1d4ed8}
+.today-btn.rolling{background:#ea580c}
+.today-btn.rolling:hover{background:#c2410c}
 .dt-label{font-size:13px;font-weight:700;min-width:170px;text-align:center;white-space:nowrap}
 .tsp{flex:1}
 .add-btn{padding:6px 14px;border-radius:8px;background:#16a34a;color:#fff;font-size:12px;font-weight:700}
@@ -1798,7 +1800,7 @@ function getWOM(d){const f=new Date(d.getFullYear(),d.getMonth(),1);return Math.
 // ================================================================
 // STATE
 // ================================================================
-const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,drag:null,drop:null,collapsedGroups:new Set(),rowDrag:null,collapsedInfreq:false};
+const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,drag:null,drop:null,collapsedGroups:new Set(),rowDrag:null,collapsedInfreq:false,rolling:false};
 const FILTER={search:'',type:'all',groups:new Set()};
 
 function applyFilter(){FILTER.search=document.getElementById('filterSearch').value;render();}
@@ -1850,7 +1852,14 @@ function toggleGrp(g){
 function getDates(){
   const d=ST.date;
   if(ST.view==='day')return[new Date(d)];
-  if(ST.view==='week'){const s=sow(d);return Array.from({length:7},(_,i)=>addD(s,i));}
+  if(ST.view==='week'){
+    // 今日起点モード：今日から7日間
+    if(ST.rolling)return Array.from({length:7},(_,i)=>addD(d,i));
+    // 通常モード：暦週（日曜始まり）
+    const s=sow(d);return Array.from({length:7},(_,i)=>addD(s,i));
+  }
+  // 月表示
+  if(ST.rolling)return Array.from({length:30},(_,i)=>addD(d,i)); // 今日起点30日間
   const s=som(d),n=dim(d);return Array.from({length:n},(_,i)=>addD(s,i));
 }
 function getResources(){return ST.res==='driver'?db.drivers:db.vehicles;}
@@ -1899,10 +1908,19 @@ function render(){
 
   const d=ST.date;
   let lbl='';
-  if(ST.view==='day')lbl=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）`;
-  else if(ST.view==='week'){const s=sow(d),e=addD(s,6);lbl=`${s.getFullYear()}年${s.getMonth()+1}月${s.getDate()}日 〜 ${e.getMonth()+1}月${e.getDate()}日`;}
-  else lbl=`${d.getFullYear()}年${d.getMonth()+1}月`;
+  if(ST.view==='day'){
+    lbl=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）`;
+  }else if(ST.view==='week'){
+    if(ST.rolling){const e=addD(d,6);lbl=`📅 今日起点 ${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）〜 ${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;}
+    else{const s=sow(d),e=addD(s,6);lbl=`${s.getFullYear()}年${s.getMonth()+1}月${s.getDate()}日 〜 ${e.getMonth()+1}月${e.getDate()}日`;}
+  }else{
+    if(ST.rolling){const e=addD(d,29);lbl=`📅 今日起点 ${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 〜 ${e.getMonth()+1}月${e.getDate()}日（30日間）`;}
+    else lbl=`${d.getFullYear()}年${d.getMonth()+1}月`;
+  }
   document.getElementById('dtLabel').textContent=lbl;
+  // 今日ボタンのローリングモードインジケーター
+  const todayBtnEl=document.querySelector('.today-btn');
+  if(todayBtnEl)todayBtnEl.classList.toggle('rolling',ST.rolling);
 
   const isDay=ST.view==='day';
   // calWrapのday-viewクラス切替
@@ -2355,6 +2373,7 @@ function renderPending(){
 // NAVIGATION
 // ================================================================
 function setView(v){
+  ST.rolling=false; // ビューボタン押下でローリングモードを常にリセット
   ST.view=v;
   ['day','week','month'].forEach(x=>document.getElementById(`vb-${x}`).classList.toggle('on',x===v));
   render();
@@ -2365,12 +2384,22 @@ function setRes(r){
   render();
 }
 function nav(d){
-  if(ST.view==='day')ST.date=addD(ST.date,d);
-  else if(ST.view==='week')ST.date=addD(ST.date,d*7);
-  else ST.date=new Date(ST.date.getFullYear(),ST.date.getMonth()+d,1);
+  if(ST.view==='day'){
+    ST.date=addD(ST.date,d);
+  }else if(ST.view==='week'){
+    ST.date=addD(ST.date,d*7); // ローリング中も7日刻みで同じ
+  }else{
+    if(ST.rolling)ST.date=addD(ST.date,d*30); // ローリング中は30日刻み
+    else ST.date=new Date(ST.date.getFullYear(),ST.date.getMonth()+d,1);
+  }
   render();
 }
-function goToday(){ST.date=new Date();render();}
+function goToday(){
+  ST.date=new Date();
+  // 週・月ビューの場合は今日起点ローリングモードに切替
+  if(ST.view==='week'||ST.view==='month') ST.rolling=true;
+  render();
+}
 function togglePending(){
   ST.pendCollapsed=!ST.pendCollapsed;
   document.getElementById('pendingPanel').classList.toggle('collapsed',ST.pendCollapsed);
