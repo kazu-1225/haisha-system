@@ -396,6 +396,16 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .carry-fixed-hdr td{background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #93c5fd}
 .carry-fixed-cell{background:#eff6ff !important;vertical-align:top;padding:3px;min-height:36px}
 .ec-carry{border:1.5px solid #3b82f6 !important;background:#dbeafe !important}
+/* ===== 定期便 カード状態別 ===== */
+/* 定期便行・ドライバー未定（赤） */
+.ecard.ec-reg-pend{background:#fee2e2;border-left-color:#dc2626;color:#7f1d1d}
+.ecard.ec-reg-pend:hover{box-shadow:0 2px 8px rgba(220,38,38,.3)}
+/* 定期便行・ドライバー確定（グレーアウト） */
+.ecard.ec-reg-done{background:#f1f5f9;border-left-color:#94a3b8;color:#94a3b8;opacity:.65;cursor:pointer}
+.ecard.ec-reg-done:hover{opacity:1;box-shadow:0 2px 8px rgba(148,163,184,.4)}
+.ecard.ec-reg-done .ec-cust{color:#64748b}
+/* ドライバー行の定期便バッジ */
+.ec-reg-drv-badge{display:inline-block;font-size:9px;font-weight:800;color:#065f46;background:#d1fae5;border-radius:3px;padding:0 4px;margin-left:3px;vertical-align:middle;line-height:1.5;border:1px solid #6ee7b7;white-space:nowrap}
 
 /* ===== マニフェスト ===== */
 .mfst-wrap{display:flex;flex-direction:column;gap:6px;margin-top:4px}
@@ -1991,14 +2001,14 @@ function render(){
           const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
           return ta<tb2?-1:ta>tb2?1:0;
         });
-        const parts=sorted.map((dp,i)=>dayCardHTML(dp,i+1));
+        const parts=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'drv'));
         const dayHtml=parts.join('<div class="day-arrow">›</div>');
         row+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','${rid}')">
           <div class="day-cell-wrap">${dayHtml||`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`}</div></td>`;
       } else {
-        const cards=disps.map(dp=>cardHTML(dp)).join('');
+        const cards=disps.map(dp=>cardHTML(dp,'drv')).join('');
         row+=`<td class="${cc}" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','${rid}')"><div class="cell-scrl">${cards}</div></td>`;
@@ -2023,7 +2033,7 @@ function render(){
         const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
         return ta<tb2?-1:ta>tb2?1:0;
       });
-      const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1)).join('<div class="day-arrow">›</div>');
+      const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'reg')).join('<div class="day-arrow">›</div>');
       regRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
         ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
         onclick="cellClick(event,'${ds}','')">
@@ -2035,7 +2045,7 @@ function render(){
         let cc='reg-fixed-cell ev-cell'+(isMonth?' td-month':'');
         if(ds===today)cc+=' td-now';
         else if(holName)cc+=' td-hol';
-        const regCards=regularDispsForDate(ds).map(dp=>cardHTML(dp)).join('');
+        const regCards=regularDispsForDate(ds).map(dp=>cardHTML(dp,'reg')).join('');
         regRow+=`<td class="${cc}" data-date="${ds}" data-rid=""
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','')"><div class="cell-scrl">${regCards}</div></td>`;
@@ -2060,7 +2070,7 @@ function render(){
         const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
         return ta<tb2?-1:ta>tb2?1:0;
       });
-      const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1)).join('<div class="day-arrow">›</div>');
+      const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'carry')).join('<div class="day-arrow">›</div>');
       carryRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
         ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
         onclick="cellClick(event,'${ds}','')">
@@ -2072,7 +2082,7 @@ function render(){
         let cc='carry-fixed-cell ev-cell'+(isMonth?' td-month':'');
         if(ds===today)cc+=' td-now';
         else if(holName)cc+=' td-hol';
-        const carryCards=carryInDispsForDate(ds).map(dp=>cardHTML(dp)).join('');
+        const carryCards=carryInDispsForDate(ds).map(dp=>cardHTML(dp,'carry')).join('');
         carryRow+=`<td class="${cc}" data-date="${ds}" data-rid=""
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','')"><div class="cell-scrl">${carryCards}</div></td>`;
@@ -2148,12 +2158,13 @@ function initColResize(){
   };
 }
 
-function dayCardHTML(dp,seqNo){
+function dayCardHTML(dp,seqNo,rowCtx){
   const isCarryIn=!!dp.isCarryIn;
   const isShip=dp.dispatchType==='shipment';
   const wdate=workDate(dp)||'';
   const holName=HOLIDAYS[wdate]||'';
   const veh=!isCarryIn?(vehName(dp.vehicle)||'未定'):'';
+  const drv=drvName(dp.driver)||'未定';
   const time=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'';
   const holBadge=holName?`<span class="ec-hol-badge">🎌</span>`:'';
   const statusMark=dp.status==='pending'?'🔴 ':'';
@@ -2162,19 +2173,42 @@ function dayCardHTML(dp,seqNo){
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
   const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
   const wt1=dp.workType||{};const isCrane=!isCarryIn&&!isShip&&wt1.type==='container'&&wt1.containerSize==='1.5box';
+  // 持込み行ではドラッグ無効
+  const dragAttr=(isCarryIn&&rowCtx==='carry')
+    ?''
+    :`draggable="true" ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"`;
+  // 定期便 in 定期便行（日表示）
+  if(dp.isReg&&rowCtx==='reg'){
+    const regHasDrv=!!(dp.driver&&dp.vehicle);
+    let cls='ecard ec-day '+(regHasDrv?'ec-reg-done':'ec-reg-pend')+(holName?' ec-hol':'');
+    const regLabel=regHasDrv
+      ?`<div class="ec-day-veh" style="color:#64748b">✓ ${drv}／${veh}</div>`
+      :`<div class="ec-day-veh" style="color:#dc2626;font-weight:700">🔴 ドライバー未定</div>`;
+    return`<div class="${cls}" ${dragAttr}
+      onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
+      onclick="event.stopPropagation();${editFn}">
+      <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
+      <div class="ec-day-seq">第${seqNo}業務${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div>
+      <div class="ec-day-cust">${custName(dp.customer)}</div>
+      ${regLabel}
+      ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:''}
+      ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
+    </div>`;
+  }
   let cls='ecard ec-day ';
   if(isCarryIn)cls+='ec-carry';
   else if(isShip)cls+=(!dp.driver||!dp.vehicle)?'ec-ship-pend':'ec-ship';
   else if(isCrane)cls+='ec-crane';
   else if(!dp.driver||!dp.vehicle)cls+='ec-pend';
-  else if(dp.isReg)cls+='ec-reg';
+  else if(dp.isReg)cls+='ec-spot'; // ドライバー行の定期便は緑（ec-reg-doneはregRowのみ）
   else cls+='ec-spot';
   if(holName)cls+=' ec-hol';
+  // 定期便バッジ（ドライバー行）
+  const regBadge=(dp.isReg&&rowCtx==='drv')?`<span class="ec-reg-drv-badge">🔁 定期</span>`:'';
   const titleLine=isShip
     ?`<div class="ec-day-cust">📦 ${statusMark}${escH(dp.destName)||'出荷'}${holBadge}</div>`
-    :`<div class="ec-day-seq">${statusMark}第${seqNo}業務${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div><div class="ec-day-cust">${custName(dp.customer)}</div>`;
-  return`<div class="${cls}" draggable="true" data-did="${dp.id}"
-    ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+    :`<div class="ec-day-seq">${statusMark}第${seqNo}業務${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${regBadge}${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div><div class="ec-day-cust">${custName(dp.customer)}</div>`;
+  return`<div class="${cls}" ${dragAttr}
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();${editFn}">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
@@ -2186,7 +2220,7 @@ function dayCardHTML(dp,seqNo){
     ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
   </div>`;
 }
-function cardHTML(dp){
+function cardHTML(dp,rowCtx){
   const isCarryIn=!!dp.isCarryIn;
   const isShip=dp.dispatchType==='shipment';
   const isUnass=!isCarryIn&&(!dp.driver||!dp.vehicle);
@@ -2198,11 +2232,47 @@ function cardHTML(dp){
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
   const dlHtml=dp.deadline?`<div class="ec-sub" style="font-size:10px;color:${dlOver?'#dc2626':dlSoon?'#d97706':'#64748b'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:'';
+  // 持込みはドラッグ無効（持込み行のみ）
+  const dragPart=(isCarryIn&&rowCtx==='carry')
+    ?''
+    :`draggable="true" ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"`;
+  // ─── 定期便 in 定期便行 ───────────────────────────────────────
+  if(dp.isReg&&rowCtx==='reg'){
+    const regHasDrv=!!(dp.driver&&dp.vehicle);
+    const cls='ecard '+(regHasDrv?'ec-reg-done':'ec-reg-pend')+(holName?' ec-hol':'');
+    const drvLabel=regHasDrv
+      ?`<div class="ec-sub" style="font-size:10px">✓ ${drvName(dp.driver)}／${vehName(dp.vehicle)}</div>`
+      :`<div class="ec-sub" style="font-size:10px;font-weight:700;color:#dc2626">🔴 ドライバー未定</div>`;
+    return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
+      onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
+      onclick="event.stopPropagation();editDisp('${dp.id}')">
+      <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
+      <div class="ec-cust">${custName(dp.customer)}${holBadge}</div>
+      ${drvLabel}
+      ${dlHtml}
+      ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.6">${dp.notes.slice(0,20)}</div>`:''}
+    </div>`;
+  }
+  // ─── 定期便 in ドライバー行（緑カード＋定期バッジ） ───────────
+  if(dp.isReg&&rowCtx==='drv'){
+    const cls='ecard ec-spot'+(holName?' ec-hol':'');
+    const sub=ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`;
+    return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
+      onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
+      onclick="event.stopPropagation();editDisp('${dp.id}')">
+      <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
+      <div class="ec-cust">${custName(dp.customer)}<span class="ec-reg-drv-badge">🔁 定期</span>${holBadge}</div>
+      <div class="ec-sub">${sub}</div>
+      ${holName?`<div class="ec-sub" style="font-size:9px;color:#dc2626;font-weight:700">🎌 ${holName}</div>`:''}
+      ${dlHtml}
+      ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.6">${dp.notes.slice(0,20)}</div>`:''}
+    </div>`;
+  }
+  // ─── 出荷案件 ─────────────────────────────────────────────────
   if(isShip){
     const cls='ecard '+(isCarryIn?'ec-carry':isUnass?'ec-ship-pend':'ec-ship')+(holName?' ec-hol':'');
     const sub=isCarryIn?'🏭 持込み':(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
-    return`<div class="${cls}" draggable="true" data-did="${dp.id}"
-      ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+    return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
       onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
       onclick="event.stopPropagation();editShipment('${dp.id}')">
       <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
@@ -2212,12 +2282,12 @@ function cardHTML(dp){
       ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.65">${dp.notes.slice(0,20)}</div>`:''}
     </div>`;
   }
+  // ─── 通常案件（スポット・クレーン・持込み） ───────────────────
   const wt2=dp.workType||{};const isCrane=!isCarryIn&&wt2.type==='container'&&wt2.containerSize==='1.5box';
   let cls='ecard '+(isCarryIn?'ec-carry':isCrane?'ec-crane':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
   if(holName)cls+=' ec-hol';
   const sub=isCarryIn?(dp.isReg?'🏭 持込み（定期）':'🏭 持込み'):(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
-  return`<div class="${cls}" draggable="true" data-did="${dp.id}"
-    ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
+  return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();editDisp('${dp.id}')">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
