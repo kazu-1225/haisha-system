@@ -315,6 +315,7 @@ hr{border:none;border-top:1px solid #e2e8f0}
 .mp-item.active{background:#dbeafe}
 .mp-item-name{font-size:13px;font-weight:600;color:#1e293b}
 .mp-item.active .mp-item-name{color:#1d4ed8}
+.mp-item-kana{font-size:10px;color:#64748b;letter-spacing:.04em}
 .mp-item-sub{font-size:10px;color:#94a3b8}
 .mp-empty{padding:20px;text-align:center;color:#94a3b8;font-size:12px}
 .mp-add-sec{padding:8px 10px;border-top:2px solid #e2e8f0;background:#f0fdf4;flex-shrink:0}
@@ -3982,17 +3983,50 @@ function closeMP(){
   document.getElementById('masterPicker').classList.add('hid');
 }
 
+// ── 検索正規化：ひらがな・半角カタカナ → 全角カタカナ、全角英数 → 半角 ──
+function toSearchable(s){
+  if(!s)return'';
+  // 半角カタカナ → 全角カタカナ（濁点・半濁点含む）
+  const hk={'ｦ':'ヲ','ｧ':'ァ','ｨ':'ィ','ｩ':'ゥ','ｪ':'ェ','ｫ':'ォ','ｬ':'ャ','ｭ':'ュ','ｮ':'ョ','ｯ':'ッ','ｰ':'ー','ｱ':'ア','ｲ':'イ','ｳ':'ウ','ｴ':'エ','ｵ':'オ','ｶ':'カ','ｷ':'キ','ｸ':'ク','ｹ':'ケ','ｺ':'コ','ｻ':'サ','ｼ':'シ','ｽ':'ス','ｾ':'セ','ｿ':'ソ','ﾀ':'タ','ﾁ':'チ','ﾂ':'ツ','ﾃ':'テ','ﾄ':'ト','ﾅ':'ナ','ﾆ':'ニ','ﾇ':'ヌ','ﾈ':'ネ','ﾉ':'ノ','ﾊ':'ハ','ﾋ':'ヒ','ﾌ':'フ','ﾍ':'ヘ','ﾎ':'ホ','ﾏ':'マ','ﾐ':'ミ','ﾑ':'ム','ﾒ':'メ','ﾓ':'モ','ﾔ':'ヤ','ﾕ':'ユ','ﾖ':'ヨ','ﾗ':'ラ','ﾘ':'リ','ﾙ':'ル','ﾚ':'レ','ﾛ':'ロ','ﾜ':'ワ','ﾝ':'ン','ﾞ':'゛','ﾟ':'゜'};
+  s=s.replace(/[ｦ-ﾟ]/g,c=>hk[c]||c);
+  // 濁点結合
+  const dk={'カ':'ガ','キ':'ギ','ク':'グ','ケ':'ゲ','コ':'ゴ','サ':'ザ','シ':'ジ','ス':'ズ','セ':'ゼ','ソ':'ゾ','タ':'ダ','チ':'ヂ','ツ':'ヅ','テ':'デ','ト':'ド','ハ':'バ','ヒ':'ビ','フ':'ブ','ヘ':'ベ','ホ':'ボ'};
+  const pk={'ハ':'パ','ヒ':'ピ','フ':'プ','ヘ':'ペ','ホ':'ポ'};
+  s=s.replace(/([カキクケコサシスセソタチツテトハヒフヘホ])゛/g,(_,c)=>dk[c]||c+'゛');
+  s=s.replace(/([ハヒフヘホ])゜/g,(_,c)=>pk[c]||c+'゜');
+  // ひらがな → カタカナ
+  s=s.replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60));
+  // 全角英数 → 半角
+  s=s.replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  return s.toLowerCase();
+}
+
 function getMPItems(){
-  if(MP.type==='customer')return(db.customers||[]).map(c=>({id:c.id,name:c.name,sub:[c.kana,c.addr,c.contact].filter(x=>x).join(' | ')}));
-  if(MP.type==='driver')return(db.drivers||[]).map(d=>({id:d.id,name:d.name,sub:[[d.group,d.group2].filter(x=>x).join('/'),d.type].filter(x=>x).join(' · ')}));
-  if(MP.type==='vehicle')return(db.vehicles||[]).map(v=>({id:v.id,name:v.name,sub:(v.type||'')+(v.req?' | '+v.req+'以上':'')}));
+  if(MP.type==='customer')return(db.customers||[]).map(c=>({
+    id:c.id, name:c.name, kana:c.kana||'',
+    sub:[c.addr,c.contact].filter(x=>x).join(' | ')
+  }));
+  if(MP.type==='driver')return(db.drivers||[]).map(d=>({id:d.id,name:d.name,kana:'',sub:[[d.group,d.group2].filter(x=>x).join('/'),d.type].filter(x=>x).join(' · ')}));
+  if(MP.type==='vehicle')return(db.vehicles||[]).map(v=>({id:v.id,name:v.name,kana:'',sub:(v.type||'')+(v.req?' | '+v.req+'以上':'')}));
   return[];
 }
 
 function filterMP(){
-  const q=document.getElementById('mpSrch').value.toLowerCase();
+  const raw=document.getElementById('mpSrch').value;
+  const qRaw=raw.toLowerCase();
+  const qNorm=toSearchable(raw); // ひらがな・半角カタカナも正規化
   const curVal=MP.targetSel?MP.targetSel.value:'';
-  const items=getMPItems().filter(i=>!q||i.name.toLowerCase().includes(q)||(i.sub||'').toLowerCase().includes(q));
+  const items=getMPItems().filter(i=>{
+    if(!raw)return true;
+    // name: 原文 + 正規化どちらでもヒット
+    if(i.name.toLowerCase().includes(qRaw))return true;
+    if(toSearchable(i.name).includes(qNorm))return true;
+    // kana: ひらがな/カタカナ/半角カタカナ 全対応
+    if(i.kana&&toSearchable(i.kana).includes(qNorm))return true;
+    // sub（住所・担当者名）
+    if(toSearchable(i.sub||'').includes(qNorm))return true;
+    return false;
+  });
   const list=document.getElementById('mpList');
   // 先頭に「クリア」行を常に表示
   const clearLabels={customer:'— 未選択（クリア）',driver:'— 未定（クリア）',vehicle:'— 未定（クリア）'};
@@ -4006,6 +4040,7 @@ function filterMP(){
   }
   list.innerHTML=clearRow+items.map(i=>`<div class="mp-item${i.id===curVal?' active':''}" onclick="selectMP('${i.id}')">
     <div class="mp-item-name">${i.name}</div>
+    ${i.kana?`<div class="mp-item-kana">📝 ${i.kana}</div>`:''}
     ${i.sub?`<div class="mp-item-sub">${i.sub}</div>`:''}
   </div>`).join('');
 }
