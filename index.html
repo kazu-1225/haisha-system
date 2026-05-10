@@ -391,6 +391,18 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .site-sel-row select{flex:1;border:1.5px solid #3b82f6;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#f0f7ff;color:#1e3a5f;font-weight:600}
 .site-save-btn{padding:5px 10px;border-radius:6px;background:#f1f5f9;color:#475569;font-size:11px;font-weight:700;border:1.5px solid #cbd5e1;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .site-save-btn:hover{background:#e2e8f0}
+/* ===== 収集先 複数担当者 ===== */
+.sc-list{margin:6px 0 4px 0;display:flex;flex-direction:column;gap:3px}
+.sc-item{display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;padding:4px 10px;font-size:11px}
+.sc-name{font-weight:600;color:#14532d;flex:1}
+.sc-phone{color:#166534;font-size:11px}
+.sc-del-btn{color:#dc2626;cursor:pointer;font-weight:700;font-size:13px;padding:0 3px;line-height:1;background:none;border:none}
+.sc-del-btn:hover{color:#b91c1c}
+.sc-add-row{display:flex;gap:5px;margin-top:5px}
+.sc-add-inp{flex:1;border:1.5px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;outline:none;min-width:0}
+.sc-add-inp:focus{border-color:#3b82f6}
+.sc-add-btn{padding:5px 10px;border-radius:6px;background:#0ea5e9;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sc-add-btn:hover{background:#0284c7}
 
 /* ===== 定期便ROW ===== */
 .reg-fixed-hdr td{background:#f0fdf4;color:#15803d;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #86efac}
@@ -586,6 +598,13 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
           <option value="">🔍 登録済み収集先から選択して自動入力...</option>
         </select>
         <button class="site-save-btn" onclick="saveSiteTemplate()" title="現在の収集先情報をテンプレートとして登録">📌 収集先を登録</button>
+      </div>
+      <!-- 複数担当者ピッカー：担当者が2名以上いる場合に自動表示 -->
+      <div id="dSiteContactPicker" style="display:none;margin:-4px 0 8px 0;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px;padding:8px 12px">
+        <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:5px">👤 担当者を選択してください（複数登録あり）</div>
+        <select id="dSiteContactSel" style="width:100%;border:1.5px solid #0ea5e9;border-radius:6px;padding:6px 10px;font-size:12px;outline:none;background:#fff;color:#0c4a6e;font-weight:600" onchange="onSiteContactSel()">
+          <option value="">-- 担当者を選択 --</option>
+        </select>
       </div>
       <div class="r2">
         <div class="fr"><label>収集先 名称</label><input type="text" id="dSiteName" placeholder="例: 〇〇工場 / 〇〇ビル地下" oninput="onSiteNameInput(this.value)"></div>
@@ -1734,6 +1753,13 @@ function normalizeDB(){
   if(!db.staffs)db.staffs=[];
   if(!db.printLogs)db.printLogs=[];
   (db.drivers||[]).forEach(d=>{if(!d.usageGroup)d.usageGroup='frequent';if(!d.group2)d.group2='';});
+  // 収集先：旧データ（contact/phone単一フィールド）→contacts[]へ移行
+  (db.sites||[]).forEach(s=>{
+    if(!s.contacts){
+      s.contacts=[];
+      if(s.contact||s.phone)s.contacts.push({id:uid(),name:s.contact||'',phone:s.phone||''});
+    }
+  });
 }
 
 let _autoSyncTimer=null;
@@ -2585,13 +2611,47 @@ function onCustChange(){
 }
 function onSiteSelect(){
   const id=document.getElementById('dSiteSelect').value;
-  if(!id)return;
+  const picker=document.getElementById('dSiteContactPicker');
+  if(!id){if(picker)picker.style.display='none';return;}
   const s=(db.sites||[]).find(x=>x.id===id);if(!s)return;
   document.getElementById('dSiteName').value=s.name||'';
-  document.getElementById('dSiteContact').value=s.contact||'';
-  document.getElementById('dSitePhone').value=s.phone||'';
   document.getElementById('dSiteAddr').value=s.addr||'';
   if(s.caution)document.getElementById('dCaution').value=s.caution;
+  // 担当者処理：contacts[]優先、なければlegacy contact/phone
+  const contacts=s.contacts||[];
+  if(contacts.length===0){
+    // legacyフィールドがあればそちらを使う
+    document.getElementById('dSiteContact').value=s.contact||'';
+    document.getElementById('dSitePhone').value=s.phone||'';
+    if(picker)picker.style.display='none';
+  }else if(contacts.length===1){
+    // 1名のみ → そのまま自動入力
+    document.getElementById('dSiteContact').value=contacts[0].name||'';
+    document.getElementById('dSitePhone').value=contacts[0].phone||'';
+    if(picker)picker.style.display='none';
+  }else{
+    // 2名以上 → ピッカーを表示
+    document.getElementById('dSiteContact').value='';
+    document.getElementById('dSitePhone').value='';
+    if(picker){
+      picker.style.display='';
+      const sel=document.getElementById('dSiteContactSel');
+      if(sel){
+        sel.innerHTML='<option value="">-- 担当者を選択 --</option>'+
+          contacts.map((c,i)=>`<option value="${i}">${c.name||'（名前なし）'}${c.phone?' ／ '+c.phone:''}</option>`).join('');
+        sel.value='';
+      }
+    }
+  }
+}
+function onSiteContactSel(){
+  const siteId=document.getElementById('dSiteSelect').value;
+  const s=(db.sites||[]).find(x=>x.id===siteId);if(!s)return;
+  const idx=parseInt(document.getElementById('dSiteContactSel').value);
+  if(isNaN(idx))return;
+  const c=(s.contacts||[])[idx];if(!c)return;
+  document.getElementById('dSiteContact').value=c.name||'';
+  document.getElementById('dSitePhone').value=c.phone||'';
 }
 async function saveSiteTemplate(){
   const name=document.getElementById('dSiteName').value.trim();
@@ -2602,13 +2662,20 @@ async function saveSiteTemplate(){
   const addr=document.getElementById('dSiteAddr').value.trim();
   const caution=document.getElementById('dCaution').value.trim();
   if(!db.sites)db.sites=[];
-  // 同名 & 同お客様で既存チェック
   const existing=db.sites.find(s=>s.name===name&&(s.customerId||'')===(custId||''));
   if(existing){
-    Object.assign(existing,{contact,phone,addr,caution,customerId:custId});
-    alert(`✅「${name}」の情報を更新しました`);
+    Object.assign(existing,{addr,caution,customerId:custId});
+    if(!existing.contacts)existing.contacts=[];
+    // 同じ担当者がいなければ追加
+    if(contact||phone){
+      const dup=existing.contacts.find(c=>c.name===contact&&c.phone===phone);
+      if(!dup){existing.contacts.push({id:uid(),name:contact,phone});alert(`✅「${name}」に担当者「${contact||phone}」を追加しました`);}
+      else alert(`✅「${name}」の情報を更新しました`);
+    }else{alert(`✅「${name}」の情報を更新しました`);}
   } else {
-    db.sites.push({id:uid(),name,contact,phone,addr,caution,customerId:custId});
+    const newSite={id:uid(),name,customerId:custId,addr,caution,contacts:[]};
+    if(contact||phone)newSite.contacts.push({id:uid(),name:contact,phone});
+    db.sites.push(newSite);
     alert(`✅「${name}」を収集先テンプレートに登録しました`);
   }
   await save();fillSiteSel();
@@ -3195,12 +3262,30 @@ function renderSLists(){
       '<div class="empty">収集先が登録されていません</div>':
       (db.sites||[]).map(s=>{
         const custName2=s.customerId?(db.customers||[]).find(c=>c.id===s.customerId)?.name||'?':'共通';
-        return`<div class="ditem"><div class="di-main">
-          <div class="di-name">${s.name}<span class="bdg ${s.customerId?'bdg-b':'bdg-g'}" style="margin-left:6px;font-size:9px">${custName2}</span></div>
-          <div class="di-meta">${[s.addr,s.contact,s.phone].filter(x=>x).join(' | ')}${s.caution?'<span class="bdg bdg-o" style="margin-left:4px;font-size:9px">⚠ '+s.caution+'</span>':''}</div>
-        </div>
-        <span class="di-del" onclick="startEditSite('${s.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
-        <span class="di-del" onclick="delSite('${s.id}')">🗑</span></div>`;}).join('');
+        const contacts=s.contacts||[];
+        const contactRows=contacts.length
+          ?contacts.map(c=>`<div class="sc-item">
+            <span class="sc-name">👤 ${escH(c.name||'（名前なし）')}</span>
+            <span class="sc-phone">${escH(c.phone||'')}</span>
+            <button class="sc-del-btn" onclick="delSiteContact('${s.id}','${c.id}')" title="この担当者を削除">×</button>
+          </div>`).join('')
+          :'<div style="font-size:11px;color:#94a3b8;padding:2px 0">担当者未登録（下から追加できます）</div>';
+        return`<div class="ditem" style="flex-direction:column;align-items:stretch;padding:10px 12px;gap:0">
+          <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+            <div class="di-main" style="flex:1;min-width:0">
+              <div class="di-name">${escH(s.name)}<span class="bdg ${s.customerId?'bdg-b':'bdg-g'}" style="margin-left:6px;font-size:9px">${custName2}</span></div>
+              <div class="di-meta">${[s.addr].filter(x=>x).map(escH).join(' | ')}${s.caution?`<span class="bdg bdg-o" style="margin-left:4px;font-size:9px">⚠ ${escH(s.caution)}</span>`:''}</div>
+            </div>
+            <span onclick="startEditSite('${s.id}')" style="color:#6366f1;font-size:15px;cursor:pointer;flex-shrink:0" title="編集">✏️</span>
+            <span onclick="delSite('${s.id}')" style="color:#dc2626;font-size:15px;cursor:pointer;flex-shrink:0" title="削除">🗑</span>
+          </div>
+          <div class="sc-list">${contactRows}</div>
+          <div class="sc-add-row">
+            <input type="text" id="scName_${s.id}" class="sc-add-inp" placeholder="担当者名（例: 鈴木 様）">
+            <input type="tel" id="scPhone_${s.id}" class="sc-add-inp" placeholder="電話番号">
+            <button class="sc-add-btn" onclick="addSiteContact('${s.id}')">＋ 担当者追加</button>
+          </div>
+        </div>`;}).join('');
   }
   // 収集先設定フォームのお客様ドロップダウンを更新
   const sSiteCustEl=document.getElementById('sSiteCustId');
@@ -3504,14 +3589,35 @@ async function addSite(){
   if(!name){alert('収集先名称を入力してください');return;}
   if(!db.sites)db.sites=[];
   const sc=document.getElementById('sSiteCustId');
-  const sdata={name,customerId:sc?sc.value:'',contact:document.getElementById('sSiteContact').value.trim(),phone:document.getElementById('sSitePhone').value.trim(),addr:document.getElementById('sSiteAddr').value.trim(),caution:document.getElementById('sSiteCaution').value.trim()};
+  const contact=document.getElementById('sSiteContact').value.trim();
+  const phone=document.getElementById('sSitePhone').value.trim();
+  const sdata={name,customerId:sc?sc.value:'',addr:document.getElementById('sSiteAddr').value.trim(),caution:document.getElementById('sSiteCaution').value.trim()};
   if(editSiteId){
     const s=db.sites.find(x=>x.id===editSiteId);
-    if(s)Object.assign(s,sdata);
+    if(s){Object.assign(s,sdata);if(!s.contacts)s.contacts=[];}
   } else {
-    db.sites.push({id:uid(),...sdata});
+    const newSite={id:uid(),...sdata,contacts:[]};
+    if(contact||phone)newSite.contacts.push({id:uid(),name:contact,phone});
+    db.sites.push(newSite);
   }
   await save();resetSiteForm();renderSLists();fillSiteSel();
+}
+async function addSiteContact(siteId){
+  const s=(db.sites||[]).find(x=>x.id===siteId);if(!s)return;
+  const nameEl=document.getElementById('scName_'+siteId);
+  const phoneEl=document.getElementById('scPhone_'+siteId);
+  const n=(nameEl?.value||'').trim(),p=(phoneEl?.value||'').trim();
+  if(!n&&!p){alert('担当者名または電話番号を入力してください');return;}
+  if(!s.contacts)s.contacts=[];
+  s.contacts.push({id:uid(),name:n,phone:p});
+  if(nameEl)nameEl.value='';if(phoneEl)phoneEl.value='';
+  await save();renderSLists();fillSiteSel();
+}
+async function delSiteContact(siteId,contactId){
+  if(!confirm('この担当者を削除しますか？'))return;
+  const s=(db.sites||[]).find(x=>x.id===siteId);if(!s)return;
+  s.contacts=(s.contacts||[]).filter(c=>c.id!==contactId);
+  await save();renderSLists();fillSiteSel();
 }
 async function delSite(id){
   if(!confirm('この収集先を削除しますか？'))return;
