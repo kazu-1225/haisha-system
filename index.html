@@ -41,7 +41,9 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .pending-hdr h3{font-size:12px;font-weight:700;color:#dc2626}
 .p-cnt{background:#dc2626;color:#fff;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;min-width:20px;text-align:center}
 .p-toggle{margin-left:auto;font-size:11px;color:#dc2626;transition:transform .2s}
-.pending-body{display:flex;gap:8px;padding:7px 14px;overflow-x:auto;max-height:100px}
+.pending-body{display:flex;gap:8px;padding:7px 14px;overflow-x:auto;max-height:100px;transition:outline .1s,background .1s}
+.pending-body.pending-drop-over{outline:3px dashed #dc2626;background:#fef2f2;border-radius:8px}
+.crane-pending-body.pending-drop-over{outline:3px dashed #ca8a04;background:#fefce8;border-radius:8px}
 .pending-panel.collapsed .pending-body{display:none}
 .pending-panel.collapsed .p-toggle{transform:rotate(-90deg)}
 /* crane pending panel */
@@ -479,7 +481,8 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
       <span class="p-cnt" id="pCnt">0</span>
       <span class="p-toggle" id="pToggle">▼</span>
     </div>
-    <div class="pending-body" id="pendingBody">
+    <div class="pending-body" id="pendingBody"
+      ondragover="onOverPending(event,'pendingBody')" ondragleave="onLeavePending(event,'pendingBody')" ondrop="onDropToPending(event,'pendingBody')">
       <div class="p-add-btn" onclick="openAddDispatch(null,null,true)" title="未定の新規依頼を追加">＋</div>
     </div>
   </div>
@@ -492,7 +495,8 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
       <span class="crane-p-cnt" id="cranePCnt">0</span>
       <span class="crane-p-toggle" id="cranePToggle">▼</span>
     </div>
-    <div class="pending-body" id="cranePendingBody">
+    <div class="pending-body crane-pending-body" id="cranePendingBody"
+      ondragover="onOverPending(event,'cranePendingBody')" ondragleave="onLeavePending(event,'cranePendingBody')" ondrop="onDropToPending(event,'cranePendingBody')">
     </div>
   </div>
 
@@ -747,11 +751,11 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 <!-- ===== MODAL: CONFIRM DROP ===== -->
 <div class="ovl hid" id="mConfirm">
   <div class="mbox sm">
-    <div class="mhdr"><h2>📋 配車移動の確認</h2><span class="mcls" onclick="cancelDrop()">×</span></div>
+    <div class="mhdr"><h2 id="cTitle">📋 配車移動の確認</h2><span class="mcls" onclick="cancelDrop()">×</span></div>
     <div class="mbdy">
       <div class="cdlg">
-        <div class="cdlg-ico">🚛</div>
-        <div class="cdlg-msg">この予定で確定しますか？</div>
+        <div class="cdlg-ico" id="cIco">🚛</div>
+        <div class="cdlg-msg" id="cMsg">この予定で確定しますか？</div>
         <div class="cdlg-det" id="cDet"></div>
         <div class="warn-txt" id="cLicWarn">⚠ 免許の条件が合わない可能性があります。確認してください。</div>
       </div>
@@ -2446,6 +2450,33 @@ function onDragStart(e,id){ST.drag={id};e.dataTransfer.setData('text/plain',id);
 function onDragEnd(e){e.target.classList.remove('dragging');}
 function onOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
 function onLeave(e){e.currentTarget.classList.remove('drag-over');}
+function onOverPending(e,elId){
+  if(!ST.drag)return;
+  e.preventDefault();e.stopPropagation();
+  document.getElementById(elId).classList.add('pending-drop-over');
+}
+function onLeavePending(e,elId){
+  // 子要素への移動は無視（フリッカー防止）
+  if(e.relatedTarget&&document.getElementById(elId).contains(e.relatedTarget))return;
+  document.getElementById(elId).classList.remove('pending-drop-over');
+}
+function onDropToPending(e,elId){
+  e.preventDefault();
+  document.getElementById(elId).classList.remove('pending-drop-over');
+  if(!ST.drag)return;
+  const dp=(db.dispatches||[]).find(x=>x.id===ST.drag.id);
+  if(!dp)return;
+  // すでに未割当なら何もしない
+  if(!dp.driver&&!dp.vehicle&&!dp.dispatchDate){ST.drag=null;return;}
+  const nameLabel=dp.dispatchType==='shipment'?(dp.destName||'出荷'):custName(dp.customer);
+  document.getElementById('cTitle').textContent='↩ 未割当に戻す';
+  document.getElementById('cIco').textContent='↩';
+  document.getElementById('cMsg').textContent='この案件を未割当に戻しますか？';
+  document.getElementById('cDet').textContent=`案件: ${nameLabel}\n\nドライバー・車両・配車日をクリアして\n未割当エリアに戻します。`;
+  document.getElementById('cLicWarn').classList.remove('show');
+  ST.drop={date:null,id:dp.id,newDriver:null,newVehicle:null,returnToPending:true};
+  openM('mConfirm');
+}
 function onDrop(e,cell){
   e.preventDefault();cell.classList.remove('drag-over');
   if(!ST.drag)return;
@@ -2459,18 +2490,26 @@ function onDrop(e,cell){
   const ve=db.vehicles.find(x=>x.id===newVehicle);
   const nameLabel=dp.dispatchType==='shipment'?(dp.destName||'出荷'):custName(dp.customer);
   const det=`案件　　　: ${nameLabel}\n移動先　　: ${date}（${DOW_JP[pd(date).getDay()]}）\nドライバー: ${dr?dr.name:'未定'}\n車両　　　: ${ve?ve.name:'未定'}`;
+  document.getElementById('cTitle').textContent='📋 配車移動の確認';
+  document.getElementById('cIco').textContent='🚛';
+  document.getElementById('cMsg').textContent='この予定で確定しますか？';
   document.getElementById('cDet').textContent=det;
   document.getElementById('cLicWarn').classList.toggle('show',!!(dr&&ve&&!canDrive(dr,ve)));
   ST.drop={date,id:dp.id,newDriver,newVehicle};
   openM('mConfirm');
 }
 async function confirmDrop(){
-  const{date,id,newDriver,newVehicle}=ST.drop;
+  const{date,id,newDriver,newVehicle,returnToPending}=ST.drop;
   const dp=(db.dispatches||[]).find(x=>x.id===id);
   if(dp){
-    dp.dispatchDate=date;  // 配車確定日を更新（受付日 dp.date は変えない）
-    dp.driver=newDriver;
-    dp.vehicle=newVehicle;
+    if(returnToPending){
+      // 未割当に戻す：ドライバー・車両・配車日をクリア
+      dp.driver=null;dp.vehicle=null;dp.dispatchDate=null;
+    }else{
+      dp.dispatchDate=date;  // 配車確定日を更新（受付日 dp.date は変えない）
+      dp.driver=newDriver;
+      dp.vehicle=newVehicle;
+    }
     dp.status=(dp.driver&&dp.vehicle&&dp.dispatchDate)?'confirmed':'pending';
     await save();
   }
