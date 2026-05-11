@@ -62,6 +62,25 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .p-add-btn{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:100px;height:80px;border:2px dashed #fca5a5;border-radius:8px;color:#dc2626;font-size:22px;cursor:pointer;transition:background .15s}
 .p-add-btn:hover{background:#fef2f2}
 
+/* ===== CONTACT WAITING PANEL ===== */
+.contact-panel{background:#fff;border-bottom:2px solid #bfdbfe;flex-shrink:0}
+.contact-hdr{display:flex;align-items:center;gap:8px;padding:7px 14px;background:#eff6ff;cursor:pointer;border-bottom:1px solid #bfdbfe;user-select:none}
+.contact-hdr h3{font-size:12px;font-weight:700;color:#1d4ed8}
+.cp-cnt{background:#2563eb;color:#fff;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;min-width:20px;text-align:center}
+.cp-toggle{margin-left:auto;font-size:11px;color:#2563eb;transition:transform .2s}
+.contact-panel.collapsed .contact-body{display:none}
+.contact-panel.collapsed .cp-toggle{transform:rotate(-90deg)}
+.contact-body{display:flex;gap:8px;padding:7px 14px;overflow-x:auto;max-height:110px}
+.ccrd{flex-shrink:0;background:#fff;border:1.5px solid #93c5fd;border-radius:7px;padding:5px 10px;min-width:170px;display:flex;flex-direction:column;gap:2px;cursor:pointer;transition:box-shadow .15s}
+.ccrd:hover{box-shadow:0 2px 8px rgba(37,99,235,.2)}
+.ccrd-name{font-weight:700;color:#1e40af;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.ccrd-date{font-size:10px;color:#2563eb;font-weight:600}
+.ccrd-drv{font-size:10px;color:#475569}
+.ccrd-btn{margin-top:4px;padding:3px 0;background:#2563eb;color:#fff;border:none;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;width:100%;transition:background .15s}
+.ccrd-btn:hover{background:#1d4ed8}
+/* カード内 連絡状態バッジ */
+.ec-contact-badge{font-size:9px;margin-left:3px;vertical-align:middle;cursor:default}
+
 /* ===== TOOLBAR ===== */
 .toolbar{display:flex;align-items:center;gap:8px;padding:7px 14px;background:#fff;border-bottom:1px solid #e2e8f0;flex-shrink:0;flex-wrap:wrap}
 .btn-grp{display:flex;background:#f1f5f9;border-radius:8px;padding:2px;gap:1px}
@@ -498,6 +517,17 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <div class="pending-body crane-pending-body" id="cranePendingBody"
       ondragover="onOverPending(event,'cranePendingBody')" ondragleave="onLeavePending(event,'cranePendingBody')" ondrop="onDropToPending(event,'cranePendingBody')">
     </div>
+  </div>
+
+  <!-- CONTACT WAITING PANEL -->
+  <div class="contact-panel" id="contactPanel" style="display:none">
+    <div class="contact-hdr" onclick="toggleContactPanel()">
+      <span style="font-size:14px">📞</span>
+      <h3>お客様連絡待ち（配車確定・連絡未済）</h3>
+      <span class="cp-cnt" id="cpCnt">0</span>
+      <span class="cp-toggle" id="cpToggle">▼</span>
+    </div>
+    <div class="contact-body" id="contactBody"></div>
   </div>
 
   <!-- TOOLBAR -->
@@ -1764,6 +1794,10 @@ function normalizeDB(){
       if(s.contact||s.phone)s.contacts.push({id:uid(),name:s.contact||'',phone:s.phone||''});
     }
   });
+  // 配車：contactStatus フィールドを追加（旧データ互換）
+  (db.dispatches||[]).forEach(dp=>{
+    if(dp.contactStatus===undefined)dp.contactStatus=null;
+  });
 }
 
 let _autoSyncTimer=null;
@@ -1831,7 +1865,7 @@ function getWOM(d){const f=new Date(d.getFullYear(),d.getMonth(),1);return Math.
 // ================================================================
 // STATE
 // ================================================================
-const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,drag:null,drop:null,collapsedGroups:new Set(),rowDrag:null,collapsedInfreq:false,rolling:false};
+const ST={view:'week',res:'driver',date:new Date(),editId:null,pendCollapsed:false,contactCollapsed:false,drag:null,drop:null,collapsedGroups:new Set(),rowDrag:null,collapsedInfreq:false,rolling:false};
 const FILTER={search:'',type:'all',groups:new Set()};
 
 function applyFilter(){FILTER.search=document.getElementById('filterSearch').value;render();}
@@ -2162,6 +2196,7 @@ function render(){
   }
   document.getElementById('calBody').innerHTML=tb;
   renderPending();
+  renderContactWaiting();
   initColResize();
 }
 
@@ -2307,11 +2342,12 @@ function cardHTML(dp,rowCtx){
   if(dp.isReg&&rowCtx==='drv'){
     const cls='ecard ec-spot'+(holName?' ec-hol':'');
     const sub=ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`;
+    const cb=dp.contactStatus==='notified'?'<span class="ec-contact-badge" title="連絡済み">✅</span>':'<span class="ec-contact-badge" title="連絡未済">📞</span>';
     return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
       onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
       onclick="event.stopPropagation();editDisp('${dp.id}')">
       <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-      <div class="ec-cust">${custName(dp.customer)}<span class="ec-reg-drv-badge">🔁 定期</span>${holBadge}</div>
+      <div class="ec-cust">${custName(dp.customer)}<span class="ec-reg-drv-badge">🔁 定期</span>${cb}${holBadge}</div>
       <div class="ec-sub">${sub}</div>
       ${holName?`<div class="ec-sub" style="font-size:9px;color:#dc2626;font-weight:700">🎌 ${holName}</div>`:''}
       ${dlHtml}
@@ -2322,11 +2358,12 @@ function cardHTML(dp,rowCtx){
   if(isShip){
     const cls='ecard '+(isCarryIn?'ec-carry':isUnass?'ec-ship-pend':'ec-ship')+(holName?' ec-hol':'');
     const sub=isCarryIn?'🏭 持込み':(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
+    const cb=(!isCarryIn&&!isUnass)?( dp.contactStatus==='notified'?'<span class="ec-contact-badge" title="連絡済み">✅</span>':'<span class="ec-contact-badge" title="連絡未済">📞</span>'):'';
     return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
       onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
       onclick="event.stopPropagation();editShipment('${dp.id}')">
       <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-      <div class="ec-cust">📦 ${statusMark}${escH(dp.destName)||'出荷'}${holBadge}</div>
+      <div class="ec-cust">📦 ${statusMark}${escH(dp.destName)||'出荷'}${cb}${holBadge}</div>
       <div class="ec-sub">${sub}</div>
       ${dlHtml}
       ${dp.notes?`<div class="ec-sub" style="font-size:10px;opacity:.65">${dp.notes.slice(0,20)}</div>`:''}
@@ -2337,11 +2374,13 @@ function cardHTML(dp,rowCtx){
   let cls='ecard '+(isCarryIn?'ec-carry':isCrane?'ec-crane':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
   if(holName)cls+=' ec-hol';
   const sub=isCarryIn?(dp.isReg?'🏭 持込み（定期）':'🏭 持込み'):(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
+  // 配車確定済みの非持込みカードに連絡バッジ
+  const cb=(!isCarryIn&&!isUnass)?(dp.contactStatus==='notified'?'<span class="ec-contact-badge" title="連絡済み">✅</span>':'<span class="ec-contact-badge" title="連絡未済">📞</span>'):'';
   return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();editDisp('${dp.id}')">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-    <div class="ec-cust">${statusMark}${custName(dp.customer)}${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${holBadge}</div>
+    <div class="ec-cust">${statusMark}${custName(dp.customer)}${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${cb}${holBadge}</div>
     <div class="ec-sub">${sub}</div>
     ${holName?`<div class="ec-sub" style="font-size:9px;color:#dc2626;font-weight:700">🎌 ${holName}</div>`:''}
     ${dlHtml}
@@ -2399,6 +2438,57 @@ function renderPending(){
     chtml+=crane.map(makePcrdHtml).join('');
   }
   craneBody.innerHTML=chtml;
+}
+
+// ================================================================
+// CONTACT WAITING PANEL
+// ================================================================
+function contactWaitingDisps(){
+  // 配車確定（driver+vehicle+dispatchDate が揃っている）かつ連絡未済・持込み以外
+  return (db.dispatches||[])
+    .filter(dp=>dp.driver&&dp.vehicle&&dp.dispatchDate&&dp.contactStatus!=='notified'&&!dp.isCarryIn)
+    .sort((a,b)=>a.dispatchDate<b.dispatchDate?-1:a.dispatchDate>b.dispatchDate?1:0);
+}
+function renderContactWaiting(){
+  const list=contactWaitingDisps();
+  const panel=document.getElementById('contactPanel');
+  const cnt=document.getElementById('cpCnt');
+  const body=document.getElementById('contactBody');
+  if(!panel)return;
+  panel.style.display=list.length>0?'':'none';
+  cnt.textContent=list.length;
+  panel.classList.toggle('collapsed',ST.contactCollapsed);
+  document.getElementById('cpToggle').textContent=ST.contactCollapsed?'▶':'▼';
+  if(ST.contactCollapsed){return;}
+  const today=fmt(new Date());
+  body.innerHTML=list.map(dp=>{
+    const isShip=dp.dispatchType==='shipment';
+    const name=isShip?(escH(dp.destName)||'出荷'):custName(dp.customer);
+    const dt=dp.dispatchDate;
+    const dow=dt?DOW_JP[pd(dt).getDay()]:'';
+    const dtStr=dt?`${dt}（${dow}）`:'日付未定';
+    const isPast=dt&&dt<today;
+    const dateColor=isPast?'#dc2626':'#2563eb';
+    const dr=db.drivers.find(x=>x.id===dp.driver);
+    const ve=db.vehicles.find(x=>x.id===dp.vehicle);
+    return`<div class="ccrd" onclick="editDisp('${dp.id}')">
+      <div class="ccrd-name">${isShip?'📦 ':isPast?'⚠️ ':'📞 '}${name}</div>
+      <div class="ccrd-date" style="color:${dateColor}">📅 ${dtStr}</div>
+      <div class="ccrd-drv">👤 ${dr?dr.name:'未定'}　🚛 ${ve?ve.name:'未定'}</div>
+      <button class="ccrd-btn" onclick="event.stopPropagation();markContacted('${dp.id}')">✅ 連絡済み</button>
+    </div>`;
+  }).join('');
+}
+async function markContacted(id){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);
+  if(!dp)return;
+  dp.contactStatus='notified';
+  await save();
+  render();
+}
+function toggleContactPanel(){
+  ST.contactCollapsed=!ST.contactCollapsed;
+  renderContactWaiting();
 }
 
 // ================================================================
@@ -2503,8 +2593,8 @@ async function confirmDrop(){
   const dp=(db.dispatches||[]).find(x=>x.id===id);
   if(dp){
     if(returnToPending){
-      // 未割当に戻す：ドライバー・車両・配車日をクリア
-      dp.driver=null;dp.vehicle=null;dp.dispatchDate=null;
+      // 未割当に戻す：ドライバー・車両・配車日・連絡状態をクリア
+      dp.driver=null;dp.vehicle=null;dp.dispatchDate=null;dp.contactStatus=null;
     }else{
       dp.dispatchDate=date;  // 配車確定日を更新（受付日 dp.date は変えない）
       dp.driver=newDriver;
