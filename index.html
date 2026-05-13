@@ -27,7 +27,37 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .hbtn:hover{background:rgba(255,255,255,.28)}
 
 /* ===== LAYOUT ===== */
-.app-wrap{display:flex;flex-direction:column;height:calc(100vh - 52px)}
+.app-wrap{display:flex;flex-direction:row;height:calc(100vh - 52px)}
+
+/* ===== SIDEBAR ===== */
+.sidebar{width:220px;flex-shrink:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;background:#f8fafc;border-right:2px solid #e2e8f0;transition:width .2s ease;position:relative;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+.sidebar.collapsed{width:44px;overflow:hidden}
+.sidebar-toggle{display:flex;align-items:center;justify-content:center;gap:5px;height:34px;background:#1e3a5f;color:#fff;cursor:pointer;font-size:11px;font-weight:700;flex-shrink:0;border-bottom:1px solid #1e4d8c;user-select:none;white-space:nowrap;overflow:hidden}
+.sidebar-toggle:hover{background:#1e4d8c}
+.sidebar-content{display:flex;flex-direction:column;flex:1}
+.sidebar.collapsed .sidebar-content{display:none}
+.sidebar-collapsed-info{display:none;flex-direction:column;align-items:center;gap:10px;padding:10px 0}
+.sidebar.collapsed .sidebar-collapsed-info{display:flex}
+.scb-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:6px 4px;border-radius:6px;transition:background .15s;width:36px}
+.scb-item:hover{background:#e2e8f0}
+.scb-item-ico{font-size:14px;line-height:1}
+.scb-item-cnt{font-size:10px;font-weight:800;color:#dc2626;line-height:1}
+.scb-item-cnt.blue{color:#2563eb}
+
+/* パネル類のサイドバー内スタイル上書き */
+.sidebar .pending-panel{border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0}
+.sidebar #cranePendingPanel{border-bottom:1px solid #fde68a}
+.sidebar .contact-panel{border-bottom:1px solid #bfdbfe;background:#fff;flex-shrink:0}
+.sidebar .pending-body,.sidebar .contact-body{flex-direction:column;overflow-x:hidden;overflow-y:visible;max-height:none;padding:6px 8px;gap:5px}
+.sidebar .pending-body.pending-drop-over,.sidebar .crane-pending-body.pending-drop-over{outline:2px dashed #dc2626}
+.sidebar .pcrd{min-width:0;width:100%;box-sizing:border-box;cursor:grab}
+.sidebar .pcrd-name,.sidebar .pcrd-info{max-width:none;overflow:hidden;text-overflow:ellipsis}
+.sidebar .p-add-btn{width:100%;height:36px;font-size:16px;min-width:0}
+.sidebar .ccrd{min-width:0;width:100%;box-sizing:border-box}
+.sidebar .ccrd-name{max-width:none}
+
+/* メインエリア */
+.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 
 /* ===== LOADING ===== */
 .loading-ovl{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-size:14px;color:#475569}
@@ -492,43 +522,79 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 <!-- APP WRAP -->
 <div class="app-wrap">
 
-  <!-- PENDING PANEL -->
-  <div class="pending-panel" id="pendingPanel">
-    <div class="pending-hdr" onclick="togglePending()">
-      <span style="font-size:14px">🔴</span>
-      <h3>未割当・新規依頼（配車未定・保留中）</h3>
-      <span class="p-cnt" id="pCnt">0</span>
-      <span class="p-toggle" id="pToggle">▼</span>
+  <!-- ===== SIDEBAR ===== -->
+  <div class="sidebar" id="sidebar">
+    <!-- 開閉ボタン -->
+    <div class="sidebar-toggle" onclick="toggleSidebar()" id="sidebarToggleBtn">
+      <span id="sidebarToggleTxt">◀ 閉じる</span>
     </div>
-    <div class="pending-body" id="pendingBody"
-      ondragover="onOverPending(event,'pendingBody')" ondragleave="onLeavePending(event,'pendingBody')" ondrop="onDropToPending(event,'pendingBody')">
-      <div class="p-add-btn" onclick="openAddDispatch(null,null,true)" title="未定の新規依頼を追加">＋</div>
-    </div>
-  </div>
 
-  <!-- CRANE PENDING PANEL -->
-  <div class="pending-panel hid" id="cranePendingPanel">
-    <div class="crane-pending-hdr" onclick="toggleCranePending()">
-      <span style="font-size:14px">🏗</span>
-      <h3>クレーン車両専用 未割当・新規依頼</h3>
-      <span class="crane-p-cnt" id="cranePCnt">0</span>
-      <span class="crane-p-toggle" id="cranePToggle">▼</span>
-    </div>
-    <div class="pending-body crane-pending-body" id="cranePendingBody"
-      ondragover="onOverPending(event,'cranePendingBody')" ondragleave="onLeavePending(event,'cranePendingBody')" ondrop="onDropToPending(event,'cranePendingBody')">
-    </div>
-  </div>
+    <!-- 展開時コンテンツ -->
+    <div class="sidebar-content">
 
-  <!-- CONTACT WAITING PANEL -->
-  <div class="contact-panel" id="contactPanel" style="display:none">
-    <div class="contact-hdr" onclick="toggleContactPanel()">
-      <span style="font-size:14px">📞</span>
-      <h3>お客様連絡待ち（配車確定・連絡未済）</h3>
-      <span class="cp-cnt" id="cpCnt">0</span>
-      <span class="cp-toggle" id="cpToggle">▼</span>
+      <!-- PENDING PANEL -->
+      <div class="pending-panel" id="pendingPanel">
+        <div class="pending-hdr" onclick="togglePending()">
+          <span style="font-size:14px">🔴</span>
+          <h3>未割当・新規依頼</h3>
+          <span class="p-cnt" id="pCnt">0</span>
+          <span class="p-toggle" id="pToggle">▼</span>
+        </div>
+        <div class="pending-body" id="pendingBody"
+          ondragover="onOverPending(event,'pendingBody')" ondragleave="onLeavePending(event,'pendingBody')" ondrop="onDropToPending(event,'pendingBody')">
+          <div class="p-add-btn" onclick="openAddDispatch(null,null,true)" title="未定の新規依頼を追加">＋</div>
+        </div>
+      </div>
+
+      <!-- CRANE PENDING PANEL -->
+      <div class="pending-panel hid" id="cranePendingPanel">
+        <div class="crane-pending-hdr" onclick="toggleCranePending()">
+          <span style="font-size:14px">🏗</span>
+          <h3>クレーン未割当</h3>
+          <span class="crane-p-cnt" id="cranePCnt">0</span>
+          <span class="crane-p-toggle" id="cranePToggle">▼</span>
+        </div>
+        <div class="pending-body crane-pending-body" id="cranePendingBody"
+          ondragover="onOverPending(event,'cranePendingBody')" ondragleave="onLeavePending(event,'cranePendingBody')" ondrop="onDropToPending(event,'cranePendingBody')">
+        </div>
+      </div>
+
+      <!-- CONTACT WAITING PANEL -->
+      <div class="contact-panel" id="contactPanel" style="display:none">
+        <div class="contact-hdr" onclick="toggleContactPanel()">
+          <span style="font-size:14px">📞</span>
+          <h3>お客様連絡待ち</h3>
+          <span class="cp-cnt" id="cpCnt">0</span>
+          <span class="cp-toggle" id="cpToggle">▼</span>
+        </div>
+        <div class="contact-body" id="contactBody"></div>
+      </div>
+
+    </div><!-- /sidebar-content -->
+
+    <!-- 折りたたみ時バッジ -->
+    <div class="sidebar-collapsed-info">
+      <div class="scb-item" onclick="toggleSidebar()" title="未割当">
+        <span class="scb-item-ico">🔴</span>
+        <span class="scb-item-cnt" id="scbPCnt">0</span>
+      </div>
+      <div class="scb-item" onclick="toggleSidebar()" title="クレーン未割当" id="scbCraneItem" style="display:none">
+        <span class="scb-item-ico">🏗</span>
+        <span class="scb-item-cnt" id="scbCraneCnt">0</span>
+      </div>
+      <div class="scb-item" onclick="toggleSidebar()" title="連絡待ち" id="scbContactItem" style="display:none">
+        <span class="scb-item-ico">📞</span>
+        <span class="scb-item-cnt blue" id="scbCPCnt">0</span>
+      </div>
+      <div class="scb-item" onclick="toggleSidebar()" title="開く" style="margin-top:4px">
+        <span class="scb-item-ico" style="font-size:16px">▶</span>
+      </div>
     </div>
-    <div class="contact-body" id="contactBody"></div>
-  </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ===== MAIN AREA ===== -->
+  <div class="main-area" id="mainArea">
 
   <!-- TOOLBAR -->
   <div class="toolbar">
@@ -579,7 +645,9 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
       </table>
     </div>
   </div>
-</div>
+
+  </div><!-- /main-area -->
+</div><!-- /app-wrap -->
 
 <!-- ===== MASTER PICKER POPUP ===== -->
 <div id="masterPicker" class="mp-wrap hid">
@@ -2197,6 +2265,7 @@ function render(){
   document.getElementById('calBody').innerHTML=tb;
   renderPending();
   renderContactWaiting();
+  updateSidebarBadges();
   initColResize();
 }
 
@@ -2521,6 +2590,28 @@ function goToday(){
   // 週・月ビューの場合は今日起点ローリングモードに切替
   if(ST.view==='week'||ST.view==='month') ST.rolling=true;
   render();
+}
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const collapsed=sb.classList.toggle('collapsed');
+  document.getElementById('sidebarToggleTxt').textContent=collapsed?'▶':'◀ 閉じる';
+  updateSidebarBadges();
+}
+function updateSidebarBadges(){
+  // 折りたたみバッジの件数を同期
+  const pCnt=(db&&db.dispatches)?pendingDisps().length:0;
+  const craneCnt=(db&&db.dispatches)?craneDisps().length:0;
+  const cpCnt=(db&&db.dispatches)?contactWaitingDisps().length:0;
+  const sbPCnt=document.getElementById('scbPCnt');
+  const sbCrane=document.getElementById('scbCraneItem');
+  const sbCraneCnt=document.getElementById('scbCraneCnt');
+  const sbContact=document.getElementById('scbContactItem');
+  const sbCPCnt=document.getElementById('scbCPCnt');
+  if(sbPCnt)sbPCnt.textContent=pCnt;
+  if(sbCrane)sbCrane.style.display=craneCnt>0?'flex':'none';
+  if(sbCraneCnt)sbCraneCnt.textContent=craneCnt;
+  if(sbContact)sbContact.style.display=cpCnt>0?'flex':'none';
+  if(sbCPCnt)sbCPCnt.textContent=cpCnt;
 }
 function togglePending(){
   ST.pendCollapsed=!ST.pendCollapsed;
