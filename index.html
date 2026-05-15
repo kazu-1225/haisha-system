@@ -462,6 +462,22 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .carry-fixed-hdr td{background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #93c5fd}
 .carry-fixed-cell{background:#eff6ff !important;vertical-align:top;padding:3px;min-height:36px}
 .ec-carry{border:1.5px solid #3b82f6 !important;background:#dbeafe !important}
+/* ===== 委託応援ROW ===== */
+.cs-fixed-hdr td{background:#fdf4ff;color:#7e22ce;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #d8b4fe}
+.cs-fixed-cell{background:#fdf4ff !important;vertical-align:top;padding:3px;min-height:36px;cursor:pointer}
+.cs-fixed-cell:hover{background:#f5f3ff !important}
+.cs-bar-outer{position:relative;height:26px;background:#f3f4f6;border-radius:6px;margin:2px 0;overflow:visible}
+.cs-bar{position:absolute;top:2px;bottom:2px;background:#c4b5fd;border:1.5px solid #7c3aed;border-radius:5px;display:flex;align-items:center;min-width:20px;cursor:pointer;overflow:visible;box-sizing:border-box}
+.cs-bar:hover{background:#a78bfa}
+.cs-bar-inner{display:flex;align-items:center;width:100%;overflow:hidden;padding:0 10px;gap:3px;pointer-events:none}
+.cs-bar-label{font-size:9px;font-weight:700;color:#4c1d95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.cs-handle{position:absolute;top:0;bottom:0;width:8px;background:#7c3aed;border-radius:3px;cursor:ew-resize;z-index:2;opacity:0;transition:opacity .15s}
+.cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
+.cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
+.cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+.ec-cs-badge{display:inline-block;font-size:9px;font-weight:800;color:#6b21a8;background:#f3e8ff;border-radius:3px;padding:0 4px;margin-bottom:2px;line-height:1.6;border:1px solid #d8b4fe;white-space:nowrap;cursor:pointer}
+.cs-cell-band{height:4px;border-radius:2px;background:#ede9fe;margin-bottom:2px;position:relative;overflow:hidden}
+.cs-cell-band-inner{position:absolute;top:0;bottom:0;background:#7c3aed;border-radius:2px}
 /* ===== 定期便 カード状態別 ===== */
 /* 定期便行・ドライバー未定（赤） */
 .ecard.ec-reg-pend{background:#fee2e2;border-left-color:#dc2626;color:#7f1d1d}
@@ -1679,6 +1695,41 @@ function archiveConfirmedDispatches() {
   </div>
 </div>
 
+<!-- 委託応援 モーダル -->
+<div class="ovl hid" id="mCS">
+  <div class="mbox" style="max-width:480px">
+    <div class="mhdr"><h2 id="mCSTitle">🏛 委託応援 登録</h2><span class="mcls" onclick="closeM('mCS')">×</span></div>
+    <div class="mbdy">
+      <div class="fr"><label>対応日 *</label><input type="date" id="csDate"></div>
+      <div class="r2">
+        <div class="fr"><label>ドライバー *</label>
+          <select id="csDriverId" style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;outline:none"></select>
+        </div>
+        <div class="fr"><label>車両</label>
+          <select id="csVehicleId" style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;outline:none"></select>
+        </div>
+      </div>
+      <div class="r2">
+        <div class="fr"><label>開始時刻</label>
+          <select id="csStartHour" style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;outline:none"></select>
+        </div>
+        <div class="fr"><label>終了時刻（帰社予定）</label>
+          <select id="csEndHour" style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;outline:none"></select>
+        </div>
+      </div>
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;font-size:11px;color:#6d28d9;margin-bottom:12px">
+        💡 終了時刻以降のスポット業務は通常通り配車できます。時間帯が重複する場合は警告を表示しますが、配車は可能です。
+      </div>
+      <div class="fr"><label>備考（委託先・地区など）</label><input type="text" id="csNote" placeholder="例: 中区A地区 市委託応援"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn btn-w" onclick="saveCS()" style="flex:1">💾 保存</button>
+        <button class="btn btn-d" id="csDeleteBtn" onclick="deleteCS()" style="background:#dc2626;color:#fff;display:none">🗑 削除</button>
+        <button class="btn btn-s" onclick="closeM('mCS')">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ================================================================
 // CONSTANTS & DEFAULTS
@@ -1852,6 +1903,7 @@ function normalizeDB(){
   if(!db.drivers)db.drivers=[];
   if(!db.vehicles)db.vehicles=[];
   if(!db.dispatches)db.dispatches=[];
+  if(!db.contractSupports)db.contractSupports=[];
   if(!db.staffs)db.staffs=[];
   if(!db.printLogs)db.printLogs=[];
   (db.drivers||[]).forEach(d=>{if(!d.usageGroup)d.usageGroup='frequent';if(!d.group2)d.group2='';});
@@ -2147,6 +2199,7 @@ function render(){
       else if(dow===0)cc+=' td-sun';
       else if(dow===6)cc+=' td-sat';
       const disps=cellDisps(ds,rid);
+      const csBands=(db.contractSupports||[]).filter(cs=>cs.date===ds&&cs.driverId===rid);
       if(isDay){
         const sorted=disps.slice().sort((a,b)=>{
           const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
@@ -2155,15 +2208,21 @@ function render(){
         });
         const parts=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'drv'));
         const dayHtml=parts.join('<div class="day-arrow">›</div>');
+        const csBadges=csBands.map(cs=>`<div class="ec-cs-badge" onclick="event.stopPropagation();openEditCS('${cs.id}')" title="委託応援: ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00${cs.note?' ('+cs.note+')':''}">🏛 委託応援 ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00</div>`).join('');
         row+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','${rid}')">
-          <div class="day-cell-wrap">${dayHtml||`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`}</div></td>`;
+          <div class="day-cell-wrap">${csBadges}${dayHtml||`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`}</div></td>`;
       } else {
+        const bandHtml=csBands.map(cs=>{
+          const lp=(cs.startHour/24*100).toFixed(1);
+          const rp=(100-cs.endHour/24*100).toFixed(1);
+          return `<div class="cs-cell-band" onclick="event.stopPropagation();openEditCS('${cs.id}')" title="委託応援: ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00${cs.note?' ('+cs.note+')':''}"><div class="cs-cell-band-inner" style="left:${lp}%;right:${rp}%"></div></div>`;
+        }).join('');
         const cards=disps.map(dp=>cardHTML(dp,'drv')).join('');
         row+=`<td class="${cc}" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-          onclick="cellClick(event,'${ds}','${rid}')"><div class="cell-scrl">${cards}</div></td>`;
+          onclick="cellClick(event,'${ds}','${rid}')"><div class="cell-scrl">${bandHtml}${cards}</div></td>`;
       }
     }
     return row+'</tr>';
@@ -2242,6 +2301,38 @@ function render(){
     }
     carryRow+='</tr>';
     tb+=carryRow;
+  }
+
+  // ===== 委託応援専用行 =====
+  {
+    const csBarHtml=cs=>{
+      const drv=(db.drivers||[]).find(d=>d.id===cs.driverId);
+      const veh=(db.vehicles||[]).find(v=>v.id===cs.vehicleId);
+      const drvName=drv?drv.name.replace(/\s+/g,''):'未定';
+      const vehName=veh?'/'+veh.name:'';
+      const label=`${drvName}${vehName} ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00`;
+      const leftPct=(cs.startHour/24*100).toFixed(1);
+      const widthPct=((cs.endHour-cs.startHour)/24*100).toFixed(1);
+      return `<div class="cs-bar-outer"><div class="cs-bar" style="left:${leftPct}%;width:${widthPct}%" data-cs-id="${cs.id}" onclick="event.stopPropagation();openEditCS('${cs.id}')" title="${label}${cs.note?'\n'+cs.note:''}"><div class="cs-handle cs-handle-l" onmousedown="startCsDrag(event,'${cs.id}','l')" onclick="event.stopPropagation()"></div><div class="cs-bar-inner"><span class="cs-bar-label">${label}</span></div><div class="cs-handle cs-handle-r" onmousedown="startCsDrag(event,'${cs.id}','r')" onclick="event.stopPropagation()"></div></div></div>`;
+    }
+    let csRow=`<tr class="cs-fixed-hdr"><td class="res-cell" style="background:#fdf4ff;border-right:2px solid #d8b4fe;position:sticky;left:0;z-index:10"><div style="font-size:11px;font-weight:700;color:#7e22ce">🏛 委託応援</div><div style="font-size:9px;color:#a78bfa;margin-top:1px">クリックで登録</div></td>`;
+    if(isDay){
+      const ds=fmt(dates[0]),holName=HOLIDAYS[ds]||'';
+      let cc='cs-fixed-cell ev-cell';
+      if(ds===today)cc+=' td-now';else if(holName)cc+=' td-hol';
+      const csItems=(db.contractSupports||[]).filter(cs=>cs.date===ds);
+      csRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録"><div class="day-cell-wrap" style="min-height:30px">${csItems.map(cs=>csBarHtml(cs)).join('')}</div></td>`;
+    } else {
+      for(const dt of dates){
+        const ds=fmt(dt),holName=HOLIDAYS[ds]||'';
+        let cc='cs-fixed-cell'+(isMonth?' td-month':'');
+        if(ds===today)cc+=' td-now';else if(holName)cc+=' td-hol';
+        const csItems=(db.contractSupports||[]).filter(cs=>cs.date===ds);
+        csRow+=`<td class="${cc}" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録"><div style="min-height:28px;padding:1px">${csItems.map(cs=>csBarHtml(cs)).join('')}</div></td>`;
+      }
+    }
+    csRow+='</tr>';
+    tb+=csRow;
   }
 
   if(!resources.length){
@@ -4213,6 +4304,141 @@ function copyGasCode(){
   navigator.clipboard.writeText(code).then(()=>alert('✅ コードをコピーしました！\nApps Scriptエディタに貼り付けてください。')).catch(()=>{
     const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('✅ コードをコピーしました！');
   });
+}
+
+// ================================================================
+// 委託応援 (CONTRACT SUPPORT)
+// ================================================================
+let _csEditId=null,_csDrag=null;
+
+function openAddCS(date){
+  _csEditId=null;
+  document.getElementById('mCSTitle').textContent='🏛 委託応援 登録';
+  document.getElementById('csDate').value=date||fmt(new Date());
+  fillCSSelects();
+  document.getElementById('csDriverId').value='';
+  document.getElementById('csVehicleId').value='';
+  fillCSHourSelects(8,17);
+  document.getElementById('csNote').value='';
+  document.getElementById('csDeleteBtn').style.display='none';
+  openM('mCS');
+}
+
+function openEditCS(id){
+  const cs=(db.contractSupports||[]).find(x=>x.id===id);
+  if(!cs)return;
+  _csEditId=id;
+  document.getElementById('mCSTitle').textContent='🏛 委託応援 編集';
+  document.getElementById('csDate').value=cs.date;
+  fillCSSelects();
+  document.getElementById('csDriverId').value=cs.driverId||'';
+  document.getElementById('csVehicleId').value=cs.vehicleId||'';
+  fillCSHourSelects(cs.startHour,cs.endHour);
+  document.getElementById('csNote').value=cs.note||'';
+  document.getElementById('csDeleteBtn').style.display='';
+  openM('mCS');
+}
+
+function fillCSSelects(){
+  const dSel=document.getElementById('csDriverId');
+  const vSel=document.getElementById('csVehicleId');
+  dSel.innerHTML='<option value="">-- 選択 --</option>'+(db.drivers||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  vSel.innerHTML='<option value="">-- 選択なし --</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+}
+
+function fillCSHourSelects(startH,endH){
+  const opts=Array.from({length:25},(_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}:00</option>`).join('');
+  document.getElementById('csStartHour').innerHTML=opts;
+  document.getElementById('csEndHour').innerHTML=opts;
+  document.getElementById('csStartHour').value=startH;
+  document.getElementById('csEndHour').value=endH;
+}
+
+async function saveCS(){
+  const date=document.getElementById('csDate').value;
+  const driverId=document.getElementById('csDriverId').value;
+  const vehicleId=document.getElementById('csVehicleId').value;
+  const startHour=parseInt(document.getElementById('csStartHour').value);
+  const endHour=parseInt(document.getElementById('csEndHour').value);
+  const note=document.getElementById('csNote').value.trim();
+  if(!date){alert('対応日を入力してください');return;}
+  if(!driverId){alert('ドライバーを選択してください');return;}
+  if(endHour<=startHour){alert('終了時刻は開始時刻より後にしてください');return;}
+  if(!db.contractSupports)db.contractSupports=[];
+  const now=new Date().toISOString();
+  if(_csEditId){
+    const cs=db.contractSupports.find(x=>x.id===_csEditId);
+    if(cs){cs.date=date;cs.driverId=driverId;cs.vehicleId=vehicleId;cs.startHour=startHour;cs.endHour=endHour;cs.note=note;cs.updated=now;}
+  } else {
+    db.contractSupports.push({id:uid(),date,driverId,vehicleId,startHour,endHour,note,created:now,updated:now});
+  }
+  const drv=(db.drivers||[]).find(d=>d.id===driverId);
+  const conflicts=(db.dispatches||[]).filter(dp=>{
+    if(dp.driver!==driverId)return false;
+    const wd=workDate(dp);
+    if(wd!==date)return false;
+    if(!dp.timeSpec||!dp.timeSpec.enabled||!dp.timeSpec.time)return false;
+    const h=parseInt((dp.timeSpec.time||'0').split(':')[0]);
+    return h>=startHour&&h<endHour;
+  });
+  await save();
+  closeM('mCS');
+  render();
+  if(conflicts.length){
+    const names=conflicts.slice(0,3).map(dp=>{const c=(db.customers||[]).find(x=>x.id===dp.customer);return '・'+(c?c.name:'不明');}).join('\n');
+    alert(`⚠ 委託応援を登録しました。\n\n${drv?drv.name:'ドライバー'}のスポット配車 ${conflicts.length}件と\n時間帯が重複している可能性があります:\n${names}${conflicts.length>3?'\n...他'+(conflicts.length-3)+'件':''}\n\n配車はそのまま有効です。確認してください。`);
+  }
+}
+
+async function deleteCS(){
+  if(!_csEditId)return;
+  if(!confirm('この委託応援を削除しますか？'))return;
+  db.contractSupports=(db.contractSupports||[]).filter(x=>x.id!==_csEditId);
+  await save();closeM('mCS');render();
+}
+
+function startCsDrag(e,csId,side){
+  e.preventDefault();e.stopPropagation();
+  const cs=(db.contractSupports||[]).find(x=>x.id===csId);
+  if(!cs)return;
+  const outerEl=e.target.closest('.cs-bar-outer');
+  _csDrag={csId,side,startX:e.clientX,origStart:cs.startHour,origEnd:cs.endHour,outerW:outerEl?outerEl.offsetWidth:200};
+  document.addEventListener('mousemove',onCsDragMove);
+  document.addEventListener('mouseup',endCsDrag);
+}
+
+function onCsDragMove(e){
+  if(!_csDrag)return;
+  const cs=(db.contractSupports||[]).find(x=>x.id===_csDrag.csId);
+  if(!cs)return;
+  const pxPerHour=_csDrag.outerW/24;
+  const dh=Math.round((e.clientX-_csDrag.startX)/pxPerHour);
+  if(_csDrag.side==='l'){
+    cs.startHour=Math.max(0,Math.min(_csDrag.origEnd-1,_csDrag.origStart+dh));
+  } else {
+    cs.endHour=Math.max(_csDrag.origStart+1,Math.min(24,_csDrag.origEnd+dh));
+  }
+  const barEl=document.querySelector(`.cs-bar[data-cs-id="${_csDrag.csId}"]`);
+  if(barEl){
+    barEl.style.left=(cs.startHour/24*100).toFixed(1)+'%';
+    barEl.style.width=((cs.endHour-cs.startHour)/24*100).toFixed(1)+'%';
+    const lbl=barEl.querySelector('.cs-bar-label');
+    if(lbl){
+      const drv=(db.drivers||[]).find(d=>d.id===cs.driverId);
+      const veh=(db.vehicles||[]).find(v=>v.id===cs.vehicleId);
+      const drvName=drv?drv.name.replace(/\s+/g,''):'未定';
+      lbl.textContent=`${drvName}${veh?'/'+veh.name:''} ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00`;
+    }
+  }
+}
+
+async function endCsDrag(){
+  if(!_csDrag)return;
+  document.removeEventListener('mousemove',onCsDragMove);
+  document.removeEventListener('mouseup',endCsDrag);
+  _csDrag=null;
+  await save();
+  render();
 }
 
 // ================================================================
