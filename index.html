@@ -639,7 +639,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 
   <!-- FILTER BAR -->
   <div class="filter-bar" id="filterBar">
-    <input class="filter-search" id="filterSearch" type="text" placeholder="🔍 名前で絞り込み..." oninput="applyFilter()">
+    <input class="filter-search" id="filterSearch" type="text" placeholder="🔍 名前で絞り込み..." oninput="if(!event.isComposing)applyFilter()" oncompositionend="applyFilter()">
     <div style="display:flex;gap:4px;flex-shrink:0">
       <button class="ftgl on" id="ft-all" onclick="setFilterType('all')">全員</button>
       <button class="ftgl" id="ft-専任" onclick="setFilterType('専任')">専任</button>
@@ -1657,7 +1657,7 @@ function archiveConfirmedDispatches() {
         💡 定期便を登録すると、<strong>今後3ヶ月分の配車予定</strong>が自動的にカレンダーに表示されます。
       </div>
       <div class="r2">
-        <div class="fr"><label>お客様 *</label><input type="text" id="rCustSearch" placeholder="🔍 お客様名で絞り込み..." oninput="filterRCust(this.value)" style="margin-bottom:5px"><select id="rCust"></select></div>
+        <div class="fr"><label>お客様 *</label><input type="text" id="rCustSearch" placeholder="🔍 お客様名で絞り込み..." oninput="if(!event.isComposing)filterRCust(this.value)" oncompositionend="filterRCust(this.value)" style="margin-bottom:5px"><select id="rCust"></select></div>
         <div class="fr"><label>頻度</label>
           <select id="rFreq" onchange="onFreqChg()">
             <option value="weekly">毎週</option>
@@ -1720,7 +1720,7 @@ function archiveConfirmedDispatches() {
       <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;font-size:11px;color:#6d28d9;margin-bottom:12px">
         💡 終了時刻以降のスポット業務は通常通り配車できます。時間帯が重複する場合は警告を表示しますが、配車は可能です。
       </div>
-      <div class="fr"><label>備考（委託先・地区など）</label><input type="text" id="csNote" placeholder="例: 中区A地区 市委託応援"></div>
+      <div class="fr"><label>備考（委託先・地区など）</label><input type="text" id="csNote" placeholder="例: 中区A地区 市委託応援" autocomplete="off" lang="ja"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
         <button class="btn btn-w" onclick="saveCS()" style="flex:1">💾 保存</button>
         <button class="btn btn-d" id="csDeleteBtn" onclick="deleteCS()" style="background:#dc2626;color:#fff;display:none">🗑 削除</button>
