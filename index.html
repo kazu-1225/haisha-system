@@ -698,7 +698,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
             <span class="mp-trigger-arr">▼</span>
           </button>
           <select id="dCust" style="display:none" onchange="onCustChange()"><option value="">-- お客様を選択 --</option></select></div>
-        <div class="fr"><label>お客様 担当者名</label><input type="text" id="dCustContact" placeholder="例: 山田 部長" autocomplete="off" onfocus="showContactSuggest(this,'dCustPhone','customer')" oninput="showContactSuggest(this,'dCustPhone','customer')" onblur="hideContactSuggest()"></div>
+        <div class="fr"><label>お客様 担当者名</label><input type="text" id="dCustContact" placeholder="例: 山田 部長" autocomplete="off" onfocus="showContactSuggest(this,'dCustPhone','customer')" oninput="if(!window._imeActive)showContactSuggest(this,'dCustPhone','customer')" oncompositionstart="window._imeActive=true" oncompositionend="window._imeActive=false;showContactSuggest(this,'dCustPhone','customer')" onblur="hideContactSuggest()"></div>
       </div>
       <div class="r2">
         <div class="fr"><label>① お客様担当者 電話番号</label><input type="tel" id="dCustPhone" placeholder="例: 090-0000-0000"></div>
@@ -725,8 +725,8 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
         </select>
       </div>
       <div class="r2">
-        <div class="fr"><label>収集先 名称</label><input type="text" id="dSiteName" placeholder="例: 〇〇工場 / 〇〇ビル地下" oninput="onSiteNameInput(this.value)"></div>
-        <div class="fr"><label>収集先 担当者名</label><input type="text" id="dSiteContact" placeholder="例: 鈴木 様" autocomplete="off" onfocus="showContactSuggest(this,'dSitePhone','site')" oninput="showContactSuggest(this,'dSitePhone','site')" onblur="hideContactSuggest()"></div>
+        <div class="fr"><label>収集先 名称</label><input type="text" id="dSiteName" placeholder="例: 〇〇工場 / 〇〇ビル地下" oninput="if(!window._imeActive)onSiteNameInput(this.value)" oncompositionstart="window._imeActive=true" oncompositionend="window._imeActive=false;onSiteNameInput(this.value)"></div>
+        <div class="fr"><label>収集先 担当者名</label><input type="text" id="dSiteContact" placeholder="例: 鈴木 様" autocomplete="off" onfocus="showContactSuggest(this,'dSitePhone','site')" oninput="if(!window._imeActive)showContactSuggest(this,'dSitePhone','site')" oncompositionstart="window._imeActive=true" oncompositionend="window._imeActive=false;showContactSuggest(this,'dSitePhone','site')" onblur="hideContactSuggest()"></div>
       </div>
       <div class="r2">
         <div class="fr"><label>② 収集先担当者 電話番号</label><input type="tel" id="dSitePhone" placeholder="例: 082-000-0000"></div>
