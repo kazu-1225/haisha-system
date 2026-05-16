@@ -639,7 +639,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 
   <!-- FILTER BAR -->
   <div class="filter-bar" id="filterBar">
-    <input class="filter-search" id="filterSearch" type="text" placeholder="🔍 名前で絞り込み..." oninput="if(!event.isComposing)applyFilter()" oncompositionend="applyFilter()">
+    <input class="filter-search" id="filterSearch" type="text" placeholder="🔍 名前で絞り込み..." oninput="applyFilter()">
     <div style="display:flex;gap:4px;flex-shrink:0">
       <button class="ftgl on" id="ft-all" onclick="setFilterType('all')">全員</button>
       <button class="ftgl" id="ft-専任" onclick="setFilterType('専任')">専任</button>
@@ -672,7 +672,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <button class="mp-head-cls" onclick="closeMP()">×</button>
   </div>
   <div class="mp-srch-wrap">
-    <input type="text" id="mpSrch" class="mp-srch" placeholder="🔍 名前で検索..." oninput="if(!event.isComposing)filterMP()" oncompositionend="filterMP()">
+    <input type="text" id="mpSrch" class="mp-srch" placeholder="🔍 名前で検索..." oninput="filterMP()">
   </div>
   <div id="mpList" class="mp-list"></div>
   <div class="mp-add-sec" id="mpAddSec">
@@ -1657,7 +1657,7 @@ function archiveConfirmedDispatches() {
         💡 定期便を登録すると、<strong>今後3ヶ月分の配車予定</strong>が自動的にカレンダーに表示されます。
       </div>
       <div class="r2">
-        <div class="fr"><label>お客様 *</label><input type="text" id="rCustSearch" placeholder="🔍 お客様名で絞り込み..." oninput="if(!event.isComposing)filterRCust(this.value)" oncompositionend="filterRCust(this.value)" style="margin-bottom:5px"><select id="rCust"></select></div>
+        <div class="fr"><label>お客様 *</label><input type="text" id="rCustSearch" placeholder="🔍 お客様名で絞り込み..." oninput="filterRCust(this.value)" style="margin-bottom:5px"><select id="rCust"></select></div>
         <div class="fr"><label>頻度</label>
           <select id="rFreq" onchange="onFreqChg()">
             <option value="weekly">毎週</option>
