@@ -2208,7 +2208,17 @@ function render(){
         });
         const parts=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'drv'));
         const dayHtml=parts.join('<div class="day-arrow">›</div>');
-        const csBadges=csBands.map(cs=>`<div class="ec-cs-badge" onclick="event.stopPropagation();openEditCS('${cs.id}')" title="委託応援: ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00${cs.note?' ('+cs.note+')':''}">🏛 委託応援 ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00</div>`).join('');
+        const csBadges=csBands.map(cs=>{
+          const veh=(db.vehicles||[]).find(v=>v.id===cs.vehicleId);
+          const sh=String(cs.startHour).padStart(2,'0');
+          const eh=String(cs.endHour).padStart(2,'0');
+          return `<div class="ecard ec-day" style="border-left-color:#7c3aed;background:#fdf4ff;cursor:pointer" onclick="event.stopPropagation();openEditCS('${cs.id}')">
+            <div class="ec-day-seq">🏛 委託応援</div>
+            <div class="ec-day-cust" style="color:#4c1d95">${sh}:00 〜 ${eh}:00</div>
+            ${veh?`<div class="ec-day-veh" style="color:#7c3aed">🚛 ${veh.name}</div>`:''}
+            ${cs.note?`<div class="ec-day-note">${cs.note}</div>`:''}
+          </div>`;
+        }).join('<div class="day-arrow">›</div>');
         row+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','${rid}')">
