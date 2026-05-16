@@ -740,18 +740,83 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <button class="hbtn" style="font-size:12px" onclick="toggleConSettings()">⚙ アラート設定</button>
   </div>
   <!-- アラート設定パネル（折りたたみ） -->
-  <div id="conSettingsPanel" class="hid" style="background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 18px">
-    <div class="con-settings-card" style="box-shadow:none;padding:0">
-      <h4>⚙ アラート基準設定</h4>
-      <div class="con-settings-row">
-        <span class="con-settings-label">デフォルト目標設置日数（この日数を経過でアラート）</span>
-        <input type="number" class="con-settings-input" id="conDefaultTargetDays" min="1" max="999" value="90" onchange="saveConSettings()">
-        <span style="font-size:12px;color:#64748b">日</span>
+  <div id="conSettingsPanel" class="hid" style="background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 18px">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+
+      <!-- 左: アラート基準 -->
+      <div style="flex:1;min-width:260px">
+        <div style="font-size:12px;font-weight:800;color:#1e3a5f;margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">⚙ アラート基準</div>
+        <div class="con-settings-row">
+          <span class="con-settings-label">目標設置日数（標準）</span>
+          <input type="number" class="con-settings-input" id="conDefaultTargetDays" min="1" max="999" value="90" onchange="saveConSettings()">
+          <span style="font-size:12px;color:#64748b">日</span>
+        </div>
+        <div class="con-settings-row">
+          <span class="con-settings-label">🟡 警告（目標まで残りN日前）</span>
+          <input type="number" class="con-settings-input" id="conDefaultWarnDays" min="0" max="60" value="7" onchange="saveConSettings()">
+          <span style="font-size:12px;color:#64748b">日前</span>
+        </div>
       </div>
-      <div class="con-settings-row">
-        <span class="con-settings-label">警告日数（目標まで残りN日前に🟡警告）</span>
-        <input type="number" class="con-settings-input" id="conDefaultWarnDays" min="0" max="60" value="7" onchange="saveConSettings()">
-        <span style="font-size:12px;color:#64748b">日前</span>
+
+      <!-- 右: メール通知設定 -->
+      <div style="flex:2;min-width:320px">
+        <div style="font-size:12px;font-weight:800;color:#1e3a5f;margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">📧 アラートメール通知設定</div>
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;font-size:11px;color:#92400e;margin-bottom:10px">
+          💡 システムを開いていなくても、GASが毎日決まった時刻に自動でメールを送信します。<br>設定後は下の「トリガー設定手順」に従ってGASで一度だけ設定が必要です。
+        </div>
+        <div class="con-settings-row" style="margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+            <input type="checkbox" id="conEmailEnabled" onchange="saveConSettings()" style="width:16px;height:16px;accent-color:#2563eb">
+            <span style="font-weight:700;color:#1e293b">メール通知を有効にする</span>
+          </label>
+        </div>
+        <div id="conEmailBody" style="display:none">
+          <!-- 通知条件 -->
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px">通知条件（複数選択可）</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="conNotifyOver" checked onchange="saveConSettings()" style="accent-color:#dc2626">
+              <span>🔴 超過コンテナがある場合</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="conNotifyWarn" checked onchange="saveConSettings()" style="accent-color:#d97706">
+              <span>🟡 警告コンテナがある場合</span>
+            </label>
+          </div>
+          <!-- 送信時刻 -->
+          <div class="con-settings-row" style="margin-bottom:10px">
+            <span class="con-settings-label">送信時刻の目安</span>
+            <select id="conEmailHour" onchange="saveConSettings()" style="border:1px solid #cbd5e1;border-radius:6px;padding:4px 8px;font-size:12px">
+              <option value="7">朝 7時頃</option>
+              <option value="8" selected>朝 8時頃</option>
+              <option value="9">朝 9時頃</option>
+              <option value="6">早朝 6時頃</option>
+            </select>
+            <span style="font-size:11px;color:#94a3b8;margin-left:4px">※GASトリガーで設定</span>
+          </div>
+          <!-- 宛先メール一覧 -->
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px">送信先メールアドレス（複数設定可）</div>
+          <div id="conEmailList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px">
+            <input type="email" id="conEmailInput" placeholder="例: tanaka@example.com" style="flex:1;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12px">
+            <button onclick="addConEmail()" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;white-space:nowrap">＋ 追加</button>
+          </div>
+          <!-- トリガー設定手順 -->
+          <div style="margin-top:14px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px">
+            <div style="font-size:12px;font-weight:800;color:#15803d;margin-bottom:8px">🔧 GASトリガー設定手順（初回のみ）</div>
+            <ol style="font-size:11px;color:#166534;line-height:1.9;padding-left:18px;margin:0">
+              <li>GASのスクリプトを<strong>最新版に更新</strong>（設定→Google連携タブ→コードをコピー→GASに貼り付けて保存・再デプロイ）</li>
+              <li>GASエディタ左側の「<strong>⏰ トリガー</strong>」アイコンをクリック</li>
+              <li>右下の「<strong>＋ トリガーを追加</strong>」をクリック</li>
+              <li>実行する関数：<code style="background:#dcfce7;padding:1px 5px;border-radius:3px">checkContainerAlerts</code></li>
+              <li>イベントのソース：<strong>時間主導型</strong>／タイマーの種類：<strong>日タイマー</strong></li>
+              <li>時刻を選択して「<strong>保存</strong>」</li>
+            </ol>
+            <div style="font-size:11px;color:#166534;margin-top:6px;padding-top:6px;border-top:1px solid #bbf7d0">
+              ✅ 設定完了後、毎日自動でアラートメールが届きます。アラートが0件の日はメールは送られません。
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1463,6 +1528,98 @@ function archiveConfirmedDispatches() {
   if (rows.length > 0) {
     sheet.getRange(lastRow + 1, 1, rows.length, HEADERS.length).setValues(rows);
   }
+}
+
+// =====================================================
+// 📧 コンテナアラートメール通知（毎日タイマーで実行）
+// GASトリガー設定: 実行関数 = checkContainerAlerts
+//   イベントのソース: 時間主導型 → 日タイマー
+//   時刻: 朝8時〜9時 など任意の時間帯を選択
+// =====================================================
+function checkContainerAlerts() {
+  const data = readData();
+  const settings = data.containerSettings || {};
+  const emailConfig = settings.emailAlerts || {};
+
+  if (!emailConfig.enabled) return;
+  const recipients = (emailConfig.recipients || []).filter(r => r && r.trim());
+  if (recipients.length === 0) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const defaultTarget = settings.defaultTargetDays || 90;
+  const defaultWarn = settings.defaultWarnDays || 7;
+
+  const overAlerts = [];
+  const warnAlerts = [];
+
+  (data.containerPlacements || [])
+    .filter(p => p.status === 'active' && p.installDate)
+    .forEach(p => {
+      const inst = new Date(p.installDate);
+      inst.setHours(0, 0, 0, 0);
+      const elapsed = Math.floor((today - inst) / 86400000);
+      const target = p.targetDays || defaultTarget;
+      const warn = (p.warnBeforeDays !== undefined) ? p.warnBeforeDays : defaultWarn;
+      const remain = target - elapsed;
+
+      if (remain <= 0 && emailConfig.notifyOver !== false) {
+        overAlerts.push({ p, elapsed, overDays: Math.abs(remain) });
+      } else if (remain > 0 && remain <= warn && emailConfig.notifyWarn !== false) {
+        warnAlerts.push({ p, elapsed, remain });
+      }
+    });
+
+  const total = overAlerts.length + warnAlerts.length;
+  if (total === 0) return;  // アラートなし → メール送らない
+
+  const todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd');
+  const nowStr   = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
+  const subject  = '[コンテナ管理] ' + todayStr + ' アラート通知 - 超過' + overAlerts.length + '件・警告' + warnAlerts.length + '件';
+
+  let body = 'コンテナ管理システム アラート通知\n';
+  body += '送信日時：' + nowStr + '\n';
+  body += '━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+
+  if (overAlerts.length > 0) {
+    body += '🔴 超過コンテナ（' + overAlerts.length + '件）\n';
+    body += '─────────────────────────────\n';
+    overAlerts.forEach(function(a, i) {
+      body += '[' + (i+1) + '] ' + a.p.customerName + (a.p.siteName ? ' ／ ' + a.p.siteName : '') + '\n';
+      body += '    種類：' + a.p.containerType + (a.p.containerNo ? '  No.' + a.p.containerNo : '') + '\n';
+      body += '    設置日：' + a.p.installDate + '（経過 ' + a.elapsed + '日 ／ 目標 ' + (a.p.targetDays||defaultTarget) + '日）\n';
+      body += '    ⚠ 目標日数を ' + a.overDays + ' 日超過\n';
+      if (a.p.notes) body += '    備考：' + a.p.notes + '\n';
+      body += '\n';
+    });
+  }
+
+  if (warnAlerts.length > 0) {
+    body += '🟡 警告コンテナ（' + warnAlerts.length + '件）\n';
+    body += '─────────────────────────────\n';
+    warnAlerts.forEach(function(a, i) {
+      body += '[' + (i+1) + '] ' + a.p.customerName + (a.p.siteName ? ' ／ ' + a.p.siteName : '') + '\n';
+      body += '    種類：' + a.p.containerType + (a.p.containerNo ? '  No.' + a.p.containerNo : '') + '\n';
+      body += '    設置日：' + a.p.installDate + '（経過 ' + a.elapsed + '日 ／ 目標 ' + (a.p.targetDays||defaultTarget) + '日）\n';
+      body += '    📅 交換予定まで残り ' + a.remain + ' 日\n';
+      if (a.p.notes) body += '    備考：' + a.p.notes + '\n';
+      body += '\n';
+    });
+  }
+
+  body += '━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  body += '※このメールは配車管理システムから自動送信されています。\n';
+  body += '※アラートが0件の日はメールは送信されません。\n';
+
+  recipients.forEach(function(email) {
+    try {
+      MailApp.sendEmail(email.trim(), subject, body);
+    } catch(e) {
+      Logger.log('メール送信エラー: ' + email + ' / ' + e.message);
+    }
+  });
+
+  Logger.log('アラートメール送信完了: 超過' + overAlerts.length + '件・警告' + warnAlerts.length + '件 → ' + recipients.join(', '));
 }</div>
           </div>
         </div>
@@ -5044,17 +5201,74 @@ function toggleConSettings() {
   const p = document.getElementById('conSettingsPanel');
   p.classList.toggle('hid');
   if (!p.classList.contains('hid')) {
-    const s = db.containerSettings || {};
-    document.getElementById('conDefaultTargetDays').value = s.defaultTargetDays || 90;
-    document.getElementById('conDefaultWarnDays').value = s.defaultWarnDays || 7;
+    loadConSettingsUI();
   }
+}
+function loadConSettingsUI() {
+  const s = db.containerSettings || {};
+  const ea = s.emailAlerts || {};
+  document.getElementById('conDefaultTargetDays').value = s.defaultTargetDays || 90;
+  document.getElementById('conDefaultWarnDays').value = s.defaultWarnDays || 7;
+  document.getElementById('conEmailEnabled').checked = !!ea.enabled;
+  document.getElementById('conEmailBody').style.display = ea.enabled ? '' : 'none';
+  document.getElementById('conNotifyOver').checked = ea.notifyOver !== false;
+  document.getElementById('conNotifyWarn').checked = ea.notifyWarn !== false;
+  document.getElementById('conEmailHour').value = ea.sendHour || 8;
+  renderConEmailList(ea.recipients || []);
 }
 function saveConSettings() {
   if (!db.containerSettings) db.containerSettings = {};
   db.containerSettings.defaultTargetDays = parseInt(document.getElementById('conDefaultTargetDays').value) || 90;
   db.containerSettings.defaultWarnDays = parseInt(document.getElementById('conDefaultWarnDays').value) || 7;
+  const enabled = document.getElementById('conEmailEnabled').checked;
+  document.getElementById('conEmailBody').style.display = enabled ? '' : 'none';
+  if (!db.containerSettings.emailAlerts) db.containerSettings.emailAlerts = { recipients: [] };
+  db.containerSettings.emailAlerts.enabled = enabled;
+  db.containerSettings.emailAlerts.notifyOver = document.getElementById('conNotifyOver').checked;
+  db.containerSettings.emailAlerts.notifyWarn = document.getElementById('conNotifyWarn').checked;
+  db.containerSettings.emailAlerts.sendHour = parseInt(document.getElementById('conEmailHour').value) || 8;
   saveDB();
   renderConView();
+}
+// メールアドレスリスト描画
+function renderConEmailList(recipients) {
+  const list = document.getElementById('conEmailList');
+  if (!list) return;
+  if (recipients.length === 0) {
+    list.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:4px 0">まだ送信先が登録されていません</div>';
+    return;
+  }
+  list.innerHTML = recipients.map((r, i) => `
+    <div style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px">
+      <span style="font-size:13px">📧</span>
+      <span style="flex:1;font-size:12px">${esc(r)}</span>
+      <button onclick="removeConEmail(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:0 2px" title="削除">×</button>
+    </div>`).join('');
+}
+function addConEmail() {
+  const inp = document.getElementById('conEmailInput');
+  const email = (inp.value || '').trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('有効なメールアドレスを入力してください');
+    return;
+  }
+  if (!db.containerSettings) db.containerSettings = {};
+  if (!db.containerSettings.emailAlerts) db.containerSettings.emailAlerts = { recipients: [] };
+  const recs = db.containerSettings.emailAlerts.recipients || [];
+  if (recs.includes(email)) { alert('すでに登録済みのアドレスです'); return; }
+  recs.push(email);
+  db.containerSettings.emailAlerts.recipients = recs;
+  inp.value = '';
+  saveDB();
+  renderConEmailList(recs);
+}
+function removeConEmail(idx) {
+  if (!db.containerSettings || !db.containerSettings.emailAlerts) return;
+  const recs = db.containerSettings.emailAlerts.recipients || [];
+  recs.splice(idx, 1);
+  db.containerSettings.emailAlerts.recipients = recs;
+  saveDB();
+  renderConEmailList(recs);
 }
 
 // ── タブ切り替え ──
