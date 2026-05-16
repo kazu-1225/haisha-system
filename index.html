@@ -672,7 +672,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <button class="mp-head-cls" onclick="closeMP()">×</button>
   </div>
   <div class="mp-srch-wrap">
-    <input type="text" id="mpSrch" class="mp-srch" placeholder="🔍 名前で検索..." oninput="filterMP()">
+    <input type="text" id="mpSrch" class="mp-srch" placeholder="🔍 名前で検索..." oninput="if(!window._imeActive)filterMP()" oncompositionstart="window._imeActive=true" oncompositionend="window._imeActive=false;filterMP()">
   </div>
   <div id="mpList" class="mp-list"></div>
   <div class="mp-add-sec" id="mpAddSec">
