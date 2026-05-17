@@ -544,6 +544,39 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .ecard.ec-reg-done{background:#f1f5f9;border-left-color:#94a3b8;color:#94a3b8;opacity:.65;cursor:pointer}
 .ecard.ec-reg-done:hover{opacity:1;box-shadow:0 2px 8px rgba(148,163,184,.4)}
 .ecard.ec-reg-done .ec-cust{color:#64748b}
+/* ===== 業務フロー ===== */
+.js-badge{display:inline-flex;align-items:center;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;flex-shrink:0;margin-left:2px;vertical-align:middle;line-height:1.4}
+.js-badge.js-new{background:#dbeafe;color:#1d4ed8}
+.js-badge.js-dispatched{background:#fef9c3;color:#854d0e}
+.js-badge.js-confirmed_job{background:#dcfce7;color:#166534}
+.js-badge.js-collected{background:#fed7aa;color:#9a3412}
+.js-badge.js-processed{background:#e9d5ff;color:#7e22ce}
+.js-badge.js-invoiced{background:#d1fae5;color:#065f46}
+/* ジョブフロー ステップバー */
+.job-flow{display:flex;align-items:flex-start;padding:10px 0 4px;overflow-x:auto;gap:0}
+.job-flow-item{display:flex;flex-direction:column;align-items:center;flex:1;min-width:52px;position:relative}
+.job-flow-item:not(:last-child)::after{content:'';position:absolute;top:8px;left:50%;width:100%;height:2px;background:#e2e8f0;z-index:0}
+.job-flow-item.jf-done:not(:last-child)::after{background:#2563eb}
+.job-flow-dot{width:18px;height:18px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;z-index:1;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700}
+.job-flow-item.jf-done .job-flow-dot{background:#2563eb;border-color:#2563eb;color:#fff}
+.job-flow-item.jf-current .job-flow-dot{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.2);background:#eff6ff;color:#1d4ed8;font-size:10px}
+.job-flow-lbl{font-size:8px;color:#94a3b8;text-align:center;margin-top:3px;white-space:nowrap}
+.job-flow-item.jf-done .job-flow-lbl,.job-flow-item.jf-current .job-flow-lbl{color:#1d4ed8;font-weight:700}
+/* 展開処理待ちパネル */
+.tenkai-panel{background:#fff;border-bottom:2px solid #fb923c;flex-shrink:0}
+.tenkai-hdr{display:flex;align-items:center;gap:8px;padding:7px 14px;background:#fff7ed;cursor:pointer;border-bottom:1px solid #fed7aa;user-select:none}
+.tenkai-hdr h3{font-size:12px;font-weight:700;color:#c2410c}
+.tenkai-body{display:flex;gap:8px;padding:7px 14px;overflow-x:auto;max-height:110px;transition:background .1s}
+.tenkai-panel.collapsed .tenkai-body{display:none}
+.tkcrd{background:#fff;border:1.5px solid #fb923c;border-radius:8px;padding:5px 9px;min-width:130px;max-width:170px;cursor:pointer;flex-shrink:0;font-size:11px}
+.tkcrd:hover{box-shadow:0 2px 8px rgba(251,146,60,.3)}
+.tkcrd-name{font-weight:700;color:#c2410c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tkcrd-info{font-size:10px;color:#78350f;margin-top:2px}
+/* 展開処理モーダル */
+.tk-grid{display:grid;grid-template-columns:1fr 80px 64px 88px 80px 28px;gap:5px;align-items:center;margin-bottom:4px}
+.tk-grid-hdr{display:grid;grid-template-columns:1fr 80px 64px 88px 80px 28px;gap:5px;font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px;padding:0 2px}
+.tk-input{border:1px solid #cbd5e1;border-radius:5px;padding:4px 6px;font-size:12px;width:100%}
+.tk-total{text-align:right;font-size:13px;font-weight:800;color:#1e3a5f;padding:8px 4px;border-top:2px solid #e2e8f0;margin-top:6px}
 /* ドライバー行の定期便バッジ */
 .ec-reg-drv-badge{display:inline-block;font-size:9px;font-weight:800;color:#065f46;background:#d1fae5;border-radius:3px;padding:0 4px;margin-left:3px;vertical-align:middle;line-height:1.5;border:1px solid #6ee7b7;white-space:nowrap}
 
@@ -648,6 +681,16 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
           <span class="cp-toggle" id="cpToggle">▼</span>
         </div>
         <div class="contact-body" id="contactBody"></div>
+      </div>
+
+      <!-- 展開処理待ちパネル -->
+      <div class="tenkai-panel hid" id="tenkaiPanel">
+        <div class="tenkai-hdr" onclick="toggleTenkaiPanel()">
+          <span id="tkToggle">▼</span>
+          <h3>🏭 展開処理待ち</h3>
+          <span class="p-cnt" id="tkCnt" style="background:#fb923c;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">0</span>
+        </div>
+        <div class="tenkai-body" id="tenkaiBody"></div>
       </div>
 
     </div><!-- /sidebar-content -->
@@ -915,6 +958,11 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
   <div class="mbox">
     <div class="mhdr"><h2 id="mDTitle">配車追加</h2><span class="mcls" onclick="closeM('mDispatch')">×</span></div>
     <div class="mbdy">
+      <!-- 業務フロー -->
+      <div id="dJobFlowWrap" class="hid" style="background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;padding:10px 14px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:#1e3a5f;margin-bottom:2px">📋 業務進捗</div>
+        <div id="dJobFlow"></div>
+      </div>
       <!-- ① お客様情報 -->
       <div style="font-size:11px;font-weight:700;color:#1e3a5f;margin-bottom:6px;background:#e0f2fe;padding:4px 8px;border-radius:4px">🏢 お客様情報</div>
       <div class="r2">
@@ -1087,6 +1135,47 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 
 <!-- ===== DISPATCH HOVER POPUP ===== -->
 <div class="disp-popup" id="dispPopup"></div>
+
+<!-- ===== MODAL: 展開処理入力 ===== -->
+<div class="ovl hid" id="mTENKAI">
+  <div class="mbox" style="max-width:700px">
+    <div class="mhdr"><h2>🏭 展開処理入力</h2><span class="mcls" onclick="closeM('mTENKAI')">×</span></div>
+    <div class="mbdy">
+      <div id="tkDispInfo" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:12px"></div>
+      <div class="r2" style="margin-bottom:10px">
+        <div class="fr">
+          <label>収集完了日</label>
+          <input type="date" id="tkDate">
+        </div>
+        <div class="fr">
+          <label>作業区分</label>
+          <select id="tkWorkKind" style="border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:12px;width:100%">
+            <option value="collect">収集運搬</option>
+            <option value="manual">手積み</option>
+            <option value="crane">クレーン</option>
+            <option value="other">その他</option>
+          </select>
+        </div>
+      </div>
+      <!-- 廃棄物品目入力テーブル -->
+      <div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:6px">廃棄物品目・数量</div>
+      <div class="tk-grid-hdr">
+        <span>廃棄物種別</span><span>数量</span><span>単位</span><span>単価(円)</span><span>金額</span><span></span>
+      </div>
+      <div id="tkItems"></div>
+      <button onclick="addTenkaiItem()" style="font-size:11px;color:#2563eb;padding:3px 10px;border:1px dashed #93c5fd;border-radius:5px;background:#eff6ff;margin-top:2px">＋ 品目追加</button>
+      <div class="tk-total" id="tkTotal">合計: ¥0</div>
+      <div class="fr" style="margin-top:8px">
+        <label>備考</label>
+        <textarea id="tkNotes" rows="2" placeholder="特記事項など"></textarea>
+      </div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-s" onclick="closeM('mTENKAI')">キャンセル</button>
+      <button class="btn btn-p" onclick="saveTenkai()">💾 展開処理を保存</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== MODAL: CONFIRM DROP ===== -->
 <div class="ovl hid" id="mConfirm">
@@ -2163,6 +2252,55 @@ function checkContainerAlerts() {
 const LIC_ORDER=['普通','準中型','中型（8tに限る）','中型（限定解除）','大型'];
 const DOW_JP=['日','月','火','水','木','金','土'];
 const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const JOB_STATUS_FLOW=['new','dispatched','confirmed_job','collected','processed','invoiced'];
+const JOB_STATUS_INFO={
+  new:         {label:'新規依頼',  emoji:'🔵', short:'新規'},
+  dispatched:  {label:'配車済',    emoji:'🟡', short:'配車'},
+  confirmed_job:{label:'確定済',   emoji:'🟢', short:'確定'},
+  collected:   {label:'収集完了',  emoji:'🟠', short:'完了'},
+  processed:   {label:'展開処理済',emoji:'🟣', short:'展開'},
+  invoiced:    {label:'請求確定',  emoji:'💰', short:'請求'},
+};
+function jsBadge(s){
+  const i=JOB_STATUS_INFO[s]||{label:s,emoji:'',short:s};
+  return`<span class="js-badge js-${s}">${i.emoji} ${i.short}</span>`;
+}
+function jobFlowHTML(currentStatus,dispId){
+  const idx=JOB_STATUS_FLOW.indexOf(currentStatus);
+  let html='<div class="job-flow">';
+  JOB_STATUS_FLOW.forEach((s,i)=>{
+    const info=JOB_STATUS_INFO[s];
+    const done=i<idx;const cur=i===idx;
+    const cls='job-flow-item'+(done?' jf-done':cur?' jf-current':'');
+    html+=`<div class="${cls}">
+      <div class="job-flow-dot">${done?'✓':cur?info.emoji:''}</div>
+      <div class="job-flow-lbl">${info.label}</div>
+    </div>`;
+  });
+  html+='</div>';
+  // 次のステータスへ進むボタン
+  const nextStatus=JOB_STATUS_FLOW[idx+1];
+  if(nextStatus&&currentStatus!=='invoiced'){
+    const ni=JOB_STATUS_INFO[nextStatus];
+    if(nextStatus==='processed'){
+      html+=`<div style="text-align:center;margin-top:4px"><button class="btn" style="background:#7e22ce;color:#fff;font-size:12px;padding:5px 16px" onclick="openTenkai('${dispId}')">🏭 展開処理入力 →</button></div>`;
+    } else {
+      html+=`<div style="text-align:center;margin-top:4px"><button class="btn btn-p" style="font-size:12px;padding:5px 16px" onclick="advanceJobStatus('${dispId}','${nextStatus}')">→ ${ni.emoji} ${ni.label}へ進む</button></div>`;
+    }
+  }
+  return html;
+}
+function advanceJobStatus(id,nextStatus){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);
+  if(!dp)return;
+  dp.jobStatus=nextStatus;
+  save();renderAll();
+  // モーダルが開いていれば更新
+  const flowDiv=document.getElementById('dJobFlow');
+  if(flowDiv&&!document.getElementById('mDispatch').classList.contains('hid')){
+    flowDiv.innerHTML=jobFlowHTML(nextStatus,id);
+  }
+}
 
 // ================================================================
 // AI AUTO-DISPATCH PATTERNS (702 patterns from 9 months of Excel data)
@@ -2348,6 +2486,14 @@ function normalizeDB(){
   (db.dispatches||[]).forEach(dp=>{
     if(dp.contactStatus===undefined)dp.contactStatus=null;
   });
+  // 配車：jobStatusフィールド追加（旧データ互換）
+  (db.dispatches||[]).forEach(dp=>{
+    if(!dp.jobStatus){
+      dp.jobStatus=(dp.driver&&dp.vehicle&&dp.dispatchDate)?'dispatched':'new';
+    }
+  });
+  if(!db.salesInvoices)db.salesInvoices=[];
+  if(!db.wasteUnitPrices)db.wasteUnitPrices=[];
 }
 
 let _autoSyncTimer=null;
@@ -2796,6 +2942,7 @@ function render(){
   document.getElementById('calBody').innerHTML=tb;
   renderPending();
   renderContactWaiting();
+  renderTenkaiPanel();
   updateSidebarBadges();
   initColResize();
 }
@@ -2980,7 +3127,7 @@ function cardHTML(dp,rowCtx){
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();editDisp('${dp.id}')">
     <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-    <div class="ec-cust">${statusMark}${custName(dp.customer)}${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${cb}${holBadge}</div>
+    <div class="ec-cust">${statusMark}${custName(dp.customer)}${jsBadge(dp.jobStatus||'new')}${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${cb}${holBadge}</div>
     <div class="ec-sub">${sub}</div>
     ${holName?`<div class="ec-sub" style="font-size:9px;color:#dc2626;font-weight:700">🎌 ${holName}</div>`:''}
     ${dlHtml}
@@ -3049,6 +3196,139 @@ function contactWaitingDisps(){
     .filter(dp=>dp.driver&&dp.vehicle&&dp.dispatchDate&&dp.contactStatus!=='notified'&&!dp.isCarryIn)
     .sort((a,b)=>a.dispatchDate<b.dispatchDate?-1:a.dispatchDate>b.dispatchDate?1:0);
 }
+// ================================================================
+// 展開処理待ちパネル
+// ================================================================
+function tenkaiWaitingDisps(){
+  return (db.dispatches||[])
+    .filter(dp=>dp.jobStatus==='collected'&&!dp.isCarryIn&&dp.dispatchType!=='shipment')
+    .sort((a,b)=>(a.dispatchDate||a.date||'')<(b.dispatchDate||b.date||'')?-1:1);
+}
+function toggleTenkaiPanel(){
+  if(!ST.tenkaiCollapsed)ST.tenkaiCollapsed=false;
+  ST.tenkaiCollapsed=!ST.tenkaiCollapsed;
+  renderTenkaiPanel();
+}
+function renderTenkaiPanel(){
+  const list=tenkaiWaitingDisps();
+  const panel=document.getElementById('tenkaiPanel');
+  if(!panel)return;
+  panel.classList.toggle('hid',list.length===0);
+  document.getElementById('tkCnt').textContent=list.length;
+  panel.classList.toggle('collapsed',!!ST.tenkaiCollapsed);
+  if(ST.tenkaiCollapsed)return;
+  const body=document.getElementById('tenkaiBody');
+  if(!list.length){body.innerHTML='';return;}
+  body.innerHTML=list.map(dp=>{
+    const cu=db.customers.find(x=>x.id===dp.customer);
+    const date=dp.dispatchDate||dp.date||'';
+    return`<div class="tkcrd" onclick="openTenkai('${dp.id}')">
+      <div class="tkcrd-name">🟠 ${cu?cu.name:'（お客様未設定）'}</div>
+      <div class="tkcrd-info">📅 ${date} 収集完了</div>
+    </div>`;
+  }).join('');
+}
+
+let _tkDispId=null;
+let _tkItems=[];
+function openTenkai(id){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);
+  if(!dp)return;
+  _tkDispId=id;
+  const cu=db.customers.find(x=>x.id===dp.customer);
+  const dr=db.drivers.find(x=>x.id===dp.driver);
+  const date=dp.dispatchDate||dp.date||'';
+  document.getElementById('tkDispInfo').innerHTML=
+    `<strong>${cu?cu.name:'（お客様未設定）'}</strong> ／ 📅 ${date} ／ 👤 ${dr?dr.name:'未定'}`;
+  document.getElementById('tkDate').value=dp.tenkai?.completedAt||fmt(new Date());
+  document.getElementById('tkWorkKind').value=dp.tenkai?.workKind||'collect';
+  document.getElementById('tkNotes').value=dp.tenkai?.notes||'';
+  // 既存データがあれば読み込む
+  _tkItems=(dp.tenkai?.items||[]).map(x=>({...x}));
+  if(!_tkItems.length)_tkItems=[{wasteType:'',qty:'',unit:'t',unitPrice:'',amount:0}];
+  renderTkItems();
+  calcTenkaiTotal();
+  // モーダルを開く（mDispatchが開いていれば閉じる）
+  closeM('mDispatch');
+  openM('mTENKAI');
+}
+function renderTkItems(){
+  const WASTE_TYPES=['廃プラスチック類','金属くず','木くず','廃油','紙くず','繊維くず','ガラスくず・陶磁器くず','ゴムくず','廃アルカリ','廃酸','その他産業廃棄物','一般廃棄物'];
+  const UNITS=['t','kg','㎥','台','個','式','回'];
+  document.getElementById('tkItems').innerHTML=_tkItems.map((item,i)=>`
+    <div class="tk-grid">
+      <select class="tk-input" onchange="_tkItems[${i}].wasteType=this.value">
+        <option value="">種別を選択</option>
+        ${WASTE_TYPES.map(t=>`<option value="${t}"${item.wasteType===t?' selected':''}>${t}</option>`).join('')}
+        <option value="__other"${!WASTE_TYPES.includes(item.wasteType)&&item.wasteType?' selected':''}>その他（直接入力）</option>
+      </select>
+      <input type="number" class="tk-input" step="0.001" placeholder="0.000" value="${item.qty||''}"
+        oninput="_tkItems[${i}].qty=this.value;calcTenkaiTotal()">
+      <select class="tk-input" onchange="_tkItems[${i}].unit=this.value">
+        ${UNITS.map(u=>`<option value="${u}"${item.unit===u?' selected':''}>${u}</option>`).join('')}
+      </select>
+      <input type="number" class="tk-input" step="1" placeholder="単価" value="${item.unitPrice||''}"
+        oninput="_tkItems[${i}].unitPrice=this.value;calcTenkaiTotal()">
+      <div style="font-size:12px;font-weight:700;color:#1e3a5f;padding:0 4px">${item.amount?'¥'+item.amount.toLocaleString():'-'}</div>
+      <button onclick="removeTenkaiItem(${i})" style="color:#dc2626;font-size:14px;padding:0 4px;line-height:1">×</button>
+    </div>
+  `).join('');
+}
+function addTenkaiItem(){
+  _tkItems.push({wasteType:'',qty:'',unit:'t',unitPrice:'',amount:0});
+  renderTkItems();calcTenkaiTotal();
+}
+function removeTenkaiItem(i){
+  _tkItems.splice(i,1);
+  if(!_tkItems.length)_tkItems=[{wasteType:'',qty:'',unit:'t',unitPrice:'',amount:0}];
+  renderTkItems();calcTenkaiTotal();
+}
+function calcTenkaiTotal(){
+  let total=0;
+  _tkItems.forEach((item,i)=>{
+    const q=parseFloat(item.qty)||0;
+    const p=parseFloat(item.unitPrice)||0;
+    item.amount=Math.round(q*p);
+    total+=item.amount;
+  });
+  document.getElementById('tkTotal').textContent='合計: ¥'+total.toLocaleString();
+  // 金額列を再描画（数値だけ更新）
+  const amountCells=document.querySelectorAll('#tkItems .tk-grid');
+  amountCells.forEach((row,i)=>{
+    if(_tkItems[i]){
+      const amountDiv=row.children[4];
+      if(amountDiv)amountDiv.textContent=_tkItems[i].amount?'¥'+_tkItems[i].amount.toLocaleString():'-';
+    }
+  });
+}
+async function saveTenkai(){
+  const dp=(db.dispatches||[]).find(x=>x.id===_tkDispId);
+  if(!dp)return;
+  const completedAt=document.getElementById('tkDate').value;
+  const workKind=document.getElementById('tkWorkKind').value;
+  const notes=document.getElementById('tkNotes').value;
+  calcTenkaiTotal();
+  const validItems=_tkItems.filter(x=>x.wasteType||x.qty);
+  dp.tenkai={completedAt,workKind,items:validItems,notes};
+  dp.jobStatus='processed';
+  // 売上伝票ドラフト自動生成
+  const cu=db.customers.find(x=>x.id===dp.customer);
+  const total=validItems.reduce((s,x)=>s+(x.amount||0),0);
+  const invId='INV-'+dp.id;
+  const existing=(db.salesInvoices||[]).findIndex(x=>x.sourceId===dp.id);
+  const inv={
+    id:invId,sourceId:dp.id,sourceType:'dispatch',
+    tpcd:cu?.tpcd||'',customerName:cu?.name||'',
+    date:completedAt,workKind,items:validItems,total,notes,
+    status:'draft',createdAt:new Date().toISOString()
+  };
+  if(existing>=0)db.salesInvoices[existing]=inv;
+  else db.salesInvoices.push(inv);
+  await save();
+  closeM('mTENKAI');
+  renderAll();
+  alert('展開処理を保存しました。売上伝票ドラフトを作成しました。');
+}
 function renderContactWaiting(){
   const list=contactWaitingDisps();
   const panel=document.getElementById('contactPanel');
@@ -3089,6 +3369,7 @@ async function markContacted(id){
 function toggleContactPanel(){
   ST.contactCollapsed=!ST.contactCollapsed;
   renderContactWaiting();
+  renderTenkaiPanel();
 }
 
 // ================================================================
@@ -3910,6 +4191,15 @@ function editDisp(id){
   updateDeadlineWarn();
   syncAllMPTriggers();
   onCustChange(); // T-PlannerCD表示 & 収集先絞り込み
+  // 業務フロー表示
+  const flowWrap=document.getElementById('dJobFlowWrap');
+  const flowDiv=document.getElementById('dJobFlow');
+  if(dp.dispatchType!=='shipment'&&!dp.isCarryIn){
+    flowWrap.classList.remove('hid');
+    flowDiv.innerHTML=jobFlowHTML(dp.jobStatus||'new',id);
+  } else {
+    flowWrap.classList.add('hid');
+  }
   openM('mDispatch');
 }
 async function saveDispatch(){
