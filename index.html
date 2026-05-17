@@ -737,6 +737,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <div id="conAlertBadges" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     <div class="tsp" style="flex:1"></div>
     <button class="btn btn-p" style="font-size:12px;padding:5px 14px" onclick="openConAction('install')">＋ 新規設置</button>
+    <button class="hbtn" style="font-size:12px;background:rgba(255,255,255,.15)" onclick="openConImport()">📥 初期データ取込</button>
     <button class="hbtn" style="font-size:12px" onclick="toggleConSettings()">⚙ アラート設定</button>
   </div>
   <!-- アラート設定パネル（折りたたみ） -->
@@ -2109,6 +2110,47 @@ function checkContainerAlerts() {
         <button class="btn btn-w" onclick="saveCON()" style="flex:1">💾 保存</button>
         <button class="btn btn-d" id="conDeleteBtn" onclick="deleteCON()" style="background:#dc2626;color:#fff;display:none">🗑 削除</button>
         <button class="btn btn-s" onclick="closeM('mCON')">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GLOBAL-EX インポートモーダル ===== -->
+<div class="ovl hid" id="mCONImport">
+  <div class="mbox" style="max-width:900px;width:96vw">
+    <div class="mhdr"><h2>📥 GLOBAL-EX コンテナデータ 初期取込</h2><span class="mcls" onclick="closeM('mCONImport')">×</span></div>
+    <div class="mbdy" style="padding:14px 18px">
+      <!-- 説明 -->
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:12px">
+        📋 GLOBAL-EXのコンテナ管理データ（57件）を取り込みます。<br>
+        設置日は「本日 − 設置日数」で自動計算します。顧客名は顧客マスタと照合し、一致するものは正式名称に変換します。<br>
+        ⚠ <strong>大栄クリーナー 西風新都（設置日数なし）の40件はスキップ</strong>します。今後の設置・交換から個別登録してください。
+      </div>
+      <!-- サマリー -->
+      <div id="importSummary" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"></div>
+      <!-- テーブル -->
+      <div style="overflow-y:auto;max-height:48vh;border:1px solid #e2e8f0;border-radius:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="background:#1e3a5f;color:#fff;position:sticky;top:0;z-index:5">
+              <th style="padding:6px 8px;white-space:nowrap"><input type="checkbox" id="importChkAll" checked onclick="toggleAllImportChk(this.checked)" style="accent-color:#fff"></th>
+              <th style="padding:6px 8px;text-align:left">CSV顧客名</th>
+              <th style="padding:6px 8px;text-align:left">照合結果</th>
+              <th style="padding:6px 8px;text-align:left">事業場</th>
+              <th style="padding:6px 8px;text-align:left">種類</th>
+              <th style="padding:6px 8px">No.</th>
+              <th style="padding:6px 8px">設置日(計算)</th>
+              <th style="padding:6px 8px">経過</th>
+              <th style="padding:6px 8px">ステータス</th>
+            </tr>
+          </thead>
+          <tbody id="importTableBody"></tbody>
+        </table>
+      </div>
+      <!-- ボタン -->
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+        <button class="btn btn-w" onclick="executeConImport()" style="flex:1;font-size:13px">📥 チェックした件数をインポート</button>
+        <button class="btn btn-s" onclick="closeM('mCONImport')">キャンセル</button>
       </div>
     </div>
   </div>
@@ -5567,6 +5609,191 @@ function deleteCON() {
   saveDB();
   closeM('mCON');
   renderConView();
+}
+
+// ================================================================
+// GLOBAL-EX 初期データインポート
+// ================================================================
+const GLOBAL_EX_DATA = [
+  {n:'バルコム',s:'バルコムBMW観音新町',t:'8㎥（4DR）コンテナ',no:19,d:126},
+  {n:'三建産業　株式会社',s:'事務所',t:'4㎥（2DR）コンテナ',no:1,d:126},
+  {n:'中外工業　株式会社',s:'中電プラント敷地内事務所',t:'4㎥（2DR）コンテナ',no:16,d:126},
+  {n:'株式会社　アクアスマート',s:'事務所',t:'4㎥（2DR）コンテナ',no:23,d:126},
+  {n:'大下産業　株式会社',s:'本社',t:'4㎥（2DR）コンテナ',no:25,d:126},
+  {n:'朝日ソーラー株式会社',s:'広島営業所',t:'8㎥（4DR）コンテナ',no:37,d:125},
+  {n:'バルコム',s:'バルコム宇品',t:'1.5㎥BOX',no:15,d:123},
+  {n:'石崎硝子',s:'石崎硝子',t:'1.5㎥BOX',no:2,d:121},
+  {n:'石崎硝子',s:'石崎硝子',t:'1.5㎥BOX',no:39,d:121},
+  {n:'雅工舎',s:'雅工舎',t:'1㎥BOX',no:4,d:119},
+  {n:'雅工舎',s:'雅工舎',t:'1.5㎥BOX',no:70,d:119},
+  {n:'愛谷瓦',s:'愛谷瓦　事務所',t:'1.5㎥BOX',no:7,d:116},
+  {n:'JA',s:'JA五日市',t:'1.5㎥BOX',no:31,d:115},
+  {n:'光和物産',s:'光和物産',t:'1.5㎥BOX',no:36,d:115},
+  {n:'株式会社　カナモト',s:'カナモト出島',t:'1.5㎥BOX',no:58,d:115},
+  {n:'ミヤシタ技研',s:'ミヤシタ技研',t:'1.5㎥BOX',no:12,d:113},
+  {n:'ウォールテック',s:'ウォールテック事務所',t:'1.5㎥BOX',no:49,d:113},
+  {n:'太陽工業',s:'太陽工業（栄町）',t:'2㎥BOX',no:4,d:113},
+  {n:'新生機械',s:'新生機械',t:'1㎥BOX',no:3,d:112},
+  {n:'中村建設',s:'中村建設',t:'1.5㎥BOX',no:22,d:112},
+  {n:'平田工務店',s:'平田工務店',t:'1.5㎥BOX',no:34,d:112},
+  {n:'コベルコ',s:'コベルコ',t:'1.5㎥BOX',no:40,d:112},
+  {n:'平田工務店',s:'平田工務店',t:'1.5㎥BOX',no:52,d:112},
+  {n:'ミサカ設備',s:'ミサカ設備',t:'1.5㎥BOX',no:25,d:109},
+  {n:'リード通信',s:'リード通信',t:'1㎥BOX',no:8,d:109},
+  {n:'尾上建設',s:'尾上建設',t:'1.5㎥BOX',no:35,d:109},
+  {n:'共同冷機',s:'共同冷機',t:'1.5㎥BOX',no:32,d:106},
+  {n:'ウエダ',s:'ウエダ',t:'1.5㎥BOX',no:16,d:105},
+  {n:'株式会社カインズ',s:'広島LECT店',t:'8㎥（4DR）コンテナ',no:3,d:102},
+  {n:'ウィズリンク',s:'ウィズリンク',t:'1.5㎥BOX',no:42,d:102},
+  {n:'株式会社　エイトコーポレーション',s:'事務所',t:'4㎥（2DR）コンテナ',no:41,d:101},
+  {n:'株式会社　コンセック',s:'コンセック',t:'1㎥BOX',no:2,d:99},
+  {n:'カネミツ工芸',s:'カネミツ工芸',t:'1.5㎥BOX',no:28,d:99},
+  {n:'大栄設備',s:'大栄設備',t:'1.5㎥BOX',no:62,d:99},
+  {n:'大栄設備',s:'大栄設備',t:'1.5㎥BOX',no:65,d:99},
+  {n:'光和物産',s:'光和物産',t:'1.5㎥BOX',no:6,d:98},
+  {n:'新和金属',s:'新和金属',t:'1.5㎥BOX',no:11,d:98},
+  {n:'新和金属',s:'新和金属',t:'1.5㎥BOX',no:55,d:98},
+  {n:'竹本電工',s:'竹本電工',t:'1.5㎥BOX',no:1,d:95},
+  {n:'株式会社 TAKEMOTO Kousya',s:'坪井工場',t:'8㎥（4DR）コンテナ',no:1,d:94},
+  {n:'オートザム東広島',s:'オートザム東広島',t:'1㎥BOX',no:6,d:94},
+  {n:'株式会社　松田紙店',s:'松田紙店',t:'8㎥（4DR）コンテナ',no:2,d:92},
+  {n:'株式会社　DCM',s:'ダイキ焼山',t:'8㎥（4DR）コンテナ',no:21,d:91},
+  {n:'株式会社　松下塗装工業',s:'松下塗装工業',t:'1.5㎥BOX',no:26,d:74},
+  {n:'株式会社　松下塗装工業',s:'松下塗装工業',t:'1.5㎥BOX',no:27,d:74},
+  {n:'株式会社　カナモト',s:'カナモト出島',t:'1.5㎥BOX',no:43,d:73},
+  {n:'株式会社　カナモト',s:'カナモト出島',t:'1.5㎥BOX',no:56,d:73},
+  {n:'SGエンジニアリング　株式会社',s:'SGエンジニアリング',t:'1.5㎥BOX',no:20,d:72},
+  {n:'大森輸業',s:'大森輸業',t:'1.5㎥BOX',no:23,d:71},
+  {n:'大森輸業',s:'大森輸業',t:'1.5㎥BOX',no:30,d:71},
+  {n:'陸正',s:'陸正',t:'1.5㎥BOX',no:24,d:66},
+  {n:'エビス化成株式会社',s:'エビス化成',t:'8㎥（4DR）コンテナ',no:6,d:65},
+  {n:'take2',s:'take2',t:'1.5㎥BOX',no:8,d:65},
+  {n:'湯来塗装',s:'湯来塗装',t:'1.5㎥BOX',no:5,d:64},
+  {n:'アンフィールド',s:'アンフィールド東雲',t:'1.5㎥BOX',no:13,d:64},
+  {n:'バーンリペア',s:'バーンリペア',t:'1.5㎥BOX',no:3,d:63},
+  {n:'ビーコネクト',s:'ビーコネクト',t:'1㎥BOX',no:5,d:63},
+];
+
+// 顧客名正規化（会社形態・スペース除去）
+function _normName(s) {
+  return (s||'')
+    .replace(/株式会社|有限会社|合同会社|（株）|\(株\)/g,'')
+    .replace(/[　\s]+/g,'')
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .toLowerCase();
+}
+
+// 顧客マスタから最適一致を探す
+function _matchCust(csvName) {
+  const q = _normName(csvName);
+  if (!q) return null;
+  const custs = db.customers || [];
+  // 1. 正規化後の完全一致
+  let m = custs.find(c => _normName(c.name) === q);
+  if (m) return m;
+  // 2. 一方が他方を含む（長い方が短い方を含む）
+  m = custs.find(c => {
+    const cn = _normName(c.name);
+    return cn.includes(q) || q.includes(cn);
+  });
+  return m || null;
+}
+
+// 設置日計算（基準日 − days）
+function _calcInstallDate(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0,10);
+}
+
+let _importRows = [];
+
+function openConImport() {
+  // 既存データがある場合は警告
+  if ((db.containerPlacements||[]).length > 0) {
+    if (!confirm(`すでに ${db.containerPlacements.length} 件のコンテナデータが登録されています。\n重複して取り込まれる場合があります。続けますか？`)) return;
+  }
+  const settings = db.containerSettings || {};
+  const defaultTarget = settings.defaultTargetDays || 90;
+  const warnDays = settings.defaultWarnDays || 7;
+  const today = new Date().toISOString().slice(0,10);
+
+  let matched=0, unmatched=0;
+  _importRows = GLOBAL_EX_DATA.map((row,i) => {
+    const custMatch = _matchCust(row.n);
+    if (custMatch) matched++; else unmatched++;
+    const installDate = _calcInstallDate(row.d);
+    const remain = defaultTarget - row.d;
+    const cls = remain<=0 ? 'over' : remain<=warnDays ? 'warn' : 'ok';
+    const lbl = remain<=0 ? `🔴 ${Math.abs(remain)}日超過` : remain<=warnDays ? `🟡 残${remain}日` : `🟢 残${remain}日`;
+    return {idx:i, csvName:row.n, siteName:row.s, containerType:row.t, containerNo:row.no,
+            days:row.d, installDate, custMatch, cls, lbl};
+  });
+
+  // サマリー
+  document.getElementById('importSummary').innerHTML = [
+    `<span class="con-alert-badge green">📦 合計 ${_importRows.length} 件</span>`,
+    `<span class="con-alert-badge green">✅ 顧客マスタ一致 ${matched} 件</span>`,
+    unmatched>0 ? `<span class="con-alert-badge yellow">⚠ 未一致 ${unmatched} 件（CSV名称のまま登録）</span>` : '',
+    `<span style="font-size:11px;color:#64748b;align-self:center;margin-left:4px">📅 設置日基準日: ${today}</span>`,
+  ].join('');
+
+  // テーブル描画
+  document.getElementById('importTableBody').innerHTML = _importRows.map(r => `
+    <tr style="border-bottom:1px solid #f1f5f9">
+      <td style="text-align:center;padding:5px 6px"><input type="checkbox" class="import-chk" data-idx="${r.idx}" checked style="accent-color:#2563eb"></td>
+      <td style="padding:5px 6px;color:#475569">${esc(r.csvName)}</td>
+      <td style="padding:5px 6px;font-weight:600;color:${r.custMatch?'#16a34a':'#94a3b8'}">${r.custMatch ? esc(r.custMatch.name) : '— 未一致'}</td>
+      <td style="padding:5px 6px;color:#64748b">${esc(r.siteName)}</td>
+      <td style="padding:5px 6px">${esc(r.containerType)}</td>
+      <td style="padding:5px 6px;text-align:center;font-weight:600">${r.containerNo}</td>
+      <td style="padding:5px 6px">${r.installDate}</td>
+      <td style="padding:5px 6px;text-align:center">${r.days}日</td>
+      <td style="padding:5px 6px"><span class="con-status ${r.cls}" style="font-size:10px">${r.lbl}</span></td>
+    </tr>`).join('');
+
+  document.getElementById('importChkAll').checked = true;
+  openM('mCONImport');
+}
+
+function toggleAllImportChk(checked) {
+  document.querySelectorAll('.import-chk').forEach(el => el.checked = checked);
+}
+
+function executeConImport() {
+  const checked = [...document.querySelectorAll('.import-chk:checked')].map(el=>parseInt(el.dataset.idx));
+  if (checked.length===0) { alert('インポートする行を選択してください'); return; }
+  if (!confirm(`${checked.length}件のコンテナデータを取り込みます。よろしいですか？`)) return;
+
+  const settings = db.containerSettings || {};
+  const defaultTarget = settings.defaultTargetDays || 90;
+  const warnDays = settings.defaultWarnDays || 7;
+  const now = new Date().toISOString();
+  if (!db.containerPlacements) db.containerPlacements=[];
+  if (!db.containerActions) db.containerActions=[];
+
+  checked.forEach(idx => {
+    const r = _importRows[idx];
+    const custName = r.custMatch ? r.custMatch.name : r.csvName;
+    const newId = uid();
+    db.containerPlacements.push({
+      id:newId, containerType:r.containerType, containerNo:r.containerNo,
+      customerName:custName, siteName:r.siteName,
+      installDate:r.installDate, targetDays:defaultTarget, warnBeforeDays:warnDays,
+      status:'active', removeDate:'', notes:'', created:now, updated:now
+    });
+    db.containerActions.push({
+      id:uid(), placementId:newId, actionType:'install',
+      containerType:r.containerType, containerNo:r.containerNo,
+      customerName:custName, siteName:r.siteName,
+      actionDate:r.installDate, notes:'GLOBAL-EXより初期インポート', created:now
+    });
+  });
+
+  saveDB();
+  closeM('mCONImport');
+  renderConView();
+  alert(`✅ ${checked.length}件のコンテナデータを取り込みました！`);
 }
 
 // ================================================================
