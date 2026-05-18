@@ -3936,6 +3936,14 @@ function printWorkOrder(id,mode){
     </table>
   </div>
 </div>`;
+    const otherSec=`<div style="display:grid;grid-template-columns:1fr 1fr;border:1px solid #e2e8f0;border-radius:4px;overflow:hidden;margin-bottom:4px">
+  <div style="padding:5px 10px;min-height:52px;border-right:1px solid #e2e8f0">
+    <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:.04em;margin-bottom:4px">その他の品目と数量：</div>
+  </div>
+  <div style="padding:5px 10px;min-height:52px">
+    <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:.04em;margin-bottom:4px">外部の搬入先名：</div>
+  </div>
+</div>`;
     const signSec=`<div class="sign-row">
   <div class="sign-box"><div class="sign-label">${isCustomer?'受取確認':copyType==='office'?'確認（事務所）':'確認（管理者）'}</div></div>
   <div class="sign-box"><div class="sign-label">ドライバー確認</div></div>
@@ -3977,7 +3985,7 @@ function printWorkOrder(id,mode){
 </div>
 ${metaTop}
 ${dp.workType&&dp.workType.type?`<div style="background:#ede9fe;border:1px solid #ddd6fe;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10px;font-weight:700;color:#6d28d9">🔧 作業種別：${workTypeLabel(dp.workType)}</div>`:''}
-${custSec}${siteSec}${drvSec}${notesSec}${cautionSec}${collectSec}${signSec}
+${custSec}${siteSec}${drvSec}${notesSec}${cautionSec}${collectSec}${otherSec}${signSec}
 <div class="footer">
   <span>廃棄物収集・運搬 配車管理システム　${footerLabel}</span>
   <span>印刷日時: ${new Date().toLocaleString('ja-JP')}</span>
