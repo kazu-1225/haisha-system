@@ -7,6 +7,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "sales.db")
 CREATE_SALES_TABLE = """
 CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_no TEXT,
     upload_id INTEGER NOT NULL,
     sale_date TEXT NOT NULL,
     customer_code TEXT,
@@ -68,6 +69,12 @@ async def init_db():
         await db.execute(CREATE_INDEX_PRODUCT)
         await db.execute(CREATE_INDEX_CATEGORY)
         await db.commit()
+        # Migration: add invoice_no if not exists
+        try:
+            await db.execute("ALTER TABLE sales ADD COLUMN invoice_no TEXT")
+            await db.commit()
+        except Exception:
+            pass  # Column already exists
 
 
 async def insert_upload(db: aiosqlite.Connection, filename: str, uploaded_at: str,
@@ -83,9 +90,9 @@ async def insert_upload(db: aiosqlite.Connection, filename: str, uploaded_at: st
 async def insert_sales_batch(db: aiosqlite.Connection, rows: list[dict]):
     await db.executemany(
         """INSERT INTO sales
-           (upload_id, sale_date, customer_code, customer_name,
+           (invoice_no, upload_id, sale_date, customer_code, customer_name,
             product_code, product_name, category, quantity, unit_price, amount)
-           VALUES (:upload_id, :sale_date, :customer_code, :customer_name,
+           VALUES (:invoice_no, :upload_id, :sale_date, :customer_code, :customer_name,
                    :product_code, :product_name, :category, :quantity, :unit_price, :amount)""",
         rows
     )
@@ -215,6 +222,45 @@ async def delete_upload(db: aiosqlite.Connection, upload_id: int):
     await db.execute("DELETE FROM sales WHERE upload_id = ?", (upload_id,))
     await db.execute("DELETE FROM uploads WHERE id = ?", (upload_id,))
     await db.commit()
+
+
+async def get_frequency_analysis(db: aiosqlite.Connection, start: Optional[str], end: Optional[str],
+                                  customer_keyword: Optional[str], product_keyword: Optional[str],
+                                  group_by: str, pivot_by: str) -> list[dict]:
+    where, params = _date_filter(start, end)
+    if customer_keyword:
+        connector = "AND" if where else "WHERE"
+        where += f" {connector} customer_name LIKE ?"
+        params.append(f"%{customer_keyword}%")
+    if product_keyword:
+        connector = "AND" if where else "WHERE"
+        where += f" {connector} product_name LIKE ?"
+        params.append(f"%{product_keyword}%")
+
+    if group_by == 'day':
+        date_expr = "sale_date"
+    elif group_by == 'week':
+        date_expr = "strftime('%Y-W%W', sale_date)"
+    elif group_by == 'year':
+        date_expr = "strftime('%Y', sale_date)"
+    else:
+        date_expr = "strftime('%Y-%m', sale_date)"
+
+    group_col = "customer_name" if pivot_by == "customer" else "product_name"
+
+    rows = await (await db.execute(f"""
+        SELECT
+            {date_expr} as period,
+            {group_col} as group_label,
+            COUNT(DISTINCT invoice_no) as invoice_count,
+            COUNT(*) as transaction_count,
+            COALESCE(SUM(amount), 0) as total_amount,
+            COALESCE(SUM(quantity), 0) as total_quantity
+        FROM sales {where}
+        GROUP BY period, {group_col}
+        ORDER BY period ASC, total_amount DESC
+    """, params)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def _date_filter(start: Optional[str], end: Optional[str]) -> tuple[str, list]:

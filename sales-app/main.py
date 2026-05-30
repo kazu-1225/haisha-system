@@ -16,6 +16,7 @@ from database import (
     get_customer_aggregation,
     get_customers,
     get_db,
+    get_frequency_analysis,
     get_period_aggregation,
     get_product_aggregation,
     get_products,
@@ -36,6 +37,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # ---------------------------------------------------------------------------
 COLUMN_CANDIDATES = {
     "sale_date": ["売上日", "日付", "受注日", "計上日", "date", "sale_date", "受注年月日", "売上年月日"],
+    "invoice_no": ["売上NO", "売上No", "売上番号", "伝票NO", "伝票No", "invoice_no"],
     "customer_code": ["得意先コード", "顧客コード", "取引先コード", "customer_code", "得意先CD", "顧客CD"],
     "customer_name": ["得意先名", "顧客名", "取引先名", "customer_name", "得意先名称", "顧客名称"],
     "product_code": ["商品コード", "品番", "product_code", "商品CD", "品目コード"],
@@ -173,6 +175,7 @@ async def upload_csv(
 
         rows.append({
             "upload_id": None,  # filled after insert_upload
+            "invoice_no": str(row.get(mapping.get("invoice_no", ""), "") or "").strip() or None,
             "sale_date": sale_date,
             "customer_code": str(row.get(mapping.get("customer_code", ""), "") or "").strip() or None,
             "customer_name": str(row.get(mapping.get("customer_name", ""), "") or "").strip() or None,
@@ -302,3 +305,24 @@ async def api_delete_upload(upload_id: int):
     async with get_db() as db:
         await delete_upload(db, upload_id)
     return {"success": True, "upload_id": upload_id}
+
+
+# ---------------------------------------------------------------------------
+# Frequency analysis
+# ---------------------------------------------------------------------------
+@app.get("/api/aggregation/frequency")
+async def api_frequency(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    customer_keyword: Optional[str] = None,
+    product_keyword: Optional[str] = None,
+    group_by: str = "month",
+    pivot_by: str = "customer",
+):
+    if group_by not in ("day", "week", "month", "year"):
+        raise HTTPException(400, "group_by は day/week/month/year のいずれかを指定してください。")
+    if pivot_by not in ("customer", "product"):
+        raise HTTPException(400, "pivot_by は customer/product のいずれかを指定してください。")
+    async with get_db() as db:
+        data = await get_frequency_analysis(db, start, end, customer_keyword, product_keyword, group_by, pivot_by)
+    return data

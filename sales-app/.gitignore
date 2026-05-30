@@ -1,6 +1,8 @@
 __pycache__/
-*.py[cod]
+*.pyc
+sales.db
 *.db
-*.db-shm
-*.db-wal
+sales.db-wal
+sales.db-shm
+node_modules/
 .env

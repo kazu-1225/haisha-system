@@ -109,6 +109,7 @@
     <a class="active" onclick="showPage('dashboard')"><span class="icon">📊</span>ダッシュボード</a>
     <a onclick="showPage('period')"><span class="icon">📅</span>期間別集計</a>
     <a onclick="showPage('customer')"><span class="icon">👥</span>得意先別集計</a>
+    <a onclick="showPage('frequency')"><span class="icon">🔄</span>収集頻度分析</a>
     <a onclick="showPage('product')"><span class="icon">📦</span>商品別集計</a>
     <a onclick="showPage('upload')"><span class="icon">⬆️</span>データ管理</a>
   </nav>
@@ -189,6 +190,47 @@
       </div>
     </div>
 
+    <!-- 収集頻度分析 -->
+    <div id="page-frequency" class="page">
+      <div class="controls mb16">
+        <div class="field"><label>開始日</label><input type="date" id="freq-start"></div>
+        <div class="field"><label>終了日</label><input type="date" id="freq-end"></div>
+        <div class="field"><label>得意先名キーワード</label><input type="text" id="freq-customer" placeholder="例: ローソン"></div>
+        <div class="field"><label>商品名キーワード</label><input type="text" id="freq-product" placeholder="例: 4tコンテナ"></div>
+        <div class="field"><label>集計単位</label>
+          <select id="freq-groupby">
+            <option value="month" selected>月次</option>
+            <option value="week">週次</option>
+            <option value="year">年次</option>
+          </select>
+        </div>
+        <div class="field"><label>行の区分</label>
+          <select id="freq-pivotby">
+            <option value="customer" selected>得意先別</option>
+            <option value="product">商品別</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="loadFrequency()">集計</button>
+      </div>
+
+      <div class="kpi-grid mb16" id="freq-kpis" style="display:none">
+        <div class="kpi"><div class="label">収集回数合計</div><div class="value" id="freq-kpi-trips">―</div></div>
+        <div class="kpi"><div class="label">売上合計</div><div class="value" id="freq-kpi-amount">―</div></div>
+        <div class="kpi"><div class="label">対象グループ数</div><div class="value" id="freq-kpi-customers">―</div></div>
+        <div class="kpi"><div class="label">対象期間数</div><div class="value" id="freq-kpi-periods">―</div></div>
+      </div>
+
+      <div class="card mb16" id="freq-chart-card" style="display:none">
+        <div class="section-title" id="freq-chart-title">月別収集回数推移</div>
+        <div class="chart-wrap" style="height:300px"><canvas id="chart-freq-trend"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">収集頻度ピボット表（行:グループ / 列:期間）</div>
+        <div id="freq-table-wrap"><p class="empty-msg">条件を入力して集計ボタンを押してください。</p></div>
+      </div>
+    </div>
+
     <!-- 商品別集計 -->
     <div id="page-product" class="page">
       <div class="controls mb16">
@@ -260,6 +302,7 @@ const pageTitles = {
   dashboard: 'ダッシュボード',
   period: '期間別集計',
   customer: '得意先別集計',
+  frequency: '収集頻度分析',
   product: '商品別集計',
   upload: 'データ管理'
 };
@@ -272,6 +315,7 @@ function showPage(name) {
   document.getElementById('page-title').textContent = pageTitles[name];
   if (name === 'dashboard') loadDashboard();
   if (name === 'upload') loadUploadHistory();
+  if (name === 'frequency') { /* user clicks 集計 to load */ }
 }
 
 // ==================== API ====================
@@ -521,9 +565,127 @@ async function loadProduct() {
   }
 }
 
+// ==================== Frequency ====================
+async function loadFrequency() {
+  const start = document.getElementById('freq-start').value;
+  const end = document.getElementById('freq-end').value;
+  const customer = document.getElementById('freq-customer').value;
+  const product = document.getElementById('freq-product').value;
+  const group_by = document.getElementById('freq-groupby').value;
+  const pivot_by = document.getElementById('freq-pivotby').value;
+
+  const params = new URLSearchParams({ group_by, pivot_by });
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  if (customer) params.set('customer_keyword', customer);
+  if (product) params.set('product_keyword', product);
+
+  try {
+    const data = await api('/api/aggregation/frequency?' + params);
+    if (!data.length) {
+      document.getElementById('freq-table-wrap').innerHTML = '<p class="empty-msg">データがありません</p>';
+      document.getElementById('freq-kpis').style.display = 'none';
+      document.getElementById('freq-chart-card').style.display = 'none';
+      return;
+    }
+
+    // Build pivot: groups (rows) x periods (columns)
+    const periods = [...new Set(data.map(r => r.period))].sort();
+    const groups = [...new Set(data.map(r => r.group_label))];
+
+    // Index data
+    const idx = {};
+    for (const r of data) {
+      if (!idx[r.group_label]) idx[r.group_label] = {};
+      idx[r.group_label][r.period] = r;
+    }
+
+    // KPIs
+    const totalTrips = data.reduce((s, r) => s + (r.invoice_count || 0), 0);
+    const totalAmount = data.reduce((s, r) => s + (r.total_amount || 0), 0);
+    document.getElementById('freq-kpi-trips').textContent = fmt(totalTrips) + '回';
+    document.getElementById('freq-kpi-amount').textContent = fmtYen(totalAmount);
+    document.getElementById('freq-kpi-customers').textContent = fmt(groups.length) + (pivot_by === 'customer' ? '社' : '種');
+    document.getElementById('freq-kpi-periods').textContent = fmt(periods.length) + '期間';
+    document.getElementById('freq-kpis').style.display = 'grid';
+
+    // Trend chart: sum invoice_count per period
+    const trendData = periods.map(p => data.filter(r => r.period === p).reduce((s, r) => s + (r.invoice_count || 0), 0));
+    destroyChart('freq-trend');
+    charts['freq-trend'] = new Chart(document.getElementById('chart-freq-trend'), {
+      type: 'bar',
+      data: {
+        labels: periods,
+        datasets: [{
+          label: '収集回数',
+          data: trendData,
+          backgroundColor: '#2563eb88',
+          borderColor: '#2563eb',
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { stepSize: 1 }, title: { display: true, text: '収集回数' } } }
+      }
+    });
+    document.getElementById('freq-chart-card').style.display = 'block';
+
+    // Pivot table
+    const groupLabel = pivot_by === 'customer' ? '得意先名' : '商品名';
+    const rows = groups.map(g => {
+      const rowData = idx[g] || {};
+      const rowTrips = periods.reduce((s, p) => s + (rowData[p]?.invoice_count || 0), 0);
+      const rowAmount = periods.reduce((s, p) => s + (rowData[p]?.total_amount || 0), 0);
+      return { group: g, rowData, rowTrips, rowAmount };
+    });
+    rows.sort((a, b) => b.rowTrips - a.rowTrips);
+
+    const wrap = document.getElementById('freq-table-wrap');
+    wrap.innerHTML = `
+      <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:160px">${groupLabel}</th>
+            ${periods.map(p => `<th class="num" style="min-width:70px">${p}</th>`).join('')}
+            <th class="num" style="background:#eff6ff">合計回数</th>
+            <th class="num" style="background:#eff6ff">売上合計</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `<tr>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.group || ''}">${r.group || '不明'}</td>
+            ${periods.map(p => {
+              const cell = r.rowData[p];
+              return cell ? `<td class="num" title="売上: ${fmtYen(cell.total_amount)}">${fmt(cell.invoice_count)}</td>` : '<td class="num">―</td>';
+            }).join('')}
+            <td class="num" style="background:#eff6ff;font-weight:600">${fmt(r.rowTrips)}</td>
+            <td class="num" style="background:#eff6ff">${fmtYen(r.rowAmount)}</td>
+          </tr>`).join('')}
+          <tr style="background:#f8fafc;font-weight:600">
+            <td>合計</td>
+            ${periods.map(p => {
+              const total = data.filter(r => r.period === p).reduce((s, r) => s + (r.invoice_count || 0), 0);
+              return `<td class="num">${fmt(total)}</td>`;
+            }).join('')}
+            <td class="num" style="background:#dbeafe">${fmt(totalTrips)}</td>
+            <td class="num" style="background:#dbeafe">${fmtYen(totalAmount)}</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted)">※ 数値は収集回数（伝票数）。セルにカーソルを合わせると売上金額を表示。</div>
+    `;
+  } catch (e) {
+    toast('エラー: ' + e.message, 'error');
+  }
+}
+
 // ==================== Upload ====================
 const FIELD_LABELS = {
-  sale_date: '売上日 *', customer_code: '得意先コード', customer_name: '得意先名',
+  sale_date: '売上日 *', invoice_no: '売上NO（伝票番号）', customer_code: '得意先コード', customer_name: '得意先名',
   product_code: '商品コード', product_name: '商品名', category: 'カテゴリ',
   quantity: '数量', unit_price: '単価', amount: '金額'
 };
