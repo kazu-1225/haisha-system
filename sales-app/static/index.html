@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>T-PLANNER 売上集計システム</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #2563eb; --primary-dark: #1d4ed8; --bg: #f1f5f9;
+    --surface: #ffffff; --border: #e2e8f0; --text: #1e293b;
+    --muted: #64748b; --success: #16a34a; --danger: #dc2626;
+    --warn: #d97706; --sidebar-w: 220px;
+  }
+  body { font-family: 'Segoe UI', 'Meiryo', sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  #sidebar { width: var(--sidebar-w); background: #1e293b; color: #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; }
+  #sidebar .logo { padding: 20px 16px 16px; font-size: 14px; font-weight: 700; color: #fff; border-bottom: 1px solid #334155; }
+  #sidebar .logo span { display: block; font-size: 11px; font-weight: 400; color: #94a3b8; margin-top: 2px; }
+  #sidebar nav { flex: 1; padding: 8px 0; }
+  #sidebar nav a { display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 14px; color: #cbd5e1; text-decoration: none; transition: background .15s; cursor: pointer; }
+  #sidebar nav a:hover, #sidebar nav a.active { background: #334155; color: #fff; }
+  #sidebar nav a .icon { width: 18px; text-align: center; }
+
+  /* Main */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+  #topbar h1 { font-size: 18px; font-weight: 600; }
+  #content { flex: 1; padding: 24px; overflow-y: auto; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; }
+  .kpi .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .kpi .value { font-size: 24px; font-weight: 700; color: var(--text); }
+  .kpi .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* Controls */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  input[type=date], input[type=text], select {
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px;
+    font-size: 13px; color: var(--text); background: var(--surface); outline: none;
+  }
+  input:focus, select:focus { border-color: var(--primary); }
+  button {
+    border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: background .15s;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f8fafc; font-weight: 600; color: var(--muted); padding: 10px 12px; text-align: left; border-bottom: 2px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: #f8fafc; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Chart container */
+  .chart-wrap { position: relative; height: 300px; }
+
+  /* Upload area */
+  .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; }
+  .drop-zone:hover, .drop-zone.over { border-color: var(--primary); background: #eff6ff; }
+  .drop-zone .icon { font-size: 40px; margin-bottom: 10px; }
+  .drop-zone p { font-size: 14px; color: var(--muted); }
+  .drop-zone strong { color: var(--primary); }
+
+  /* Toast */
+  #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; max-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,.2); animation: fadeIn .2s; }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--danger); }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+
+  /* Page */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Badge */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-blue { background: #dbeafe; color: #1d4ed8; }
+
+  h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--muted); }
+  .mb16 { margin-bottom: 16px; }
+  .mt16 { margin-top: 16px; }
+  .text-muted { color: var(--muted); font-size: 13px; }
+  .empty-msg { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="logo">T-PLANNER 集計<span>売上データ分析システム</span></div>
+  <nav>
+    <a class="active" onclick="showPage('dashboard')"><span class="icon">📊</span>ダッシュボード</a>
+    <a onclick="showPage('period')"><span class="icon">📅</span>期間別集計</a>
+    <a onclick="showPage('customer')"><span class="icon">👥</span>得意先別集計</a>
+    <a onclick="showPage('product')"><span class="icon">📦</span>商品別集計</a>
+    <a onclick="showPage('upload')"><span class="icon">⬆️</span>データ管理</a>
+  </nav>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <h1 id="page-title">ダッシュボード</h1>
+    <span id="topbar-sub" class="text-muted"></span>
+  </div>
+  <div id="content">
+
+    <!-- ダッシュボード -->
+    <div id="page-dashboard" class="page active">
+      <div class="controls mb16">
+        <div class="field"><label>開始日</label><input type="date" id="dash-start"></div>
+        <div class="field"><label>終了日</label><input type="date" id="dash-end"></div>
+        <button class="btn-primary" onclick="loadDashboard()">集計</button>
+      </div>
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi"><div class="label">売上合計</div><div class="value" id="kpi-amount">―</div></div>
+        <div class="kpi"><div class="label">取引件数</div><div class="value" id="kpi-txn">―</div></div>
+        <div class="kpi"><div class="label">得意先数</div><div class="value" id="kpi-customers">―</div></div>
+        <div class="kpi"><div class="label">商品数</div><div class="value" id="kpi-products">―</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="section-title">月別売上推移</div>
+          <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-title">得意先TOP10</div>
+          <div class="chart-wrap"><canvas id="chart-top-customers"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 期間別集計 -->
+    <div id="page-period" class="page">
+      <div class="controls mb16">
+        <div class="field"><label>開始日</label><input type="date" id="period-start"></div>
+        <div class="field"><label>終了日</label><input type="date" id="period-end"></div>
+        <div class="field"><label>集計単位</label>
+          <select id="period-group">
+            <option value="day">日次</option>
+            <option value="week">週次</option>
+            <option value="month" selected>月次</option>
+            <option value="year">年次</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="loadPeriod()">集計</button>
+      </div>
+      <div class="card mb16">
+        <div class="section-title">売上推移グラフ</div>
+        <div class="chart-wrap"><canvas id="chart-period"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-title">集計データ</div>
+        <div class="table-wrap" id="period-table-wrap"><p class="empty-msg">期間と集計単位を選択して集計ボタンを押してください。</p></div>
+      </div>
+    </div>
+
+    <!-- 得意先別集計 -->
+    <div id="page-customer" class="page">
+      <div class="controls mb16">
+        <div class="field"><label>開始日</label><input type="date" id="cust-start"></div>
+        <div class="field"><label>終了日</label><input type="date" id="cust-end"></div>
+        <div class="field"><label>得意先名（部分一致）</label><input type="text" id="cust-search" placeholder="すべて"></div>
+        <button class="btn-primary" onclick="loadCustomer()">集計</button>
+      </div>
+      <div class="card mb16">
+        <div class="section-title">得意先別売上グラフ（上位20件）</div>
+        <div class="chart-wrap" style="height:360px"><canvas id="chart-customer"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-title">得意先別集計データ</div>
+        <div class="table-wrap" id="cust-table-wrap"><p class="empty-msg">期間を指定して集計ボタンを押してください。</p></div>
+      </div>
+    </div>
+
+    <!-- 商品別集計 -->
+    <div id="page-product" class="page">
+      <div class="controls mb16">
+        <div class="field"><label>開始日</label><input type="date" id="prod-start"></div>
+        <div class="field"><label>終了日</label><input type="date" id="prod-end"></div>
+        <button class="btn-primary" onclick="loadProduct()">集計</button>
+      </div>
+      <div class="grid-2 mb16">
+        <div class="card">
+          <div class="section-title">カテゴリ別売上（円グラフ）</div>
+          <div class="chart-wrap"><canvas id="chart-category-pie"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-title">カテゴリ別売上（棒グラフ）</div>
+          <div class="chart-wrap"><canvas id="chart-category-bar"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">商品別集計データ</div>
+        <div class="table-wrap" id="prod-table-wrap"><p class="empty-msg">期間を指定して集計ボタンを押してください。</p></div>
+      </div>
+    </div>
+
+    <!-- データ管理 -->
+    <div id="page-upload" class="page">
+      <div class="grid-2">
+        <div>
+          <div class="card mb16">
+            <h2>CSVファイルのアップロード</h2>
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+              <div class="icon">📂</div>
+              <p><strong>クリックまたはドラッグ</strong>してCSVファイルを選択</p>
+              <p style="margin-top:6px;font-size:12px;">T-PLANNERからエクスポートしたCSV/TSVファイル</p>
+            </div>
+            <input type="file" id="file-input" accept=".csv,.tsv" style="display:none" onchange="handleFileSelect(this.files[0])">
+            <div id="upload-preview" style="display:none;margin-top:16px;">
+              <div class="section-title">カラムマッピング確認</div>
+              <div id="mapping-fields"></div>
+              <div style="margin-top:12px;display:flex;gap:8px;">
+                <button class="btn-primary" onclick="submitUpload()">アップロード</button>
+                <button onclick="cancelUpload()" style="background:#f1f5f9;">キャンセル</button>
+              </div>
+            </div>
+            <div id="upload-progress" style="display:none;margin-top:12px;color:var(--muted);font-size:13px;">アップロード中...</div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h2>アップロード履歴</h2>
+            <div id="upload-history"><p class="empty-msg">履歴がありません</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ==================== State ====================
+let charts = {};
+let pendingFile = null;
+let pendingColumns = null;
+
+// ==================== Navigation ====================
+const pageTitles = {
+  dashboard: 'ダッシュボード',
+  period: '期間別集計',
+  customer: '得意先別集計',
+  product: '商品別集計',
+  upload: 'データ管理'
+};
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('#sidebar nav a')[Object.keys(pageTitles).indexOf(name)].classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[name];
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'upload') loadUploadHistory();
+}
+
+// ==================== API ====================
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail));
+  }
+  return res.json();
+}
+
+// ==================== Utils ====================
+function fmt(n) {
+  if (n == null) return '―';
+  return Number(n).toLocaleString('ja-JP');
+}
+function fmtYen(n) {
+  if (n == null) return '―';
+  return '¥' + Number(n).toLocaleString('ja-JP');
+}
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+const COLORS = ['#2563eb','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#059669','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#db2777','#10b981'];
+
+// ==================== Dashboard ====================
+async function loadDashboard() {
+  const start = document.getElementById('dash-start').value;
+  const end = document.getElementById('dash-end').value;
+  const params = new URLSearchParams();
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+
+  try {
+    const [summary, monthly, topCust] = await Promise.all([
+      api('/api/summary?' + params),
+      api('/api/aggregation/period?' + new URLSearchParams({...Object.fromEntries(params), group_by: 'month'})),
+      api('/api/aggregation/customer?' + params),
+    ]);
+
+    document.getElementById('kpi-amount').textContent = fmtYen(summary.total_amount);
+    document.getElementById('kpi-txn').textContent = fmt(summary.transaction_count) + '件';
+    document.getElementById('kpi-customers').textContent = fmt(summary.customer_count) + '社';
+    document.getElementById('kpi-products').textContent = fmt(summary.product_count) + '品';
+
+    // Monthly chart
+    destroyChart('monthly');
+    charts['monthly'] = new Chart(document.getElementById('chart-monthly'), {
+      type: 'bar',
+      data: {
+        labels: monthly.map(r => r.period),
+        datasets: [{
+          label: '売上金額',
+          data: monthly.map(r => r.total_amount),
+          backgroundColor: '#2563eb88',
+          borderColor: '#2563eb',
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } }
+      }
+    });
+
+    // Top customers chart
+    destroyChart('top-customers');
+    const top10 = topCust.slice(0, 10);
+    charts['top-customers'] = new Chart(document.getElementById('chart-top-customers'), {
+      type: 'bar',
+      data: {
+        labels: top10.map(r => r.customer_name || '不明'),
+        datasets: [{ label: '売上金額', data: top10.map(r => r.total_amount), backgroundColor: COLORS }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } }
+      }
+    });
+  } catch (e) {
+    toast('エラー: ' + e.message, 'error');
+  }
+}
+
+// ==================== Period ====================
+async function loadPeriod() {
+  const start = document.getElementById('period-start').value;
+  const end = document.getElementById('period-end').value;
+  const group_by = document.getElementById('period-group').value;
+  const params = new URLSearchParams({ group_by });
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+
+  try {
+    const data = await api('/api/aggregation/period?' + params);
+    destroyChart('period');
+    charts['period'] = new Chart(document.getElementById('chart-period'), {
+      type: group_by === 'day' ? 'line' : 'bar',
+      data: {
+        labels: data.map(r => r.period),
+        datasets: [{
+          label: '売上金額',
+          data: data.map(r => r.total_amount),
+          backgroundColor: '#2563eb66',
+          borderColor: '#2563eb',
+          borderWidth: 2,
+          fill: group_by === 'day',
+          tension: 0.3,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } }
+      }
+    });
+
+    const wrap = document.getElementById('period-table-wrap');
+    if (!data.length) { wrap.innerHTML = '<p class="empty-msg">データがありません</p>'; return; }
+    wrap.innerHTML = `<table>
+      <thead><tr><th>期間</th><th class="num">売上金額</th><th class="num">数量</th><th class="num">件数</th><th class="num">得意先数</th></tr></thead>
+      <tbody>${data.map(r => `<tr>
+        <td>${r.period}</td>
+        <td class="num">${fmtYen(r.total_amount)}</td>
+        <td class="num">${fmt(r.total_quantity)}</td>
+        <td class="num">${fmt(r.transaction_count)}</td>
+        <td class="num">${fmt(r.customer_count)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch (e) {
+    toast('エラー: ' + e.message, 'error');
+  }
+}
+
+// ==================== Customer ====================
+async function loadCustomer() {
+  const start = document.getElementById('cust-start').value;
+  const end = document.getElementById('cust-end').value;
+  const search = document.getElementById('cust-search').value;
+  const params = new URLSearchParams();
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  if (search) params.set('customer_name', search);
+
+  try {
+    const data = await api('/api/aggregation/customer?' + params);
+    const top20 = data.slice(0, 20);
+    destroyChart('customer');
+    charts['customer'] = new Chart(document.getElementById('chart-customer'), {
+      type: 'bar',
+      data: {
+        labels: top20.map(r => r.customer_name || '不明'),
+        datasets: [{ label: '売上金額', data: top20.map(r => r.total_amount), backgroundColor: COLORS }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } }
+      }
+    });
+
+    const wrap = document.getElementById('cust-table-wrap');
+    if (!data.length) { wrap.innerHTML = '<p class="empty-msg">データがありません</p>'; return; }
+    wrap.innerHTML = `<table>
+      <thead><tr><th>コード</th><th>得意先名</th><th class="num">売上金額</th><th class="num">数量</th><th class="num">件数</th><th class="num">取引日数</th></tr></thead>
+      <tbody>${data.map(r => `<tr>
+        <td>${r.customer_code || ''}</td>
+        <td>${r.customer_name || '不明'}</td>
+        <td class="num">${fmtYen(r.total_amount)}</td>
+        <td class="num">${fmt(r.total_quantity)}</td>
+        <td class="num">${fmt(r.transaction_count)}</td>
+        <td class="num">${fmt(r.active_days)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch (e) {
+    toast('エラー: ' + e.message, 'error');
+  }
+}
+
+// ==================== Product ====================
+async function loadProduct() {
+  const start = document.getElementById('prod-start').value;
+  const end = document.getElementById('prod-end').value;
+  const params = new URLSearchParams();
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+
+  try {
+    const { products, categories } = await api('/api/aggregation/product?' + params);
+
+    destroyChart('category-pie');
+    destroyChart('category-bar');
+    const cats = categories.filter(c => c.category);
+    charts['category-pie'] = new Chart(document.getElementById('chart-category-pie'), {
+      type: 'pie',
+      data: {
+        labels: cats.map(c => c.category),
+        datasets: [{ data: cats.map(c => c.total_amount), backgroundColor: COLORS }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } }
+      }
+    });
+    charts['category-bar'] = new Chart(document.getElementById('chart-category-bar'), {
+      type: 'bar',
+      data: {
+        labels: cats.map(c => c.category),
+        datasets: [{ label: '売上金額', data: cats.map(c => c.total_amount), backgroundColor: COLORS }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } }
+      }
+    });
+
+    const wrap = document.getElementById('prod-table-wrap');
+    if (!products.length) { wrap.innerHTML = '<p class="empty-msg">データがありません</p>'; return; }
+    wrap.innerHTML = `<table>
+      <thead><tr><th>商品コード</th><th>商品名</th><th>カテゴリ</th><th class="num">売上金額</th><th class="num">数量</th><th class="num">件数</th><th class="num">得意先数</th></tr></thead>
+      <tbody>${products.map(r => `<tr>
+        <td>${r.product_code || ''}</td>
+        <td>${r.product_name || '不明'}</td>
+        <td>${r.category ? `<span class="badge badge-blue">${r.category}</span>` : ''}</td>
+        <td class="num">${fmtYen(r.total_amount)}</td>
+        <td class="num">${fmt(r.total_quantity)}</td>
+        <td class="num">${fmt(r.transaction_count)}</td>
+        <td class="num">${fmt(r.customer_count)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch (e) {
+    toast('エラー: ' + e.message, 'error');
+  }
+}
+
+// ==================== Upload ====================
+const FIELD_LABELS = {
+  sale_date: '売上日 *', customer_code: '得意先コード', customer_name: '得意先名',
+  product_code: '商品コード', product_name: '商品名', category: 'カテゴリ',
+  quantity: '数量', unit_price: '単価', amount: '金額'
+};
+
+async function handleFileSelect(file) {
+  if (!file) return;
+  pendingFile = file;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res = await api('/api/preview-columns', { method: 'POST', body: form });
+    pendingColumns = res.columns;
+    const mapping = res.detected_mapping;
+    const fields = document.getElementById('mapping-fields');
+    fields.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">検出されたCSVカラム: ${res.columns.join(', ')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      ${Object.entries(FIELD_LABELS).map(([key, label]) => `
+        <div class="field">
+          <label>${label}</label>
+          <select id="map-${key}">
+            <option value="">(なし)</option>
+            ${res.columns.map(c => `<option value="${c}" ${mapping[key] === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+      </div>`;
+    document.getElementById('upload-preview').style.display = 'block';
+    document.getElementById('drop-zone').querySelector('p').textContent = '📄 ' + file.name;
+  } catch (e) {
+    toast('ファイル読み込みエラー: ' + e.message, 'error');
+  }
+}
+
+function cancelUpload() {
+  pendingFile = null;
+  pendingColumns = null;
+  document.getElementById('upload-preview').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-zone').querySelector('p').innerHTML = '<strong>クリックまたはドラッグ</strong>してCSVファイルを選択';
+}
+
+async function submitUpload() {
+  if (!pendingFile) return;
+  const mapping = {};
+  Object.keys(FIELD_LABELS).forEach(key => {
+    const v = document.getElementById('map-' + key)?.value;
+    if (v) mapping[key] = v;
+  });
+  if (!mapping.sale_date) { toast('売上日のカラムを選択してください', 'error'); return; }
+
+  const form = new FormData();
+  form.append('file', pendingFile);
+  form.append('column_mapping_json', JSON.stringify(mapping));
+  document.getElementById('upload-progress').style.display = 'block';
+  document.getElementById('upload-preview').style.display = 'none';
+  try {
+    const res = await api('/api/upload', { method: 'POST', body: form });
+    toast(`✅ ${res.row_count}件のデータを取り込みました（スキップ: ${res.skipped}件）`, 'success');
+    cancelUpload();
+    loadUploadHistory();
+  } catch (e) {
+    toast('アップロードエラー: ' + e.message, 'error');
+  } finally {
+    document.getElementById('upload-progress').style.display = 'none';
+  }
+}
+
+async function loadUploadHistory() {
+  try {
+    const data = await api('/api/uploads');
+    const el = document.getElementById('upload-history');
+    if (!data.length) { el.innerHTML = '<p class="empty-msg">履歴がありません</p>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr><th>ファイル名</th><th class="num">件数</th><th>アップロード日時</th><th></th></tr></thead>
+      <tbody>${data.map(r => `<tr>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.filename}">${r.filename}</td>
+        <td class="num">${fmt(r.row_count)}</td>
+        <td>${r.uploaded_at}</td>
+        <td><button class="btn-danger btn-sm" onclick="deleteUpload(${r.id},'${r.filename.replace(/'/g, "\\'")}')">削除</button></td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch (e) {
+    toast('履歴の読み込みに失敗: ' + e.message, 'error');
+  }
+}
+
+async function deleteUpload(id, name) {
+  if (!confirm(`「${name}」のデータを削除しますか？\nこの操作は元に戻せません。`)) return;
+  try {
+    await api('/api/uploads/' + id, { method: 'DELETE' });
+    toast('削除しました', 'success');
+    loadUploadHistory();
+  } catch (e) {
+    toast('削除エラー: ' + e.message, 'error');
+  }
+}
+
+// ==================== Drag & Drop ====================
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFileSelect(f);
+});
+
+// ==================== Init ====================
+loadDashboard();
+</script>
+</body>
+</html>
