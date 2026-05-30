@@ -188,7 +188,7 @@ async def upload_csv(
         raise HTTPException(400, "有効なデータ行がありませんでした。日付カラムを確認してください。")
 
     uploaded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    async with await get_db() as db:
+    async with get_db() as db:
         upload_id = await insert_upload(db, file.filename, uploaded_at, len(rows), json.dumps(mapping, ensure_ascii=False))
         for r in rows:
             r["upload_id"] = upload_id
@@ -230,7 +230,7 @@ async def preview_columns(file: UploadFile = File(...)):
 # ---------------------------------------------------------------------------
 @app.get("/api/summary")
 async def api_summary(start: Optional[str] = None, end: Optional[str] = None):
-    async with await get_db() as db:
+    async with get_db() as db:
         data = await get_summary(db, start, end)
     return data
 
@@ -246,7 +246,7 @@ async def api_period(
 ):
     if group_by not in ("day", "week", "month", "year"):
         raise HTTPException(400, "group_by は day/week/month/year のいずれかを指定してください。")
-    async with await get_db() as db:
+    async with get_db() as db:
         data = await get_period_aggregation(db, start, end, group_by)
     return data
 
@@ -257,7 +257,7 @@ async def api_customer(
     end: Optional[str] = None,
     customer_name: Optional[str] = None,
 ):
-    async with await get_db() as db:
+    async with get_db() as db:
         data = await get_customer_aggregation(db, start, end, customer_name)
     return data
 
@@ -267,7 +267,7 @@ async def api_product(
     start: Optional[str] = None,
     end: Optional[str] = None,
 ):
-    async with await get_db() as db:
+    async with get_db() as db:
         products = await get_product_aggregation(db, start, end)
         categories = await get_category_aggregation(db, start, end)
     return {"products": products, "categories": categories}
@@ -278,27 +278,27 @@ async def api_product(
 # ---------------------------------------------------------------------------
 @app.get("/api/customers")
 async def api_customers():
-    async with await get_db() as db:
+    async with get_db() as db:
         data = await get_customers(db)
     return data
 
 
 @app.get("/api/products")
 async def api_products():
-    async with await get_db() as db:
+    async with get_db() as db:
         data = await get_products(db)
     return data
 
 
 @app.get("/api/uploads")
 async def api_uploads():
-    async with await get_db() as db:
+    async with get_db() as db:
         data = await get_uploads(db)
     return data
 
 
 @app.delete("/api/uploads/{upload_id}")
 async def api_delete_upload(upload_id: int):
-    async with await get_db() as db:
+    async with get_db() as db:
         await delete_upload(db, upload_id)
     return {"success": True, "upload_id": upload_id}
