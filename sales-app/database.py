@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS sales (
     quantity REAL,
     unit_price REAL,
     amount REAL,
+    remarks TEXT,
+    spec TEXT,
     FOREIGN KEY (upload_id) REFERENCES uploads(id)
 );
 """
@@ -75,6 +77,13 @@ async def init_db():
             await db.commit()
         except Exception:
             pass  # Column already exists
+        # Migration: add remarks and spec if not exists
+        for col in [("remarks", "TEXT"), ("spec", "TEXT")]:
+            try:
+                await db.execute(f"ALTER TABLE sales ADD COLUMN {col[0]} {col[1]}")
+                await db.commit()
+            except Exception:
+                pass
 
 
 async def insert_upload(db: aiosqlite.Connection, filename: str, uploaded_at: str,
@@ -91,9 +100,11 @@ async def insert_sales_batch(db: aiosqlite.Connection, rows: list[dict]):
     await db.executemany(
         """INSERT INTO sales
            (invoice_no, upload_id, sale_date, customer_code, customer_name,
-            product_code, product_name, category, quantity, unit_price, amount)
+            product_code, product_name, category, quantity, unit_price, amount,
+            remarks, spec)
            VALUES (:invoice_no, :upload_id, :sale_date, :customer_code, :customer_name,
-                   :product_code, :product_name, :category, :quantity, :unit_price, :amount)""",
+                   :product_code, :product_name, :category, :quantity, :unit_price, :amount,
+                   :remarks, :spec)""",
         rows
     )
     await db.commit()
@@ -259,6 +270,71 @@ async def get_frequency_analysis(db: aiosqlite.Connection, start: Optional[str],
         FROM sales {where}
         GROUP BY period, {group_col}
         ORDER BY period ASC, total_amount DESC
+    """, params)).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_product_search(db, start, end, keywords, group_by='customer'):
+    where, params = _date_filter(start, end)
+    for kw in keywords:
+        if not kw.strip():
+            continue
+        connector = "AND" if where else "WHERE"
+        where += f" {connector} (product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
+        params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
+
+    if group_by == 'month':
+        group_col = "strftime('%Y-%m', sale_date)"
+        label_col = "strftime('%Y-%m', sale_date) as group_label"
+    elif group_by == 'product':
+        group_col = "product_name"
+        label_col = "product_name as group_label"
+    else:
+        group_col = "customer_name"
+        label_col = "customer_name as group_label"
+
+    rows = await (await db.execute(f"""
+        SELECT
+            {label_col},
+            COUNT(DISTINCT invoice_no) as invoice_count,
+            COUNT(*) as line_count,
+            COALESCE(SUM(amount), 0) as total_amount,
+            COALESCE(SUM(quantity), 0) as total_quantity,
+            COUNT(DISTINCT customer_name) as customer_count,
+            COUNT(DISTINCT product_name) as product_count
+        FROM sales {where}
+        GROUP BY {group_col}
+        ORDER BY total_amount DESC
+    """, params)).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_product_detail(db, start, end, keywords, group_value, group_by='customer'):
+    where, params = _date_filter(start, end)
+    for kw in keywords:
+        if not kw.strip():
+            continue
+        connector = "AND" if where else "WHERE"
+        where += f" {connector} (product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
+        params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
+
+    if group_by == 'month':
+        filter_col = "strftime('%Y-%m', sale_date)"
+    elif group_by == 'product':
+        filter_col = "product_name"
+    else:
+        filter_col = "customer_name"
+
+    connector = "AND" if where else "WHERE"
+    where += f" {connector} {filter_col} = ?"
+    params.append(group_value)
+
+    rows = await (await db.execute(f"""
+        SELECT sale_date, invoice_no, customer_name, product_name, spec, remarks,
+               quantity, unit_price, amount
+        FROM sales {where}
+        ORDER BY sale_date DESC, invoice_no
+        LIMIT 500
     """, params)).fetchall()
     return [dict(r) for r in rows]
 

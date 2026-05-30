@@ -99,6 +99,12 @@
   .mt16 { margin-top: 16px; }
   .text-muted { color: var(--muted); font-size: 13px; }
   .empty-msg { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center; }
+  .modal { background:#fff;border-radius:12px;width:90%;max-width:900px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .modal-header { padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center; }
+  .modal-header h3 { font-size:15px;font-weight:700; }
+  .modal-body { flex:1;overflow-y:auto;padding:20px; }
+  .modal-close { background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:4px; }
 </style>
 </head>
 <body>
@@ -236,21 +242,38 @@
       <div class="controls mb16">
         <div class="field"><label>開始日</label><input type="date" id="prod-start"></div>
         <div class="field"><label>終了日</label><input type="date" id="prod-end"></div>
-        <button class="btn-primary" onclick="loadProduct()">集計</button>
-      </div>
-      <div class="grid-2 mb16">
-        <div class="card">
-          <div class="section-title">カテゴリ別売上（円グラフ）</div>
-          <div class="chart-wrap"><canvas id="chart-category-pie"></canvas></div>
+        <div class="field" style="flex:1;min-width:200px">
+          <label>キーワード（商品名・摘要・規格、スペースまたはカンマ区切りで複数指定）</label>
+          <input type="text" id="prod-keywords" placeholder="例: 4tコンテナ ローソン　または　フレコン,交換">
         </div>
-        <div class="card">
-          <div class="section-title">カテゴリ別売上（棒グラフ）</div>
-          <div class="chart-wrap"><canvas id="chart-category-bar"></canvas></div>
+        <div class="field"><label>集計軸</label>
+          <select id="prod-groupby">
+            <option value="customer" selected>得意先別</option>
+            <option value="month">月別</option>
+            <option value="product">商品名別</option>
+          </select>
         </div>
+        <button class="btn-primary" onclick="loadProductSearch()">検索・集計</button>
       </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid mb16" id="prod-kpis" style="display:none">
+        <div class="kpi"><div class="label">売上合計</div><div class="value" id="prod-kpi-amount">―</div></div>
+        <div class="kpi"><div class="label">収集回数</div><div class="value" id="prod-kpi-trips">―</div></div>
+        <div class="kpi"><div class="label">明細行数</div><div class="value" id="prod-kpi-lines">―</div></div>
+        <div class="kpi"><div class="label">対象件数</div><div class="value" id="prod-kpi-groups">―</div></div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card mb16" id="prod-chart-card" style="display:none">
+        <div class="section-title" id="prod-chart-title">集計グラフ（上位20件）</div>
+        <div class="chart-wrap" style="height:300px"><canvas id="chart-prod-search"></canvas></div>
+      </div>
+
+      <!-- Results table -->
       <div class="card">
-        <div class="section-title">商品別集計データ</div>
-        <div class="table-wrap" id="prod-table-wrap"><p class="empty-msg">期間を指定して集計ボタンを押してください。</p></div>
+        <div class="section-title">集計結果 <span style="font-size:11px;font-weight:400;color:var(--muted)">※ 行をクリックすると明細を表示</span></div>
+        <div id="prod-result-wrap"><p class="empty-msg">キーワードを入力して検索ボタンを押してください。</p></div>
       </div>
     </div>
 
@@ -286,6 +309,20 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detail-modal" class="modal-overlay" style="display:none" onclick="closeDetailModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">明細</h3>
+      <button class="modal-close" onclick="document.getElementById('detail-modal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-kpis" class="kpi-grid mb16" style="grid-template-columns:repeat(3,1fr)"></div>
+      <div class="table-wrap" id="modal-table"></div>
+    </div>
   </div>
 </div>
 
@@ -687,7 +724,8 @@ async function loadFrequency() {
 const FIELD_LABELS = {
   sale_date: '売上日 *', invoice_no: '売上NO（伝票番号）', customer_code: '得意先コード', customer_name: '得意先名',
   product_code: '商品コード', product_name: '商品名', category: 'カテゴリ',
-  quantity: '数量', unit_price: '単価', amount: '金額'
+  quantity: '数量', unit_price: '単価', amount: '金額',
+  remarks: '摘要', spec: '規格'
 };
 
 async function handleFileSelect(file) {
@@ -779,6 +817,156 @@ async function deleteUpload(id, name) {
     loadUploadHistory();
   } catch (e) {
     toast('削除エラー: ' + e.message, 'error');
+  }
+}
+
+// ==================== Product Search ====================
+async function loadProductSearch() {
+  const start = document.getElementById('prod-start').value;
+  const end = document.getElementById('prod-end').value;
+  const rawKw = document.getElementById('prod-keywords').value;
+  const group_by = document.getElementById('prod-groupby').value;
+
+  // Split by comma or whitespace (including full-width space), filter empty
+  const keywords = rawKw.split(/[,\s　]+/).filter(k => k.trim());
+
+  const params = new URLSearchParams({ group_by });
+  if (start) params.set('start', start);
+  if (end) params.set('end', end);
+  if (keywords.length) params.set('keywords', keywords.join(','));
+
+  try {
+    const data = await api('/api/search/product?' + params);
+
+    if (!data.length) {
+      document.getElementById('prod-result-wrap').innerHTML = '<p class="empty-msg">該当データがありません</p>';
+      document.getElementById('prod-kpis').style.display = 'none';
+      document.getElementById('prod-chart-card').style.display = 'none';
+      return;
+    }
+
+    // KPIs
+    const totalAmount = data.reduce((s, r) => s + r.total_amount, 0);
+    const totalTrips = data.reduce((s, r) => s + r.invoice_count, 0);
+    const totalLines = data.reduce((s, r) => s + r.line_count, 0);
+    document.getElementById('prod-kpi-amount').textContent = fmtYen(totalAmount);
+    document.getElementById('prod-kpi-trips').textContent = fmt(totalTrips) + '回';
+    document.getElementById('prod-kpi-lines').textContent = fmt(totalLines) + '行';
+    document.getElementById('prod-kpi-groups').textContent = fmt(data.length);
+    document.getElementById('prod-kpis').style.display = 'grid';
+
+    // Chart (top 20)
+    const top20 = data.slice(0, 20);
+    destroyChart('prod-search');
+    charts['prod-search'] = new Chart(document.getElementById('chart-prod-search'), {
+      type: 'bar',
+      data: {
+        labels: top20.map(r => (r.group_label || '不明').substring(0, 20)),
+        datasets: [{
+          label: '売上金額',
+          data: top20.map(r => r.total_amount),
+          backgroundColor: COLORS,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } }
+      }
+    });
+    document.getElementById('prod-chart-card').style.display = 'block';
+
+    // Table
+    const groupLabel = {'customer': '得意先名', 'month': '年月', 'product': '商品名'}[group_by] || '区分';
+    const searchParamsStr = params.toString();
+
+    document.getElementById('prod-result-wrap').innerHTML = `
+      <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>${groupLabel}</th>
+          <th class="num">売上金額</th>
+          <th class="num">収集回数</th>
+          <th class="num">明細行数</th>
+          ${group_by !== 'customer' ? '<th class="num">得意先数</th>' : ''}
+          ${group_by !== 'product' ? '<th class="num">商品種類</th>' : ''}
+        </tr></thead>
+        <tbody>${data.map(r => `
+          <tr style="cursor:pointer" onclick="showProductDetail('${encodeURIComponent(r.group_label || '')}','${group_by}','${encodeURIComponent(searchParamsStr)}','${encodeURIComponent(r.group_label || '不明')}')" title="クリックで明細を表示">
+            <td><span style="color:var(--primary);text-decoration:underline">${r.group_label || '不明'}</span></td>
+            <td class="num">${fmtYen(r.total_amount)}</td>
+            <td class="num">${fmt(r.invoice_count)}回</td>
+            <td class="num">${fmt(r.line_count)}</td>
+            ${group_by !== 'customer' ? `<td class="num">${fmt(r.customer_count)}</td>` : ''}
+            ${group_by !== 'product' ? `<td class="num">${fmt(r.product_count)}</td>` : ''}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+    `;
+  } catch (e) {
+    toast('エラー: ' + e.message, 'error');
+  }
+}
+
+async function showProductDetail(groupValueEnc, group_by, searchParamsEnc, labelEnc) {
+  const groupValue = decodeURIComponent(groupValueEnc);
+  const label = decodeURIComponent(labelEnc);
+  const searchParams = new URLSearchParams(decodeURIComponent(searchParamsEnc));
+
+  const dParams = new URLSearchParams(searchParams);
+  dParams.set('group_by', group_by);
+  dParams.set('group_value', groupValue);
+
+  document.getElementById('modal-title').textContent = label + ' の明細';
+  document.getElementById('modal-table').innerHTML = '<p class="empty-msg">読み込み中...</p>';
+  document.getElementById('modal-kpis').innerHTML = '';
+  document.getElementById('detail-modal').style.display = 'flex';
+
+  try {
+    const data = await api('/api/search/product/detail?' + dParams);
+
+    if (!data.length) {
+      document.getElementById('modal-table').innerHTML = '<p class="empty-msg">データがありません</p>';
+      return;
+    }
+
+    const totalAmt = data.reduce((s, r) => s + (r.amount || 0), 0);
+    const invoices = new Set(data.map(r => r.invoice_no)).size;
+    document.getElementById('modal-kpis').innerHTML = `
+      <div class="kpi"><div class="label">売上合計</div><div class="value" style="font-size:18px">${fmtYen(totalAmt)}</div></div>
+      <div class="kpi"><div class="label">収集回数</div><div class="value" style="font-size:18px">${fmt(invoices)}回</div></div>
+      <div class="kpi"><div class="label">明細行数</div><div class="value" style="font-size:18px">${fmt(data.length)}行</div></div>
+    `;
+
+    document.getElementById('modal-table').innerHTML = `
+      <table>
+        <thead><tr>
+          <th>売上日</th><th>伝票NO</th><th>得意先名</th><th>商品名</th>
+          <th>規格</th><th>摘要</th><th class="num">数量</th><th class="num">単価</th><th class="num">金額</th>
+        </tr></thead>
+        <tbody>${data.map(r => `<tr>
+          <td style="white-space:nowrap">${r.sale_date || ''}</td>
+          <td>${r.invoice_no || ''}</td>
+          <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.customer_name || ''}">${r.customer_name || ''}</td>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.product_name || ''}">${r.product_name || ''}</td>
+          <td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.spec || ''}">${r.spec || ''}</td>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.remarks || ''}">${r.remarks || ''}</td>
+          <td class="num">${fmt(r.quantity)}</td>
+          <td class="num">${fmtYen(r.unit_price)}</td>
+          <td class="num">${fmtYen(r.amount)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    `;
+  } catch (e) {
+    document.getElementById('modal-table').innerHTML = `<p class="empty-msg">エラー: ${e.message}</p>`;
+  }
+}
+
+function closeDetailModal(event) {
+  if (event.target === document.getElementById('detail-modal')) {
+    document.getElementById('detail-modal').style.display = 'none';
   }
 }
 

@@ -19,6 +19,8 @@ from database import (
     get_frequency_analysis,
     get_period_aggregation,
     get_product_aggregation,
+    get_product_detail,
+    get_product_search,
     get_products,
     get_summary,
     get_uploads,
@@ -46,6 +48,8 @@ COLUMN_CANDIDATES = {
     "quantity": ["数量", "qty", "quantity", "受注数量", "出荷数量"],
     "unit_price": ["単価", "unit_price", "販売単価", "売上単価"],
     "amount": ["金額", "売上金額", "受注金額", "amount", "売上高", "合計金額", "小計"],
+    "remarks": ["摘要", "備考", "摘要欄", "remarks"],
+    "spec": ["規格", "仕様", "規格名", "spec"],
 }
 
 
@@ -185,6 +189,8 @@ async def upload_csv(
             "quantity": safe_float(row.get(mapping.get("quantity", ""), pd.NA)),
             "unit_price": safe_float(row.get(mapping.get("unit_price", ""), pd.NA)),
             "amount": safe_float(row.get(mapping.get("amount", ""), pd.NA)),
+            "remarks": str(row.get(mapping.get("remarks", ""), "") or "").strip() or None,
+            "spec": str(row.get(mapping.get("spec", ""), "") or "").strip() or None,
         })
 
     if not rows:
@@ -325,4 +331,34 @@ async def api_frequency(
         raise HTTPException(400, "pivot_by は customer/product のいずれかを指定してください。")
     async with get_db() as db:
         data = await get_frequency_analysis(db, start, end, customer_keyword, product_keyword, group_by, pivot_by)
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Product search (multi-keyword, grouped)
+# ---------------------------------------------------------------------------
+@app.get("/api/search/product")
+async def api_product_search(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    keywords: Optional[str] = None,
+    group_by: str = "customer",
+):
+    kw_list = [k.strip() for k in (keywords or "").split(",") if k.strip()]
+    async with get_db() as db:
+        data = await get_product_search(db, start, end, kw_list, group_by)
+    return data
+
+
+@app.get("/api/search/product/detail")
+async def api_product_detail(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    keywords: Optional[str] = None,
+    group_by: str = "customer",
+    group_value: str = "",
+):
+    kw_list = [k.strip() for k in (keywords or "").split(",") if k.strip()]
+    async with get_db() as db:
+        data = await get_product_detail(db, start, end, kw_list, group_value, group_by)
     return data
