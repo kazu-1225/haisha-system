@@ -622,11 +622,12 @@ async function loadCustomer() {
 
     const wrap = document.getElementById('cust-table-wrap');
     if (!data.length) { wrap.innerHTML = '<p class="empty-msg">データがありません</p>'; return; }
+    const custSearchParams = encodeURIComponent(new URLSearchParams(Object.fromEntries(params)).toString());
     wrap.innerHTML = `<table>
       <thead><tr><th>コード</th><th>得意先名</th><th class="num">売上金額</th><th class="num">数量</th><th class="num">件数</th><th class="num">取引日数</th></tr></thead>
-      <tbody>${data.map(r => `<tr>
+      <tbody>${data.map(r => `<tr style="cursor:pointer" onclick="showFrequencyDetail('${encodeURIComponent(r.customer_name||'')}','${custSearchParams}','${encodeURIComponent(r.customer_name||'不明')}','customer')">
         <td>${r.customer_code || ''}</td>
-        <td>${r.customer_name || '不明'}</td>
+        <td style="color:var(--primary);text-decoration:underline">${r.customer_name || '不明'}</td>
         <td class="num">${fmtYen(r.total_amount)}</td>
         <td class="num">${fmt(r.total_quantity)}</td>
         <td class="num">${fmt(r.transaction_count)}</td>
