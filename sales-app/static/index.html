@@ -705,6 +705,7 @@ async function loadFrequency() {
   if (end) params.set('end', end);
   if (customer) params.set('customer_keyword', customer);
   if (product) params.set('product_keyword', product);
+  const freqSearchParamsStr = params.toString();
 
   try {
     const data = await api('/api/aggregation/frequency?' + params);
@@ -784,7 +785,7 @@ async function loadFrequency() {
         </thead>
         <tbody>
           ${rows.map(r => `<tr>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.group || ''}">${r.group || '不明'}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="${r.group || ''}" onclick="showFrequencyDetail('${encodeURIComponent(r.group||'')}','${encodeURIComponent(freqSearchParamsStr)}','${encodeURIComponent(r.group||'不明')}','${pivot_by}')"><span style="color:var(--primary);text-decoration:underline">${r.group || '不明'}</span></td>
             ${periods.map(p => {
               const cell = r.rowData[p];
               return cell ? `<td class="num" title="売上: ${fmtYen(cell.total_amount)}">${fmt(cell.invoice_count)}</td>` : '<td class="num">―</td>';
@@ -1055,6 +1056,123 @@ async function showProductDetail(groupValueEnc, group_by, searchParamsEnc, label
     `;
   } catch (e) {
     document.getElementById('modal-table').innerHTML = `<p class="empty-msg">エラー: ${e.message}</p>`;
+  }
+}
+
+async function showFrequencyDetail(groupValueEnc, searchParamsEnc, labelEnc, pivotBy) {
+  const groupValue = decodeURIComponent(groupValueEnc);
+  const label = decodeURIComponent(labelEnc);
+  const searchParams = new URLSearchParams(decodeURIComponent(searchParamsEnc));
+
+  document.getElementById('modal-title').textContent = label + ' の収集明細';
+  document.getElementById('modal-kpis').innerHTML = '';
+  document.getElementById('modal-table').innerHTML = '<p class="empty-msg">読み込み中...</p>';
+  document.getElementById('detail-modal').style.display = 'flex';
+
+  const dParams = new URLSearchParams();
+  if (searchParams.get('start')) dParams.set('start', searchParams.get('start'));
+  if (searchParams.get('end')) dParams.set('end', searchParams.get('end'));
+  if (searchParams.get('customer_keyword')) dParams.set('keywords', searchParams.get('customer_keyword'));
+  dParams.set('group_by', pivotBy || 'customer');
+  dParams.set('group_value', groupValue);
+
+  try {
+    const data = await api('/api/aggregation/frequency/detail?' + dParams);
+
+    // Store exportable format
+    lastDetailData = data.map(r => ({
+      sale_date: r.sale_date, invoice_no: r.invoice_no, customer_name: r.customer_name,
+      product_name: r.products, spec: '', remarks: '',
+      quantity: r.line_count, unit_price: null, amount: r.invoice_amount
+    }));
+    lastDetailLabel = label;
+
+    if (!data.length) {
+      document.getElementById('modal-table').innerHTML = '<p class="empty-msg">データがありません</p>';
+      return;
+    }
+
+    const totalAmt = data.reduce((s, r) => s + (r.invoice_amount || 0), 0);
+    const totalInvoices = data.length;
+    document.getElementById('modal-kpis').innerHTML = `
+      <div class="kpi"><div class="label">収集回数（伝票数）</div><div class="value" style="font-size:18px">${fmt(totalInvoices)}回</div></div>
+      <div class="kpi"><div class="label">売上合計</div><div class="value" style="font-size:18px">${fmtYen(totalAmt)}</div></div>
+      <div class="kpi"><div class="label">1回あたり平均</div><div class="value" style="font-size:18px">${fmtYen(Math.round(totalAmt / totalInvoices))}</div></div>
+    `;
+
+    document.getElementById('modal-table').innerHTML = `
+      <table id="freq-detail-table">
+        <thead><tr>
+          <th></th>
+          <th>売上日</th>
+          <th>伝票NO</th>
+          <th>商品・内容</th>
+          <th class="num">金額</th>
+          <th class="num">明細数</th>
+        </tr></thead>
+        <tbody id="freq-detail-tbody">
+          ${data.map((r, i) => `
+            <tr id="inv-row-${i}" style="cursor:pointer" onclick="toggleInvoiceLines(${i},'${encodeURIComponent(r.invoice_no || '')}')">
+              <td style="color:var(--primary);font-weight:bold" id="inv-toggle-${i}">▶</td>
+              <td style="white-space:nowrap">${r.sale_date || ''}</td>
+              <td style="color:var(--muted);font-size:12px">${r.invoice_no || ''}</td>
+              <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.products || '').replace(/"/g, '&quot;')}">${r.products || ''}</td>
+              <td class="num">${fmtYen(r.invoice_amount)}</td>
+              <td class="num">${fmt(r.line_count)}</td>
+            </tr>
+            <tr id="inv-detail-${i}" style="display:none">
+              <td colspan="6" style="padding:0;background:#f8fafc">
+                <div id="inv-detail-content-${i}" style="padding:8px 16px"></div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    document.getElementById('modal-table').innerHTML = `<p class="empty-msg">エラー: ${e.message}</p>`;
+  }
+}
+
+async function toggleInvoiceLines(idx, invoiceNoEnc) {
+  const detailRow = document.getElementById(`inv-detail-${idx}`);
+  const toggle = document.getElementById(`inv-toggle-${idx}`);
+  const content = document.getElementById(`inv-detail-content-${idx}`);
+
+  if (detailRow.style.display !== 'none') {
+    detailRow.style.display = 'none';
+    toggle.textContent = '▶';
+    return;
+  }
+
+  toggle.textContent = '▼';
+  detailRow.style.display = 'table-row';
+
+  if (content.dataset.loaded) return;
+  content.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:4px 0">読み込み中...</p>';
+
+  const invoiceNo = decodeURIComponent(invoiceNoEnc);
+  try {
+    const lines = await api('/api/invoice/' + encodeURIComponent(invoiceNo));
+    content.dataset.loaded = '1';
+    content.innerHTML = `
+      <table style="font-size:12px;width:100%">
+        <thead><tr>
+          <th>商品名</th><th>規格</th><th>摘要</th>
+          <th class="num">数量</th><th class="num">単価</th><th class="num">金額</th>
+        </tr></thead>
+        <tbody>${lines.map(l => `<tr>
+          <td>${l.product_name || ''}</td>
+          <td style="color:var(--muted)">${l.spec || ''}</td>
+          <td style="color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.remarks || '').replace(/"/g, '&quot;')}">${l.remarks || ''}</td>
+          <td class="num">${fmt(l.quantity)}</td>
+          <td class="num">${fmtYen(l.unit_price)}</td>
+          <td class="num">${fmtYen(l.amount)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    `;
+  } catch (e) {
+    content.innerHTML = `<p style="color:var(--danger);font-size:12px">${e.message}</p>`;
   }
 }
 

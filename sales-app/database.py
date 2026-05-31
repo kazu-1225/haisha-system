@@ -339,6 +339,55 @@ async def get_product_detail(db, start, end, keywords, group_value, group_by='cu
     return [dict(r) for r in rows]
 
 
+async def get_frequency_detail_by_invoice(db, start, end, keywords, group_value, group_by='customer'):
+    """Returns rows grouped by invoice_no (売上NO), showing one row per invoice."""
+    where, params = _date_filter(start, end)
+    for kw in keywords:
+        if not kw.strip(): continue
+        connector = "AND" if where else "WHERE"
+        where += f" {connector} (product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
+        params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
+
+    if group_by == 'month':
+        filter_col = "strftime('%Y-%m', sale_date)"
+    elif group_by == 'customer':
+        filter_col = "customer_name"
+    elif group_by == 'product':
+        filter_col = "product_name"
+    else:
+        filter_col = "customer_name"
+
+    connector = "AND" if where else "WHERE"
+    where += f" {connector} {filter_col} = ?"
+    params.append(group_value)
+
+    rows = await (await db.execute(f"""
+        SELECT
+            sale_date,
+            invoice_no,
+            customer_name,
+            COUNT(*) as line_count,
+            COALESCE(SUM(amount), 0) as invoice_amount,
+            GROUP_CONCAT(product_name, ' / ') as products
+        FROM sales {where}
+        GROUP BY invoice_no, sale_date, customer_name
+        ORDER BY sale_date DESC, invoice_no DESC
+        LIMIT 300
+    """, params)).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_invoice_lines(db, invoice_no: str) -> list[dict]:
+    """Returns all line items for a specific invoice."""
+    rows = await (await db.execute("""
+        SELECT sale_date, invoice_no, customer_name, product_name, spec, remarks,
+               quantity, unit_price, amount
+        FROM sales WHERE invoice_no = ?
+        ORDER BY id
+    """, (invoice_no,))).fetchall()
+    return [dict(r) for r in rows]
+
+
 def _date_filter(start: Optional[str], end: Optional[str]) -> tuple[str, list]:
     clauses = []
     params = []

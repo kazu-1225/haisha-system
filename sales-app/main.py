@@ -17,6 +17,8 @@ from database import (
     get_customers,
     get_db,
     get_frequency_analysis,
+    get_frequency_detail_by_invoice,
+    get_invoice_lines,
     get_period_aggregation,
     get_product_aggregation,
     get_product_detail,
@@ -347,6 +349,27 @@ async def api_product_search(
     kw_list = [k.strip() for k in (keywords or "").split(",") if k.strip()]
     async with get_db() as db:
         data = await get_product_search(db, start, end, kw_list, group_by)
+    return data
+
+
+@app.get("/api/aggregation/frequency/detail")
+async def api_frequency_detail(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    keywords: Optional[str] = None,
+    group_by: str = "customer",
+    group_value: str = "",
+):
+    kw_list = [k.strip() for k in (keywords or "").split(",") if k.strip()]
+    async with get_db() as db:
+        data = await get_frequency_detail_by_invoice(db, start, end, kw_list, group_value, group_by)
+    return data
+
+
+@app.get("/api/invoice/{invoice_no}")
+async def api_invoice_lines(invoice_no: str):
+    async with get_db() as db:
+        data = await get_invoice_lines(db, invoice_no)
     return data
 
 
