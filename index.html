@@ -2899,7 +2899,8 @@ function render(){
       const label=`${drvName}${vehName} ${String(cs.startHour).padStart(2,'0')}:00-${String(cs.endHour).padStart(2,'0')}:00`;
       const leftPct=(cs.startHour/24*100).toFixed(1);
       const widthPct=((cs.endHour-cs.startHour)/24*100).toFixed(1);
-      return `<div class="cs-bar-outer"><div class="cs-bar" style="left:${leftPct}%;width:${widthPct}%" data-cs-id="${cs.id}" onclick="event.stopPropagation();openEditCS('${cs.id}')" title="${label}${cs.note?'\n'+cs.note:''}"><div class="cs-handle cs-handle-l" onmousedown="startCsDrag(event,'${cs.id}','l')" onclick="event.stopPropagation()"></div><div class="cs-bar-inner"><span class="cs-bar-label">${label}</span></div><div class="cs-handle cs-handle-r" onmousedown="startCsDrag(event,'${cs.id}','r')" onclick="event.stopPropagation()"></div></div></div>`;
+      const safeId=esc(cs.id);const safeTitle=esc(`${label}${cs.note?'\n'+cs.note:''}`);
+      return `<div class="cs-bar-outer"><div class="cs-bar" style="left:${leftPct}%;width:${widthPct}%" data-cs-id="${safeId}" onclick="event.stopPropagation();openEditCS(this.dataset.csId)" title="${safeTitle}"><div class="cs-handle cs-handle-l" onmousedown="startCsDrag(event,this.closest('.cs-bar').dataset.csId,'l')" onclick="event.stopPropagation()"></div><div class="cs-bar-inner"><span class="cs-bar-label">${esc(label)}</span></div><div class="cs-handle cs-handle-r" onmousedown="startCsDrag(event,this.closest('.cs-bar').dataset.csId,'r')" onclick="event.stopPropagation()"></div></div></div>`;
     }
     let csRow=`<tr class="cs-fixed-hdr"><td class="res-cell" style="background:#fdf4ff;border-right:2px solid #d8b4fe;position:sticky;left:0;z-index:10"><div style="font-size:11px;font-weight:700;color:#7e22ce">🏛 委託応援</div><div style="font-size:9px;color:#a78bfa;margin-top:1px">クリックで登録</div></td>`;
     if(isDay){
@@ -3614,10 +3615,14 @@ function showContactSuggest(input,phoneId,type){
   csug.style.left=rect.left+'px';
   csug.style.top=(rect.bottom+3)+'px';
   csug.style.width=Math.max(rect.width,220)+'px';
-  csug.innerHTML=items.map(i=>`<div class="csug-item" onmousedown="selectContactSug('${input.id}','${phoneId}',${JSON.stringify(i.name)},${JSON.stringify(i.phone)})">
-    <div class="csug-name">${i.src==='master'?'⭐ ':'📋 '}${i.name}<span class="csug-badge">${i.src==='master'?'マスター':'履歴'}</span></div>
-    ${i.phone?`<div class="csug-phone">📞 ${i.phone}</div>`:''}
-  </div>`).join('');
+  csug.innerHTML='';
+  items.forEach(i=>{
+    const div=document.createElement('div');
+    div.className='csug-item';
+    div.innerHTML=`<div class="csug-name">${i.src==='master'?'⭐ ':'📋 '}${esc(i.name)}<span class="csug-badge">${i.src==='master'?'マスター':'履歴'}</span></div>${i.phone?`<div class="csug-phone">📞 ${esc(i.phone)}</div>`:''}`;
+    div.addEventListener('mousedown',()=>selectContactSug(input.id,phoneId,i.name,i.phone));
+    csug.appendChild(div);
+  });
   csug.classList.remove('hid');
 }
 function selectContactSug(inputId,phoneId,name,phone){
