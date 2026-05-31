@@ -244,11 +244,17 @@ async def get_frequency_analysis(db: aiosqlite.Connection, start: Optional[str],
         where += f" {connector} customer_name LIKE ?"
         params.append(f"%{customer_keyword}%")
     if product_keywords:
-        for kw in product_keywords:
-            if not kw.strip(): continue
+        valid_kws = [k for k in product_keywords if k.strip()]
+        if valid_kws:
             connector = "AND" if where else "WHERE"
-            where += f" {connector} (product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
-            params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
+            # OR logic: any keyword matching any column counts
+            clauses = " OR ".join(
+                "(product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
+                for _ in valid_kws
+            )
+            where += f" {connector} ({clauses})"
+            for kw in valid_kws:
+                params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
 
     if group_by == 'day':
         date_expr = "sale_date"
@@ -344,11 +350,16 @@ async def get_product_detail(db, start, end, keywords, group_value, group_by='cu
 async def get_frequency_detail_by_invoice(db, start, end, keywords, group_value, group_by='customer'):
     """Returns rows grouped by invoice_no (売上NO), showing one row per invoice."""
     where, params = _date_filter(start, end)
-    for kw in keywords:
-        if not kw.strip(): continue
+    valid_kws = [k for k in keywords if k.strip()]
+    if valid_kws:
         connector = "AND" if where else "WHERE"
-        where += f" {connector} (product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
-        params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
+        clauses = " OR ".join(
+            "(product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
+            for _ in valid_kws
+        )
+        where += f" {connector} ({clauses})"
+        for kw in valid_kws:
+            params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
 
     if group_by == 'month':
         filter_col = "strftime('%Y-%m', sale_date)"
