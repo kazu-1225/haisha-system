@@ -167,6 +167,7 @@
           </select>
         </div>
         <button class="btn-primary" onclick="loadPeriod()">集計</button>
+        <button onclick="exportPeriod()" style="background:#16a34a;color:#fff;">📥 CSVダウンロード</button>
       </div>
       <div class="card mb16">
         <div class="section-title">売上推移グラフ</div>
@@ -185,6 +186,7 @@
         <div class="field"><label>終了日</label><input type="date" id="cust-end"></div>
         <div class="field"><label>得意先名（部分一致）</label><input type="text" id="cust-search" placeholder="すべて"></div>
         <button class="btn-primary" onclick="loadCustomer()">集計</button>
+        <button onclick="exportCustomer()" style="background:#16a34a;color:#fff;">📥 CSVダウンロード</button>
       </div>
       <div class="card mb16">
         <div class="section-title">得意先別売上グラフ（上位20件）</div>
@@ -217,6 +219,7 @@
           </select>
         </div>
         <button class="btn-primary" onclick="loadFrequency()">集計</button>
+        <button onclick="exportFrequency()" style="background:#16a34a;color:#fff;">📥 CSVダウンロード</button>
       </div>
 
       <div class="kpi-grid mb16" id="freq-kpis" style="display:none">
@@ -254,6 +257,7 @@
           </select>
         </div>
         <button class="btn-primary" onclick="loadProductSearch()">検索・集計</button>
+        <button onclick="exportProduct()" style="background:#16a34a;color:#fff;">📥 CSVダウンロード</button>
       </div>
 
       <!-- KPIs -->
@@ -317,7 +321,10 @@
   <div class="modal">
     <div class="modal-header">
       <h3 id="modal-title">明細</h3>
-      <button class="modal-close" onclick="document.getElementById('detail-modal').style.display='none'">✕</button>
+      <div style="display:flex;align-items:center;">
+        <button onclick="exportDetail()" style="background:#16a34a;color:#fff;margin-right:8px;" class="btn-sm">📥 CSV</button>
+        <button class="modal-close" onclick="document.getElementById('detail-modal').style.display='none'">✕</button>
+      </div>
     </div>
     <div class="modal-body">
       <div id="modal-kpis" class="kpi-grid mb16" style="grid-template-columns:repeat(3,1fr)"></div>
@@ -333,6 +340,9 @@
 let charts = {};
 let pendingFile = null;
 let pendingColumns = null;
+let lastData = { period: [], customer: [], product: null, frequency: null };
+let lastDetailData = [];
+let lastDetailLabel = '';
 
 // ==================== Navigation ====================
 const pageTitles = {
@@ -383,6 +393,83 @@ function toast(msg, type = '') {
 }
 function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ==================== CSV Export ====================
+function downloadCSV(filename, headers, rows) {
+  const escapeCell = (v) => {
+    if (v == null) return '';
+    const s = String(v);
+    if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+  const lines = [headers.map(escapeCell).join(',')];
+  for (const row of rows) {
+    lines.push(row.map(escapeCell).join(','));
+  }
+  // BOM for Excel UTF-8 recognition
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2);
+}
+
+function exportPeriod() {
+  const data = lastData.period;
+  if (!data || !data.length) { toast('先に集計を実行してください', 'error'); return; }
+  const headers = ['期間','売上金額','数量','件数','得意先数'];
+  const rows = data.map(r => [r.period, r.total_amount, r.total_quantity, r.transaction_count, r.customer_count]);
+  downloadCSV(`期間別集計_${todayStr()}.csv`, headers, rows);
+}
+
+function exportCustomer() {
+  const data = lastData.customer;
+  if (!data || !data.length) { toast('先に集計を実行してください', 'error'); return; }
+  const headers = ['得意先コード','得意先名','売上金額','数量','件数','取引日数'];
+  const rows = data.map(r => [r.customer_code, r.customer_name, r.total_amount, r.total_quantity, r.transaction_count, r.active_days]);
+  downloadCSV(`得意先別集計_${todayStr()}.csv`, headers, rows);
+}
+
+function exportFrequency() {
+  const f = lastData.frequency;
+  if (!f || !f.data || !f.data.length) { toast('先に集計を実行してください', 'error'); return; }
+  const { periods, groups, idx, pivot_by } = f;
+  const groupLabel = pivot_by === 'customer' ? '得意先名' : '商品名';
+  const headers = [groupLabel, ...periods.map(p => p + '(回数)'), '合計回数', '売上合計'];
+  const rows = groups.map(g => {
+    const rd = idx[g] || {};
+    const rowTrips = periods.reduce((s,p) => s + (rd[p]?.invoice_count||0), 0);
+    const rowAmt = periods.reduce((s,p) => s + (rd[p]?.total_amount||0), 0);
+    return [g, ...periods.map(p => rd[p]?.invoice_count || 0), rowTrips, rowAmt];
+  });
+  downloadCSV(`収集頻度分析_${todayStr()}.csv`, headers, rows);
+}
+
+function exportProduct() {
+  const p = lastData.product;
+  if (!p || !p.data || !p.data.length) { toast('先に検索を実行してください', 'error'); return; }
+  const groupLabel = {'customer':'得意先名','month':'年月','product':'商品名'}[p.group_by] || '区分';
+  const headers = [groupLabel,'売上金額','収集回数','明細行数','得意先数','商品種類'];
+  const rows = p.data.map(r => [r.group_label, r.total_amount, r.invoice_count, r.line_count, r.customer_count, r.product_count]);
+  downloadCSV(`商品別集計_${todayStr()}.csv`, headers, rows);
+}
+
+function exportDetail() {
+  if (!lastDetailData.length) { toast('データがありません', 'error'); return; }
+  const headers = ['売上日','伝票NO','得意先名','商品名','規格','摘要','数量','単価','金額'];
+  const rows = lastDetailData.map(r => [r.sale_date, r.invoice_no, r.customer_name, r.product_name, r.spec, r.remarks, r.quantity, r.unit_price, r.amount]);
+  downloadCSV(`明細_${lastDetailLabel}_${todayStr()}.csv`, headers, rows);
 }
 
 const COLORS = ['#2563eb','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#059669','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#db2777','#10b981'];
@@ -460,6 +547,7 @@ async function loadPeriod() {
 
   try {
     const data = await api('/api/aggregation/period?' + params);
+    lastData.period = data;
     destroyChart('period');
     charts['period'] = new Chart(document.getElementById('chart-period'), {
       type: group_by === 'day' ? 'line' : 'bar',
@@ -511,6 +599,7 @@ async function loadCustomer() {
 
   try {
     const data = await api('/api/aggregation/customer?' + params);
+    lastData.customer = data;
     const top20 = data.slice(0, 20);
     destroyChart('customer');
     charts['customer'] = new Chart(document.getElementById('chart-customer'), {
@@ -636,6 +725,8 @@ async function loadFrequency() {
       if (!idx[r.group_label]) idx[r.group_label] = {};
       idx[r.group_label][r.period] = r;
     }
+
+    lastData.frequency = { data, periods, groups, idx, pivot_by };
 
     // KPIs
     const totalTrips = data.reduce((s, r) => s + (r.invoice_count || 0), 0);
@@ -837,6 +928,7 @@ async function loadProductSearch() {
 
   try {
     const data = await api('/api/search/product?' + params);
+    lastData.product = { data, group_by };
 
     if (!data.length) {
       document.getElementById('prod-result-wrap').innerHTML = '<p class="empty-msg">該当データがありません</p>';
@@ -926,6 +1018,8 @@ async function showProductDetail(groupValueEnc, group_by, searchParamsEnc, label
 
   try {
     const data = await api('/api/search/product/detail?' + dParams);
+    lastDetailData = data;
+    lastDetailLabel = label;
 
     if (!data.length) {
       document.getElementById('modal-table').innerHTML = '<p class="empty-msg">データがありません</p>';
