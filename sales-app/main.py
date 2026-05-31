@@ -331,8 +331,9 @@ async def api_frequency(
         raise HTTPException(400, "group_by は day/week/month/year のいずれかを指定してください。")
     if pivot_by not in ("customer", "product"):
         raise HTTPException(400, "pivot_by は customer/product のいずれかを指定してください。")
+    kw_list = [k.strip() for k in (product_keyword or "").replace("　", " ").replace(",", " ").split() if k.strip()]
     async with get_db() as db:
-        data = await get_frequency_analysis(db, start, end, customer_keyword, product_keyword, group_by, pivot_by)
+        data = await get_frequency_analysis(db, start, end, customer_keyword, kw_list, group_by, pivot_by)
     return data
 
 

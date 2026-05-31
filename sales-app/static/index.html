@@ -116,7 +116,6 @@
     <a onclick="showPage('period')"><span class="icon">📅</span>期間別集計</a>
     <a onclick="showPage('customer')"><span class="icon">👥</span>得意先別集計</a>
     <a onclick="showPage('frequency')"><span class="icon">🔄</span>収集頻度分析</a>
-    <a onclick="showPage('product')"><span class="icon">📦</span>商品別集計</a>
     <a onclick="showPage('upload')"><span class="icon">⬆️</span>データ管理</a>
   </nav>
 </div>
@@ -204,7 +203,7 @@
         <div class="field"><label>開始日</label><input type="date" id="freq-start"></div>
         <div class="field"><label>終了日</label><input type="date" id="freq-end"></div>
         <div class="field"><label>得意先名キーワード</label><input type="text" id="freq-customer" placeholder="例: ローソン"></div>
-        <div class="field"><label>商品名キーワード</label><input type="text" id="freq-product" placeholder="例: 4tコンテナ"></div>
+        <div class="field"><label>横断検索キーワード（商品名・摘要・規格）</label><input type="text" id="freq-product" placeholder="例: コンテナ ユニック（スペース区切りでAND検索）"></div>
         <div class="field"><label>集計単位</label>
           <select id="freq-groupby">
             <option value="month" selected>月次</option>
@@ -237,47 +236,6 @@
       <div class="card">
         <div class="section-title">収集頻度ピボット表（行:グループ / 列:期間）</div>
         <div id="freq-table-wrap"><p class="empty-msg">条件を入力して集計ボタンを押してください。</p></div>
-      </div>
-    </div>
-
-    <!-- 商品別集計 -->
-    <div id="page-product" class="page">
-      <div class="controls mb16">
-        <div class="field"><label>開始日</label><input type="date" id="prod-start"></div>
-        <div class="field"><label>終了日</label><input type="date" id="prod-end"></div>
-        <div class="field" style="flex:1;min-width:200px">
-          <label>キーワード（商品名・摘要・規格、スペースまたはカンマ区切りで複数指定）</label>
-          <input type="text" id="prod-keywords" placeholder="例: 4tコンテナ ローソン　または　フレコン,交換">
-        </div>
-        <div class="field"><label>集計軸</label>
-          <select id="prod-groupby">
-            <option value="customer" selected>得意先別</option>
-            <option value="month">月別</option>
-            <option value="product">商品名別</option>
-          </select>
-        </div>
-        <button class="btn-primary" onclick="loadProductSearch()">検索・集計</button>
-        <button onclick="exportProduct()" style="background:#16a34a;color:#fff;">📥 CSVダウンロード</button>
-      </div>
-
-      <!-- KPIs -->
-      <div class="kpi-grid mb16" id="prod-kpis" style="display:none">
-        <div class="kpi"><div class="label">売上合計</div><div class="value" id="prod-kpi-amount">―</div></div>
-        <div class="kpi"><div class="label">収集回数</div><div class="value" id="prod-kpi-trips">―</div></div>
-        <div class="kpi"><div class="label">明細行数</div><div class="value" id="prod-kpi-lines">―</div></div>
-        <div class="kpi"><div class="label">対象件数</div><div class="value" id="prod-kpi-groups">―</div></div>
-      </div>
-
-      <!-- Chart -->
-      <div class="card mb16" id="prod-chart-card" style="display:none">
-        <div class="section-title" id="prod-chart-title">集計グラフ（上位20件）</div>
-        <div class="chart-wrap" style="height:300px"><canvas id="chart-prod-search"></canvas></div>
-      </div>
-
-      <!-- Results table -->
-      <div class="card">
-        <div class="section-title">集計結果 <span style="font-size:11px;font-weight:400;color:var(--muted)">※ 行をクリックすると明細を表示</span></div>
-        <div id="prod-result-wrap"><p class="empty-msg">キーワードを入力して検索ボタンを押してください。</p></div>
       </div>
     </div>
 
@@ -350,7 +308,6 @@ const pageTitles = {
   period: '期間別集計',
   customer: '得意先別集計',
   frequency: '収集頻度分析',
-  product: '商品別集計',
   upload: 'データ管理'
 };
 

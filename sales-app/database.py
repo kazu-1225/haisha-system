@@ -236,17 +236,19 @@ async def delete_upload(db: aiosqlite.Connection, upload_id: int):
 
 
 async def get_frequency_analysis(db: aiosqlite.Connection, start: Optional[str], end: Optional[str],
-                                  customer_keyword: Optional[str], product_keyword: Optional[str],
+                                  customer_keyword: Optional[str], product_keywords: Optional[list],
                                   group_by: str, pivot_by: str) -> list[dict]:
     where, params = _date_filter(start, end)
     if customer_keyword:
         connector = "AND" if where else "WHERE"
         where += f" {connector} customer_name LIKE ?"
         params.append(f"%{customer_keyword}%")
-    if product_keyword:
-        connector = "AND" if where else "WHERE"
-        where += f" {connector} product_name LIKE ?"
-        params.append(f"%{product_keyword}%")
+    if product_keywords:
+        for kw in product_keywords:
+            if not kw.strip(): continue
+            connector = "AND" if where else "WHERE"
+            where += f" {connector} (product_name LIKE ? OR remarks LIKE ? OR spec LIKE ?)"
+            params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
 
     if group_by == 'day':
         date_expr = "sale_date"
