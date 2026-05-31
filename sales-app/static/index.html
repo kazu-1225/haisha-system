@@ -523,24 +523,71 @@ async function loadPeriod() {
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { y: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } }
+        scales: { y: { ticks: { callback: v => '¥' + v.toLocaleString('ja-JP') } } },
+        onClick: group_by === 'month' ? (evt, elements) => {
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            showPeriodDetail(data[idx].period);
+          }
+        } : null
       }
     });
 
     const wrap = document.getElementById('period-table-wrap');
     if (!data.length) { wrap.innerHTML = '<p class="empty-msg">データがありません</p>'; return; }
+    const isMonth = group_by === 'month';
     wrap.innerHTML = `<table>
-      <thead><tr><th>期間</th><th class="num">売上金額</th><th class="num">数量</th><th class="num">件数</th><th class="num">得意先数</th></tr></thead>
-      <tbody>${data.map(r => `<tr>
+      <thead><tr><th>期間</th><th class="num">売上金額</th><th class="num">数量</th><th class="num">件数</th><th class="num">得意先数</th>${isMonth ? '<th></th>' : ''}</tr></thead>
+      <tbody>${data.map(r => `<tr style="${isMonth ? 'cursor:pointer' : ''}" ${isMonth ? `onclick="showPeriodDetail('${r.period}')"` : ''}>
         <td>${r.period}</td>
         <td class="num">${fmtYen(r.total_amount)}</td>
         <td class="num">${fmt(r.total_quantity)}</td>
         <td class="num">${fmt(r.transaction_count)}</td>
         <td class="num">${fmt(r.customer_count)}</td>
+        ${isMonth ? '<td style="color:#2563eb;font-size:12px">詳細▶</td>' : ''}
       </tr>`).join('')}</tbody>
     </table>`;
   } catch (e) {
     toast('エラー: ' + e.message, 'error');
+  }
+}
+
+// ==================== Period Detail (monthly drill-down) ====================
+async function showPeriodDetail(period) {
+  // period is "YYYY-MM"
+  const [year, month] = period.split('-');
+  const start = `${year}-${month}-01`;
+  const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+  const end = `${year}-${month}-${String(lastDay).padStart(2,'0')}`;
+
+  document.getElementById('modal-title').textContent = period + ' の得意先別内訳';
+  document.getElementById('modal-kpis').innerHTML = '';
+  document.getElementById('modal-table').innerHTML = '<p class="empty-msg">読み込み中...</p>';
+  document.getElementById('detail-modal').style.display = 'flex';
+
+  try {
+    const data = await api('/api/aggregation/customer?' + new URLSearchParams({ start, end }));
+    if (!data.length) {
+      document.getElementById('modal-table').innerHTML = '<p class="empty-msg">データがありません</p>';
+      return;
+    }
+    const totalAmt = data.reduce((s, r) => s + (r.total_amount || 0), 0);
+    const totalQty = data.reduce((s, r) => s + (r.total_quantity || 0), 0);
+    document.getElementById('modal-kpis').innerHTML = `
+      <div class="kpi"><div class="label">得意先数</div><div class="value">${fmt(data.length)}</div></div>
+      <div class="kpi"><div class="label">売上合計</div><div class="value">${fmtYen(totalAmt)}</div></div>
+      <div class="kpi"><div class="label">数量合計</div><div class="value">${fmt(totalQty)}</div></div>`;
+    document.getElementById('modal-table').innerHTML = `<table>
+      <thead><tr><th>得意先名</th><th class="num">売上金額</th><th class="num">数量</th><th class="num">件数</th></tr></thead>
+      <tbody>${data.map(r => `<tr>
+        <td>${r.customer_name || '不明'}</td>
+        <td class="num">${fmtYen(r.total_amount)}</td>
+        <td class="num">${fmt(r.total_quantity)}</td>
+        <td class="num">${fmt(r.transaction_count)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch (e) {
+    document.getElementById('modal-table').innerHTML = `<p class="empty-msg">エラー: ${e.message}</p>`;
   }
 }
 
