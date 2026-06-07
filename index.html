@@ -1855,13 +1855,26 @@ function checkContainerAlerts() {
 
         <!-- 🔄 Googleマスタ連携（承認済マスタから一括更新） -->
         <div style="background:#ecfdf5;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-bottom:10px">
-          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">🔄 Googleマスタから一括更新（推奨）</div>
+          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">🔄 Googleマスタから一括更新</div>
           <div style="font-size:11px;color:#475569;margin-bottom:8px;line-height:1.6">
             承認済マスタ（Googleスプレッドシート）から「配車システム使用=✅」の得意先を取得します。<br>
-            <span style="color:#94a3b8">※初回は「⚙ URL設定」でCSV公開URLを設定（Sheets→ファイル→共有→ウェブに公開→✅承認済マスタ / CSV形式）</span>
+            <span style="color:#94a3b8">プライベート運用は <b>📁 ファイル取込</b>（推奨）。マスタを公開する場合のみ URL自動取得を使用。</span>
           </div>
-          <button class="btn btn-p" onclick="fetchCustomerMaster()" style="margin:3px;background:#16a34a;color:#fff;font-weight:700">🔄 マスタ更新</button>
-          <button class="btn btn-s" onclick="configMasterUrl()" style="margin:3px;font-size:11px">⚙ URL設定</button>
+          <!-- 案A: 手動ファイル取込（推奨・安全） -->
+          <div style="background:#fff;border-radius:6px;padding:8px;margin-bottom:6px;border:1px solid #86efac">
+            <div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:4px">📁 ファイル取込（推奨・プライベート運用）</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;line-height:1.5">
+              Sheetsで「ファイル→ダウンロード→カンマ区切り形式(.csv)」したファイルを選択
+            </div>
+            <button class="btn btn-p" onclick="document.getElementById('fi-master-csv').click()" style="margin:2px;background:#16a34a;color:#fff;font-weight:700">📁 マスタCSVを選択して取込</button>
+            <input id="fi-master-csv" type="file" accept=".csv" class="hid" onchange="importCustomerMasterFromFile(event,'haisha')">
+          </div>
+          <!-- 案B: URL自動取得 -->
+          <div style="background:#fff;border-radius:6px;padding:8px">
+            <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:4px">🔄 URL自動取得（マスタ公開が必要・上級者向け）</div>
+            <button class="btn btn-s" onclick="fetchCustomerMaster()" style="margin:2px;font-size:11px">🔄 URL から更新</button>
+            <button class="btn btn-s" onclick="configMasterUrl()" style="margin:2px;font-size:11px">⚙ URL設定</button>
+          </div>
         </div>
 
         <!-- 🔗 T-PLANNER 連携 -->
@@ -5601,8 +5614,13 @@ async function fetchCustomerMaster(systemType){
   const sysLabel=systemType==='container'?'コンテナ管理使用':'配車システム使用';
   const url=getMasterUrl();
   if(!url){
-    if(!confirm('マスタURLが未設定です。\n「⚙ URL設定」を開きますか？\n\n（配車システムの「⚙ 設定・マスター管理」→「データ」タブから設定できます）'))return;
-    configMasterUrl();
+    // URL未設定 → ファイル選択にフォールバック（案③プライベート運用）
+    if(!confirm('URLが未設定です。\n\n承認済マスタCSVをファイルから選んで取り込みますか？\n（Googleスプレッドシートからダウンロードした.csvファイル）\n\n※URLを設定する場合は「キャンセル」→「⚙ URL設定」へ'))return;
+    const input=document.createElement('input');
+    input.type='file';
+    input.accept='.csv';
+    input.onchange=function(e){importCustomerMasterFromFile(e,systemType);};
+    input.click();
     return;
   }
   if(!confirm(`Googleスプレッドシートから得意先マスタを更新します。\n\n・統合CDで既存得意先を上書き\n・新規CDは追加\n・「${sysLabel}=✅」の行のみ対象\n\n実行しますか？`))return;
@@ -5621,6 +5639,44 @@ async function fetchCustomerMaster(systemType){
   }catch(e){
     alert('❌ マスタ取得に失敗しました\n\n'+e.message+'\n\nURL設定とシート公開状態を確認してください。');
     console.error('fetchCustomerMaster',e);
+  }
+}
+
+async function importCustomerMasterFromFile(event,systemType){
+  systemType=systemType||'haisha';
+  const file=event.target.files[0];
+  if(!file)return;
+  event.target.value='';
+
+  const sysLabel=systemType==='container'?'コンテナ管理使用':'配車システム使用';
+  if(!confirm(`承認済マスタCSV（手動DL）から得意先を更新します。\n\n・統合CDで既存得意先を上書き\n・新規CDは追加\n・「${sysLabel}=✅」の行のみ対象\n\n実行しますか？`))return;
+
+  try{
+    const buf=await file.arrayBuffer();
+    const bytes=new Uint8Array(buf);
+    let text,encUsed;
+    if(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF){
+      text=new TextDecoder('utf-8').decode(buf).slice(1);
+      encUsed='UTF-8(BOM)';
+    }else{
+      const utf8=new TextDecoder('utf-8',{fatal:false}).decode(buf);
+      if(utf8.indexOf('�')!==-1){
+        text=new TextDecoder('shift-jis').decode(buf);
+        encUsed='Shift-JIS';
+      }else{
+        text=utf8;encUsed='UTF-8';
+      }
+    }
+    const result=mergeCustomersFromMasterCsv(text,systemType);
+    await save();renderSLists();fillSiteSel();render();
+    alert(`✅ マスタ更新完了（${encUsed}）\n\n`+
+      `🆕 新規追加: ${result.added}件\n`+
+      `🔄 更新: ${result.updated}件\n`+
+      `⏭ ${sysLabel}外: ${result.filtered}件\n`+
+      `⚠ スキップ: ${result.skipped}件`);
+  }catch(e){
+    alert('❌ 取込エラー\n\n'+e.message+'\n\nCSVが「承認済マスタ」シート形式か確認してください。');
+    console.error('importCustomerMasterFromFile',e);
   }
 }
 
