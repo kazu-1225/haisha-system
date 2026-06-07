@@ -781,6 +781,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <div class="tsp" style="flex:1"></div>
     <button class="btn btn-p" style="font-size:12px;padding:5px 14px" onclick="openConAction('install')">＋ 新規設置</button>
     <button class="hbtn" style="font-size:12px;background:rgba(255,255,255,.15)" onclick="openConImport()">📥 初期データ取込</button>
+    <button class="hbtn" style="font-size:12px;background:rgba(34,197,94,.25)" onclick="fetchCustomerMaster('container')">🔄 マスタ更新</button>
     <button class="hbtn" style="font-size:12px" onclick="toggleConSettings()">⚙ アラート設定</button>
   </div>
   <!-- アラート設定パネル（折りたたみ） -->
@@ -1158,7 +1159,16 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
         </div>
       </div>
       <!-- 廃棄物品目入力テーブル -->
-      <div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:6px">廃棄物品目・数量</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:12px;font-weight:700;color:#1e3a5f">廃棄物品目・数量</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#475569">
+          <label>T-PLANNER入力区分:</label>
+          <select id="tkInputType" style="border:1px solid #cbd5e1;border-radius:4px;padding:2px 6px;font-size:11px">
+            <option value="2">2: 臨時売上（標準）</option>
+            <option value="1">1: 定額売上</option>
+          </select>
+        </div>
+      </div>
       <div class="tk-grid-hdr">
         <span>廃棄物種別</span><span>数量</span><span>単位</span><span>単価(円)</span><span>金額</span><span></span>
       </div>
@@ -1842,6 +1852,50 @@ function checkContainerAlerts() {
 
       <!-- DATA -->
       <div class="spane" id="sp-data">
+
+        <!-- 🔄 Googleマスタ連携（承認済マスタから一括更新） -->
+        <div style="background:#ecfdf5;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">🔄 Googleマスタから一括更新（推奨）</div>
+          <div style="font-size:11px;color:#475569;margin-bottom:8px;line-height:1.6">
+            承認済マスタ（Googleスプレッドシート）から「配車システム使用=✅」の得意先を取得します。<br>
+            <span style="color:#94a3b8">※初回は「⚙ URL設定」でCSV公開URLを設定（Sheets→ファイル→共有→ウェブに公開→✅承認済マスタ / CSV形式）</span>
+          </div>
+          <button class="btn btn-p" onclick="fetchCustomerMaster()" style="margin:3px;background:#16a34a;color:#fff;font-weight:700">🔄 マスタ更新</button>
+          <button class="btn btn-s" onclick="configMasterUrl()" style="margin:3px;font-size:11px">⚙ URL設定</button>
+        </div>
+
+        <!-- 🔗 T-PLANNER 連携 -->
+        <div style="background:#fff7ed;border:2px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px">🔗 T-PLANNER 連携</div>
+
+          <!-- 売上履歴取込 -->
+          <div style="background:#fff;border-radius:6px;padding:10px;margin-bottom:8px">
+            <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:4px">📥 売上履歴CSV取込（過去12ヶ月）</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;line-height:1.6">
+              T-PLANNERから売上CSVをエクスポートして取り込むと、展開処理画面で「得意先×品目」の単価候補が表示されます。
+            </div>
+            <button class="btn btn-g" onclick="document.getElementById('fi-sales-history').click()" style="margin:2px">📥 売上履歴CSV取込</button>
+            <input id="fi-sales-history" type="file" accept=".csv" class="hid" onchange="importSalesHistoryCSV(event)">
+            <span id="salesHistoryStatus" style="font-size:10px;color:#94a3b8;margin-left:6px">（未取込）</span>
+          </div>
+
+          <!-- 売上UP CSV出力 -->
+          <div style="background:#fff;border-radius:6px;padding:10px">
+            <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:4px">📤 売上UP CSV出力（T-PLANNERへ取込）</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;line-height:1.6">
+              統合CDのprefixで自動振分け → DB1（H-）と DB2（K-）別ファイルに出力します。
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:11px;flex-wrap:wrap">
+              <label style="color:#475569">期間:</label>
+              <input type="date" id="tpExportFrom" style="border:1px solid #cbd5e1;border-radius:4px;padding:3px 6px;font-size:11px">
+              <span>～</span>
+              <input type="date" id="tpExportTo" style="border:1px solid #cbd5e1;border-radius:4px;padding:3px 6px;font-size:11px">
+            </div>
+            <button class="btn btn-p" onclick="exportTPlannerSalesCSV('DB1')" style="margin:2px;background:#dc2626;color:#fff">📥 DB1（H-）売上CSV</button>
+            <button class="btn btn-p" onclick="exportTPlannerSalesCSV('DB2')" style="margin:2px;background:#7c3aed;color:#fff">📥 DB2（K-）売上CSV</button>
+          </div>
+        </div>
+
         <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:10px">
           <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📑 マスターデータ CSVエクスポート</div>
           <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">※同一IDで再インポートすると上書き更新されます</div>
@@ -3244,6 +3298,8 @@ function openTenkai(id){
   document.getElementById('tkDate').value=dp.tenkai?.completedAt||fmt(new Date());
   document.getElementById('tkWorkKind').value=dp.tenkai?.workKind||'collect';
   document.getElementById('tkNotes').value=dp.tenkai?.notes||'';
+  const inputTypeSel=document.getElementById('tkInputType');
+  if(inputTypeSel)inputTypeSel.value=dp.tenkai?.inputType||'2';
   // 既存データがあれば読み込む
   _tkItems=(dp.tenkai?.items||[]).map(x=>({...x}));
   if(!_tkItems.length)_tkItems=[{wasteType:'',qty:'',unit:'t',unitPrice:'',amount:0}];
@@ -3256,9 +3312,19 @@ function openTenkai(id){
 function renderTkItems(){
   const WASTE_TYPES=['廃プラスチック類','金属くず','木くず','廃油','紙くず','繊維くず','ガラスくず・陶磁器くず','ゴムくず','廃アルカリ','廃酸','その他産業廃棄物','一般廃棄物'];
   const UNITS=['t','kg','㎥','台','個','式','回'];
-  document.getElementById('tkItems').innerHTML=_tkItems.map((item,i)=>`
+  const dp=(db.dispatches||[]).find(x=>x.id===_tkDispId);
+  const custId=dp?.customer;
+  document.getElementById('tkItems').innerHTML=_tkItems.map((item,i)=>{
+    const cands=(custId&&item.wasteType)?findUnitPriceCandidates(custId,item.wasteType):[];
+    const candBtn=cands.length>0
+      ?`<button type="button" onclick="showUnitPriceCandidates(${i})" style="font-size:10px;padding:1px 5px;border:1px solid #fbbf24;background:#fef3c7;color:#92400e;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:700" title="${cands.length}件の取引履歴あり">💡${cands.length}</button>`
+      :'';
+    const pcBadge=item.productCd
+      ?`<span title="商品CD: ${item.productCd}" style="display:inline-block;font-size:9px;color:#16a34a;margin-left:3px">●</span>`
+      :'';
+    return`
     <div class="tk-grid">
-      <select class="tk-input" onchange="_tkItems[${i}].wasteType=this.value">
+      <select class="tk-input" onchange="_tkItems[${i}].wasteType=this.value;_tkItems[${i}].productCd='';_tkItems[${i}].productName='';renderTkItems();calcTenkaiTotal()">
         <option value="">種別を選択</option>
         ${WASTE_TYPES.map(t=>`<option value="${t}"${item.wasteType===t?' selected':''}>${t}</option>`).join('')}
         <option value="__other"${!WASTE_TYPES.includes(item.wasteType)&&item.wasteType?' selected':''}>その他（直接入力）</option>
@@ -3268,12 +3334,15 @@ function renderTkItems(){
       <select class="tk-input" onchange="_tkItems[${i}].unit=this.value">
         ${UNITS.map(u=>`<option value="${u}"${item.unit===u?' selected':''}>${u}</option>`).join('')}
       </select>
-      <input type="number" class="tk-input" step="1" placeholder="単価" value="${item.unitPrice||''}"
-        oninput="_tkItems[${i}].unitPrice=this.value;calcTenkaiTotal()">
-      <div style="font-size:12px;font-weight:700;color:#1e3a5f;padding:0 4px">${item.amount?'¥'+item.amount.toLocaleString():'-'}</div>
+      <div style="display:flex;gap:2px;align-items:center">
+        <input type="number" class="tk-input" step="1" placeholder="単価" value="${item.unitPrice||''}" style="flex:1;min-width:0"
+          oninput="_tkItems[${i}].unitPrice=this.value;calcTenkaiTotal()">
+        ${candBtn}
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#1e3a5f;padding:0 4px">${item.amount?'¥'+item.amount.toLocaleString():'-'}${pcBadge}</div>
       <button onclick="removeTenkaiItem(${i})" style="color:#dc2626;font-size:14px;padding:0 4px;line-height:1">×</button>
     </div>
-  `).join('');
+  `}).join('');
 }
 function addTenkaiItem(){
   _tkItems.push({wasteType:'',qty:'',unit:'t',unitPrice:'',amount:0});
@@ -3308,9 +3377,10 @@ async function saveTenkai(){
   const completedAt=document.getElementById('tkDate').value;
   const workKind=document.getElementById('tkWorkKind').value;
   const notes=document.getElementById('tkNotes').value;
+  const inputType=document.getElementById('tkInputType')?.value||'2';
   calcTenkaiTotal();
   const validItems=_tkItems.filter(x=>x.wasteType||x.qty);
-  dp.tenkai={completedAt,workKind,items:validItems,notes};
+  dp.tenkai={completedAt,workKind,items:validItems,notes,inputType};
   dp.jobStatus='processed';
   // 売上伝票ドラフト自動生成
   const cu=db.customers.find(x=>x.id===dp.customer);
@@ -3319,8 +3389,8 @@ async function saveTenkai(){
   const existing=(db.salesInvoices||[]).findIndex(x=>x.sourceId===dp.id);
   const inv={
     id:invId,sourceId:dp.id,sourceType:'dispatch',
-    tpcd:cu?.tpcd||'',customerName:cu?.name||'',
-    date:completedAt,workKind,items:validItems,total,notes,
+    unifiedCd:cu?.id||'',tpcd:cu?.tpcd||'',customerName:cu?.name||'',
+    date:completedAt,workKind,items:validItems,total,notes,inputType,
     status:'draft',createdAt:new Date().toISOString()
   };
   if(existing>=0)db.salesInvoices[existing]=inv;
@@ -4272,7 +4342,7 @@ function chkLic(){
 // ================================================================
 // SETTINGS
 // ================================================================
-function openSettings(){updateUrlStatus();renderSLists();openM('mSettings');}
+function openSettings(){updateUrlStatus();renderSLists();updateSalesHistoryStatus();openM('mSettings');}
 function stab(name){
   const ns=['google','drivers','vehicles','customers','sites','data'];
   document.querySelectorAll('.stab').forEach((t,i)=>t.classList.toggle('on',ns[i]===name));
@@ -5491,6 +5561,476 @@ function parseCSVLine(line){
   }
   result.push(cur);
   return result;
+}
+
+// ================================================================
+// 承認済マスタ（Googleスプレッドシート）連携
+// ================================================================
+const MASTER_URL_KEY='haisha_master_csv_url';
+
+function getMasterUrl(){return localStorage.getItem(MASTER_URL_KEY)||'';}
+
+function configMasterUrl(){
+  const cur=getMasterUrl();
+  const url=prompt(
+    'Googleスプレッドシート「✅承認済マスタ」のCSV公開URLを入力してください。\n\n'+
+    '【URL取得手順】\n'+
+    '① Sheets → ファイル → 共有 → ウェブに公開\n'+
+    '② 「✅承認済マスタ」シート を選択\n'+
+    '③ 形式: 「カンマ区切りの値（.csv）」\n'+
+    '④ 「公開」をクリック → 表示されたURLをコピー',
+    cur
+  );
+  if(url===null)return;
+  const trimmed=url.trim();
+  if(!trimmed){
+    localStorage.removeItem(MASTER_URL_KEY);
+    alert('URL設定を削除しました');
+    return;
+  }
+  if(!/^https?:\/\//i.test(trimmed)){
+    alert('❌ 有効なURLを入力してください（http(s)://で始まる）');
+    return;
+  }
+  localStorage.setItem(MASTER_URL_KEY,trimmed);
+  alert('✅ URL を保存しました');
+}
+
+async function fetchCustomerMaster(systemType){
+  systemType=systemType||'haisha'; // 'haisha' | 'container'
+  const sysLabel=systemType==='container'?'コンテナ管理使用':'配車システム使用';
+  const url=getMasterUrl();
+  if(!url){
+    if(!confirm('マスタURLが未設定です。\n「⚙ URL設定」を開きますか？\n\n（配車システムの「⚙ 設定・マスター管理」→「データ」タブから設定できます）'))return;
+    configMasterUrl();
+    return;
+  }
+  if(!confirm(`Googleスプレッドシートから得意先マスタを更新します。\n\n・統合CDで既存得意先を上書き\n・新規CDは追加\n・「${sysLabel}=✅」の行のみ対象\n\n実行しますか？`))return;
+
+  try{
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const text=await res.text();
+    const result=mergeCustomersFromMasterCsv(text,systemType);
+    await save();renderSLists();fillSiteSel();render();
+    alert(`✅ マスタ更新完了！\n\n`+
+      `🆕 新規追加: ${result.added}件\n`+
+      `🔄 更新: ${result.updated}件\n`+
+      `⏭ ${sysLabel}外: ${result.filtered}件\n`+
+      `⚠ スキップ: ${result.skipped}件`);
+  }catch(e){
+    alert('❌ マスタ取得に失敗しました\n\n'+e.message+'\n\nURL設定とシート公開状態を確認してください。');
+    console.error('fetchCustomerMaster',e);
+  }
+}
+
+function mergeCustomersFromMasterCsv(csvText,systemType){
+  systemType=systemType||'haisha';
+  if(csvText.charCodeAt(0)===0xFEFF)csvText=csvText.slice(1); // BOM除去
+  const lines=csvText.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
+  if(lines.length<2)throw new Error('データ行がありません');
+
+  const headers=parseCSVLine(lines[0]).map(h=>h.trim());
+  const findCol=(...names)=>headers.findIndex(h=>names.some(n=>h===n||h.includes(n)));
+  const useFlagCol=systemType==='container'
+    ? findCol('コンテナ管理使用','コンテナ')
+    : findCol('配車システム使用','配車');
+  const idx={
+    unified: findCol('統合CD'),
+    tpcd:    findCol('T-PLANNER元CD','元CD','T-Planner'),
+    name:    findCol('得意先名'),
+    kana:    findCol('得意先名カナ','カナ'),
+    zip:     findCol('郵便番号'),
+    addr:    findCol('住所'),
+    tel:     findCol('TEL'),
+    fax:     findCol('FAX'),
+    mail:    findCol('MAIL','メール'),
+    useDisp: useFlagCol,
+  };
+
+  if(idx.unified<0||idx.name<0){
+    throw new Error('「統合CD」または「得意先名」列が見つかりません。\n承認済マスタシートのCSV URLを使用してください。\n\n検出ヘッダー: '+headers.join(', '));
+  }
+
+  if(!db.customers)db.customers=[];
+  let added=0,updated=0,skipped=0,filtered=0;
+
+  for(let i=1;i<lines.length;i++){
+    const vals=parseCSVLine(lines[i]);
+    const g=k=>idx[k]>=0?(vals[idx[k]]||'').trim():'';
+
+    const unifiedCd=g('unified');
+    const name=g('name');
+    if(!unifiedCd||!name){skipped++;continue;}
+
+    // 配車システム使用フラグでフィルタ
+    if(idx.useDisp>=0){
+      const f=g('useDisp');
+      if(f!=='✅'&&f!=='○'&&f!=='使用'){filtered++;continue;}
+    }
+
+    const zip=g('zip');
+    const addr=g('addr');
+    const fullAddr=zip?`〒${zip} ${addr}`.trim():addr;
+
+    const cdata={
+      name,
+      tpcd: g('tpcd'),
+      kana: g('kana'),
+      addr: fullAddr,
+      phone: g('tel'),
+      fax:  g('fax'),
+      mail: g('mail'),
+    };
+
+    const ex=db.customers.find(c=>c.id===unifiedCd);
+    if(ex){
+      // contactはマスタに無いので保持
+      Object.assign(ex,cdata);
+      updated++;
+    }else{
+      db.customers.push({id:unifiedCd,contact:'',...cdata});
+      added++;
+    }
+  }
+
+  return {added,updated,skipped,filtered};
+}
+
+// ================================================================
+// T-PLANNER 売上履歴 取込
+// ================================================================
+const SALES_HIST_COLS={
+  date:        ['売上日'],
+  salesNo:     ['売上NO'],
+  customerCd:  ['得意先CD'],
+  customerName:['得意先名'],
+  productCd:   ['商品CD'],
+  productName: ['商品名'],
+  qty:         ['数量'],
+  unit:        ['単位名','単位'],
+  unitPrice:   ['売上単価'],
+  amount:      ['売上金額'],
+  note:        ['摘要'],
+};
+
+async function importSalesHistoryCSV(event){
+  const file=event.target.files[0];
+  if(!file)return;
+  event.target.value='';
+
+  if(!confirm('T-PLANNER売上履歴CSVを取り込みます。\n\n・過去12ヶ月分のみ保存\n・既存履歴は上書き\n・商品マスタも自動構築\n\n実行しますか？'))return;
+
+  try{
+    const buf=await file.arrayBuffer();
+    const bytes=new Uint8Array(buf);
+    let text,encUsed;
+    if(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF){
+      text=new TextDecoder('utf-8').decode(buf).slice(1);
+      encUsed='UTF-8(BOM)';
+    }else{
+      const utf8=new TextDecoder('utf-8',{fatal:false}).decode(buf);
+      if(utf8.indexOf('�')!==-1){
+        text=new TextDecoder('shift-jis').decode(buf);
+        encUsed='Shift-JIS';
+      }else{
+        text=utf8;encUsed='UTF-8';
+      }
+    }
+    const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
+    if(lines.length<2){alert('データ行がありません');return;}
+
+    const headers=parseCSVLine(lines[0]).map(h=>h.trim());
+    const idx={};
+    Object.keys(SALES_HIST_COLS).forEach(k=>{
+      idx[k]=-1;
+      for(const n of SALES_HIST_COLS[k]){
+        const i=headers.findIndex(h=>h===n);
+        if(i>=0){idx[k]=i;break;}
+      }
+    });
+    const required=['date','customerCd','productCd','qty','unitPrice'];
+    const missing=required.filter(k=>idx[k]<0);
+    if(missing.length){
+      alert(`必須列が見つかりません: ${missing.join(', ')}\n\n検出ヘッダー先頭: ${headers.slice(0,15).join(', ')}...`);
+      return;
+    }
+
+    const cutoff=new Date();
+    cutoff.setMonth(cutoff.getMonth()-12);
+    const cutoffStr=cutoff.toISOString().slice(0,10);
+
+    if(!db.salesHistory)db.salesHistory=[];
+    if(!db.products)db.products=[];
+    const productMap=new Map();
+    db.products.forEach(p=>productMap.set(p.productCd,p));
+
+    let added=0,filtered=0,skipped=0;
+    const newHistory=[];
+
+    for(let i=1;i<lines.length;i++){
+      const vals=parseCSVLine(lines[i]);
+      const g=k=>idx[k]>=0?(vals[idx[k]]||'').trim():'';
+
+      const dateRaw=g('date');
+      const m=dateRaw.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if(!m){skipped++;continue;}
+      const date=`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      if(date<cutoffStr){filtered++;continue;}
+
+      const customerCd=g('customerCd');
+      const productCd=g('productCd');
+      const unitPrice=parseFloat(g('unitPrice'))||0;
+      const qty=parseFloat(g('qty'))||0;
+      if(!customerCd||!productCd){skipped++;continue;}
+
+      const productName=g('productName');
+      const unit=g('unit');
+
+      newHistory.push({
+        date,customerCd,productCd,productName,
+        qty,unit,unitPrice,
+        amount:parseFloat(g('amount'))||(qty*unitPrice),
+        note:g('note')||'',
+      });
+      added++;
+
+      if(!productMap.has(productCd)){
+        productMap.set(productCd,{productCd,productName,defaultUnit:unit});
+      }
+    }
+
+    db.salesHistory=newHistory;
+    db.products=Array.from(productMap.values());
+    await save();
+    updateSalesHistoryStatus();
+
+    alert(`✅ 売上履歴取込完了（${encUsed}）\n\n`+
+      `🆕 取込件数: ${added.toLocaleString()}件\n`+
+      `📦 商品マスタ: ${db.products.length}件\n`+
+      `⏭ 12ヶ月前より古い: ${filtered.toLocaleString()}件\n`+
+      `⚠ スキップ: ${skipped}件`);
+  }catch(e){
+    alert('❌ 取込エラー\n\n'+e.message);
+    console.error('importSalesHistoryCSV',e);
+  }
+}
+
+function updateSalesHistoryStatus(){
+  const el=document.getElementById('salesHistoryStatus');
+  if(!el)return;
+  const n=(db.salesHistory||[]).length;
+  if(n===0){
+    el.textContent='（未取込）';
+    el.style.color='#94a3b8';
+    return;
+  }
+  const dates=db.salesHistory.map(h=>h.date).sort();
+  el.textContent=`✅ ${n.toLocaleString()}件 (${dates[0]} ～ ${dates[dates.length-1]})`;
+  el.style.color='#16a34a';
+}
+
+// ================================================================
+// 単価候補（過去履歴から）
+// ================================================================
+function findUnitPriceCandidates(customerId,wasteType){
+  if(!customerId||!wasteType)return[];
+  if(!(db.salesHistory||[]).length)return[];
+  const cu=(db.customers||[]).find(c=>c.id===customerId);
+  if(!cu||!cu.tpcd)return[];
+  const tpcd=cu.tpcd;
+  // 商品名で部分一致（先頭3文字）
+  const key=wasteType.substring(0,3);
+  return db.salesHistory
+    .filter(h=>h.customerCd===tpcd&&h.productName&&h.productName.includes(key))
+    .sort((a,b)=>b.date.localeCompare(a.date));
+}
+
+function showUnitPriceCandidates(itemIdx){
+  const item=_tkItems[itemIdx];
+  if(!item||!item.wasteType){alert('先に廃棄物種別を選択してください');return;}
+  const dp=(db.dispatches||[]).find(x=>x.id===_tkDispId);
+  if(!dp){alert('配車情報が取得できません');return;}
+  const candidates=findUnitPriceCandidates(dp.customer,item.wasteType);
+  if(candidates.length===0){alert(`「${item.wasteType}」の取引履歴がありません。\n手動で単価を入力してください。`);return;}
+
+  const recent=candidates.slice(0,5);
+  const prices=recent.map(c=>c.unitPrice);
+  const minP=Math.min(...prices);
+  const maxP=Math.max(...prices);
+  const variance=maxP-minP;
+  const avg=Math.round(prices.reduce((a,b)=>a+b,0)/prices.length);
+  const isFixed=variance<100;
+  const variLabel=isFixed?'💚 契約単価（変動なし）':`⚠ 変動あり（幅 ¥${variance.toLocaleString()}）`;
+
+  let html=`<div style="max-width:620px;font-family:'Meiryo',sans-serif">
+    <h3 style="margin:0 0 8px;color:#1e3a5f;font-size:14px">💡 単価候補: ${item.wasteType}</h3>
+    <div style="background:${isFixed?'#dcfce7':'#fef3c7'};border:1px solid ${isFixed?'#86efac':'#fbbf24'};border-radius:6px;padding:7px 12px;margin-bottom:10px;font-size:11px;color:${isFixed?'#15803d':'#92400e'}">
+      ${variLabel} ／ 平均: <b>¥${avg.toLocaleString()}</b> ／ 最安: ¥${minP.toLocaleString()} ／ 最高: ¥${maxP.toLocaleString()}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:#f1f5f9;color:#475569">
+        <th style="padding:5px;text-align:right;border:1px solid #e2e8f0">単価</th>
+        <th style="padding:5px;border:1px solid #e2e8f0">売上日</th>
+        <th style="padding:5px;text-align:right;border:1px solid #e2e8f0">数量</th>
+        <th style="padding:5px;border:1px solid #e2e8f0">商品</th>
+        <th style="padding:5px;border:1px solid #e2e8f0">摘要</th>
+        <th style="padding:5px;border:1px solid #e2e8f0"></th>
+      </tr></thead><tbody>`;
+  recent.forEach((c,i)=>{
+    const noteShort=(c.note||'-').substring(0,30);
+    html+=`<tr style="background:${i%2?'#fff':'#fafbfc'}">
+      <td style="padding:5px;text-align:right;border:1px solid #e2e8f0;font-weight:700;color:#1e3a5f">¥${c.unitPrice.toLocaleString()}</td>
+      <td style="padding:5px;border:1px solid #e2e8f0">${c.date}</td>
+      <td style="padding:5px;text-align:right;border:1px solid #e2e8f0">${c.qty}${c.unit||''}</td>
+      <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(c.productName||'').replace(/"/g,'&quot;')}">${(c.productName||'').substring(0,12)}</td>
+      <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;color:#64748b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(c.note||'').replace(/"/g,'&quot;')}">${noteShort}</td>
+      <td style="padding:5px;border:1px solid #e2e8f0;text-align:center">
+        <button onclick="applyUnitPriceCandidate(${itemIdx},${c.unitPrice},'${c.productCd}','${(c.productName||'').replace(/'/g,'\\\'')}')" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 12px;font-size:11px;cursor:pointer;font-weight:700">採用</button>
+      </td>
+    </tr>`;
+  });
+  html+=`</tbody></table>
+    <div style="font-size:10px;color:#94a3b8;margin-top:8px">取引履歴: ${candidates.length}件（直近5件表示） ／ 候補にない単価は直接入力できます</div>
+  </div>`;
+  showPopover(html);
+}
+
+function applyUnitPriceCandidate(itemIdx,price,productCd,productName){
+  _tkItems[itemIdx].unitPrice=price;
+  _tkItems[itemIdx].productCd=productCd;
+  _tkItems[itemIdx].productName=productName;
+  renderTkItems();
+  calcTenkaiTotal();
+  closePopover();
+}
+
+function showPopover(html){
+  let p=document.getElementById('_tkPopover');
+  if(!p){
+    p=document.createElement('div');
+    p.id='_tkPopover';
+    p.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center';
+    p.onclick=function(e){if(e.target===p)closePopover();};
+    document.body.appendChild(p);
+  }
+  p.innerHTML=`<div style="background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,0.3);max-height:85vh;overflow-y:auto;position:relative;max-width:90vw">
+    <button onclick="closePopover()" style="position:absolute;top:6px;right:10px;background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;line-height:1">×</button>
+    ${html}
+  </div>`;
+  p.style.display='flex';
+}
+
+function closePopover(){
+  const p=document.getElementById('_tkPopover');
+  if(p)p.remove();
+}
+
+// ================================================================
+// T-PLANNER 売上UP CSV出力（28列固定）
+// ================================================================
+async function exportTPlannerSalesCSV(dbType){
+  const fromDate=document.getElementById('tpExportFrom').value;
+  const toDate=document.getElementById('tpExportTo').value;
+  if(!fromDate||!toDate){alert('期間（開始日・終了日）を指定してください');return;}
+  if(fromDate>toDate){alert('期間が逆転しています');return;}
+
+  const prefix=dbType==='DB1'?'H-':'K-';
+  const targets=(db.salesInvoices||[]).filter(inv=>{
+    if(inv.date<fromDate||inv.date>toDate)return false;
+    if(inv.status==='uploaded')return false;
+    const ucd=inv.unifiedCd||'';
+    return ucd.startsWith(prefix);
+  });
+
+  if(targets.length===0){
+    alert(`期間内の${dbType}（${prefix}）向け売上伝票がありません。\n\n（既に出力済みの伝票は対象外）`);
+    return;
+  }
+
+  // 商品CD未設定のチェック
+  const missingProduct=[];
+  targets.forEach(inv=>{
+    (inv.items||[]).forEach((it,j)=>{
+      if(!it.productCd)missingProduct.push(`${inv.customerName} / ${it.wasteType||'-'} (${inv.date})`);
+    });
+  });
+  if(missingProduct.length){
+    const sample=missingProduct.slice(0,5).join('\n  ');
+    const more=missingProduct.length>5?`\n  ... 他${missingProduct.length-5}件`:'';
+    if(!confirm(`⚠ 商品CD未設定の明細が ${missingProduct.length}件 あります。\nこの状態でCSV出力すると T-PLANNERでエラーになる可能性があります。\n\n対象:\n  ${sample}${more}\n\nこのまま出力しますか？\n（推奨: 展開処理画面で💡候補ボタンから商品CDを設定）`))return;
+  }
+
+  if(!confirm(`${dbType}向け売上伝票 ${targets.length}件 をCSV出力します。\n\n出力後、ステータスが「アップロード済み」に変わり、二重出力を防ぎます。\n\n実行しますか？`))return;
+
+  const rows=[];
+  let denpyoNo=1;
+  targets.forEach(inv=>{
+    const ucd=inv.unifiedCd||'';
+    const origCd=ucd.replace(/^[HK]-/,'');
+    const dateStr=(inv.date||'').replace(/-/g,'/');
+    const inputType=inv.inputType||'2';
+    const noteHeader=(inv.notes||'').substring(0,60);
+    (inv.items||[]).forEach((it,lineIdx)=>{
+      rows.push([
+        denpyoNo,             // A: 伝票NO
+        lineIdx+1,            // B: 伝票NO行
+        '1',                  // C: 事業所CD
+        '1',                  // D: 取引区分（掛取引）
+        dateStr,              // E: 売上日
+        origCd,               // F: 得意先CD
+        '',                   // G: 納入先CD
+        '',                   // H: 部門CD
+        '',                   // I: 担当者CD
+        '',                   // J: 配送業者CD
+        '',                   // K: 出荷日
+        '',                   // L: 納入日
+        '',                   // M: 請求計上日
+        noteHeader,           // N: 摘要
+        inputType,            // O: 入力区分
+        it.productCd||'',     // P: 商品CD
+        '',                   // Q: ケース数1
+        '',                   // R: ケース数2
+        it.qty||0,            // S: 数量
+        it.unitPrice||0,      // T: 売上単価
+        '',                   // U: 売上金額（空→自動算出）
+        '',                   // V: 原価単価
+        '',                   // W: 原価金額
+        '',                   // X: 倉庫CD
+        '',                   // Y: 仕入先CD
+        '',                   // Z: 注文番号
+        (it.wasteType||'').substring(0,60),  // AA: 明細摘要
+        '',                   // AB: ロットNO
+      ]);
+    });
+    denpyoNo++;
+  });
+
+  // CSV生成
+  const csv=rows.map(r=>r.map(v=>{
+    const s=String(v);
+    return (s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;
+  }).join(',')).join('\r\n');
+
+  // BOM付きUTF-8で出力
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${dbType}_売上UP_${fromDate.replace(/-/g,'')}_${toDate.replace(/-/g,'')}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // ステータス更新（uploaded）
+  targets.forEach(inv=>{
+    inv.status='uploaded';
+    inv.uploadedAt=new Date().toISOString();
+  });
+  await save();
+
+  alert(`✅ ${dbType}（${prefix}）売上CSV出力完了！\n\n`+
+    `📊 件数: ${targets.length}伝票 / ${rows.length}行\n`+
+    `📅 期間: ${fromDate} 〜 ${toDate}\n\n`+
+    `出力済伝票は status='uploaded' に変更しました。`);
 }
 
 // ================================================================
