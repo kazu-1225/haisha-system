@@ -1238,7 +1238,18 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
               <button class="btn btn-p" onclick="saveGasUrl()">✅ URLを保存・接続テスト</button>
               <button class="btn btn-d" onclick="clearGasUrl()">🗑 URL削除（ローカルのみ）</button>
             </div>
+            <div style="margin-top:8px">
+              <button class="btn btn-s" onclick="copyShareUrl()">📋 他のパソコン用の接続URLをコピー</button>
+            </div>
           </div>
+        </div>
+
+        <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:13px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700;color:#9a3412">🛡 データ保護の状態</div>
+            <button class="btn btn-s" onclick="checkProtection()" style="padding:4px 10px;font-size:11px">🔄 状態を確認</button>
+          </div>
+          <div id="protectStatus" style="font-size:12px;color:#475569;line-height:1.9">「状態を確認」を押すと表示されます。</div>
         </div>
 
         <hr style="margin:16px 0">
@@ -1262,7 +1273,8 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
           <div class="step-num">3</div>
           <div class="step-body">
             <div class="step-title">下のコードをコピーして貼り付け</div>
-            <div class="step-desc">エディタの既存コードを全て削除し、下のコードを貼り付けて「💾 保存」してください。</div>
+            <div class="step-desc">エディタの既存コードを全て削除し、下のコードを貼り付けて「💾 保存」してください。<br>
+              🔐 <strong>「コードをコピー」ボタンでコピーすると、このパソコン専用の合言葉が自動で入ります。</strong>画面の文字を手で選択してコピーすると合言葉が入らないので、必ずボタンを使ってください。</div>
             <button class="copy-btn" onclick="copyGasCode()">📋 コードをコピー</button>
             <div class="code-block" id="gasCodeBlock">// =====================================================
 // 配車管理システム - Google Apps Script バックエンド
@@ -1270,6 +1282,23 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 // =====================================================
 
 const SHEET_NAME = 'DB_JSON';
+const CODE_VERSION = 2;
+// 合言葉（配車システムの「📋 コードをコピー」で自動的に書き換わります。手で変更しないでください）
+const API_KEY = '__API_KEY__';
+const BACKUP_FOLDER = '配車管理バックアップ';
+const BACKUP_KEEP_DAYS = 30;
+
+// 合言葉が設定されている場合、URLの key が一致しないリクエストは拒否する
+function _keyEnabled() { return API_KEY && API_KEY.indexOf('__') !== 0; }
+function _keyOk(e) {
+  if (!_keyEnabled()) return true;
+  return !!(e && e.parameter && e.parameter.key === API_KEY);
+}
+
+// 保存のたびに1つずつ増える更新番号（同時編集の上書き防止に使う）
+function _getRev() {
+  return Number(PropertiesService.getScriptProperties().getProperty('DB_REV') || 0);
+}
 
 // チャンクプロパティを全削除するユーティリティ
 function _cleanChunkProps() {
@@ -1283,53 +1312,109 @@ function _cleanChunkProps() {
 
 function doGet(e) {
   try {
+    if (!_keyOk(e)) return respond({ error: 'auth' });
+    const action = (e && e.parameter && e.parameter.action) || '';
     // 手動クリーンアップ用エンドポイント（?action=cleanup）
-    if (e && e.parameter && e.parameter.action === 'cleanup') {
+    if (action === 'cleanup') {
       const n = _cleanChunkProps();
       return respond({ ok: true, cleaned: n });
     }
-    // 旧チャンク方式（後方互換）
-    if (e && e.parameter && e.parameter.chunk !== undefined) {
-      const idx   = parseInt(e.parameter.chunk);
-      const total = parseInt(e.parameter.total);
-      const enc   = e.parameter.enc || 'url';
-      const props = PropertiesService.getScriptProperties();
-      props.setProperty('c' + idx, e.parameter.data || '');
-      let full = '';
-      for (let i = 0; i < total; i++) {
-        const c = props.getProperty('c' + i);
-        if (c === null) return respond({ ok: 'waiting', got: idx });
-        full += c;
-      }
-      _cleanChunkProps();
-      let jsonStr = full;
-      if (enc === 'b64') {
-        jsonStr = Utilities.newBlob(Utilities.base64Decode(full)).getDataAsString('UTF-8');
-      }
-      const data = JSON.parse(jsonStr);
-      writeData(data);
-      writeReadableSheets(data);
-      return respond({ ok: true });
-    }
-    return respond(readData());
+    // 更新番号だけを返す（他のパソコンの更新チェック用・軽量）
+    if (action === 'rev') return respond({ ok: true, rev: _getRev() });
+    // データ保護の状態（設定画面の表示用）
+    if (action === 'status') return respond(_status());
+    const data = readData();
+    data._rev = _getRev();
+    return respond(data);
   } catch(err) {
-    _cleanChunkProps();
     return respond({ error: err.message });
   }
 }
 
-// POST送信対応（新方式：1回の通信で完結・高速）
+// POST送信（1回の通信で全データを保存）
+// baseRev（読み込んだ時の更新番号）がサーバーと違えば、他のパソコンが先に保存しているので上書きしない
 function doPost(e) {
+  if (!_keyOk(e)) return respond({ error: 'auth' });
+  const lock = LockService.getScriptLock();
   try {
-    const json = e.postData.contents;
-    const data = JSON.parse(json);
+    lock.waitLock(30000);
+    const data = JSON.parse(e.postData.contents);
+    const cur = _getRev();
+    const base = e.parameter.baseRev;
+    if (base !== undefined && base !== '' && Number(base) !== cur) {
+      return respond({ conflict: true, rev: cur });
+    }
+    const next = cur + 1;
+    data._rev = next;
     _cleanChunkProps();
     writeData(data);
+    PropertiesService.getScriptProperties().setProperty('DB_REV', String(next));
     writeReadableSheets(data);
-    return respond({ ok: true, method: 'post' });
+    return respond({ ok: true, method: 'post', rev: next });
   } catch(err) {
     return respond({ error: err.message });
+  } finally {
+    lock.releaseLock();
   }
+}
+
+// =====================================================
+// 💾 自動バックアップ（毎日タイマーで実行）
+// Googleドライブの「配車管理バックアップ」フォルダに全データを保存し、
+// BACKUP_KEEP_DAYS 日より古いものはゴミ箱へ移動する
+// 戻すときは、ファイルをダウンロードして配車システムの「📂 復元」で読み込む
+// =====================================================
+function dailyBackup() {
+  const json = JSON.stringify(readData());
+  const it = DriveApp.getFoldersByName(BACKUP_FOLDER);
+  const folder = it.hasNext() ? it.next() : DriveApp.createFolder(BACKUP_FOLDER);
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd_HHmm');
+  folder.createFile('配車バックアップ_' + stamp + '.json', json, 'application/json');
+
+  const limit = Date.now() - BACKUP_KEEP_DAYS * 86400000;
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    if (f.getDateCreated().getTime() < limit) f.setTrashed(true);
+  }
+  PropertiesService.getScriptProperties().setProperty('LAST_BACKUP', new Date().toISOString());
+}
+
+// =====================================================
+// ⏰ タイマー設定（最初に1回だけ、エディタで選んで ▶実行）
+// ・dailyBackup：毎日 深夜2時台
+// ・archiveConfirmedDispatches（実績ログ）：毎日 23時台
+// すでに設定済みのものは二重に作らない。最後にバックアップを1回実行して動作確認する
+// =====================================================
+function setupTriggers() {
+  const want = { dailyBackup: 2, archiveConfirmedDispatches: 23 };
+  const existing = ScriptApp.getProjectTriggers().map(function(t) { return t.getHandlerFunction(); });
+  Object.keys(want).forEach(function(fn) {
+    if (existing.indexOf(fn) === -1) {
+      ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(want[fn]).inTimezone('Asia/Tokyo').create();
+    }
+  });
+  dailyBackup();
+  archiveConfirmedDispatches();
+  Logger.log('✅ タイマー設定完了: ' + JSON.stringify(_status().triggers));
+}
+
+function _status() {
+  const fns = ScriptApp.getProjectTriggers().map(function(t) { return t.getHandlerFunction(); });
+  const p = PropertiesService.getScriptProperties();
+  return {
+    ok: true,
+    codeVersion: CODE_VERSION,
+    keyEnabled: _keyEnabled(),
+    rev: _getRev(),
+    lastBackup: p.getProperty('LAST_BACKUP') || '',
+    lastArchive: p.getProperty('LAST_ARCHIVE') || '',
+    triggers: {
+      backup: fns.indexOf('dailyBackup') !== -1,
+      archive: fns.indexOf('archiveConfirmedDispatches') !== -1,
+      containerAlert: fns.indexOf('checkContainerAlerts') !== -1
+    }
+  };
 }
 
 function respond(obj) {
@@ -1532,6 +1617,7 @@ function writeSheet(name, headers, rows) {
 // =====================================================
 function archiveConfirmedDispatches() {
   const data = readData();
+  PropertiesService.getScriptProperties().setProperty('LAST_ARCHIVE', new Date().toISOString());
   const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
   const DOW = ['日','月','火','水','木','金','土'];
 
@@ -1728,11 +1814,12 @@ function checkContainerAlerts() {
           <div class="step-body">
             <div class="step-title">Webアプリとしてデプロイ</div>
             <div class="step-desc">
-              Apps Script 画面の右上「<strong>デプロイ → 新しいデプロイ</strong>」をクリック<br>
+              <strong>初めての場合：</strong>Apps Script 画面の右上「<strong>デプロイ → 新しいデプロイ</strong>」をクリック<br>
               ①「種類の選択」→「ウェブアプリ」<br>
               ②「次のユーザーとして実行」→「自分」<br>
               ③「アクセスできるユーザー」→「<strong>全員</strong>」<br>
-              ④「デプロイ」ボタンを押して、表示された <strong>URL をコピー</strong>
+              ④「デプロイ」ボタンを押して、表示された <strong>URL をコピー</strong><br>
+              <strong>コードを更新した場合：</strong>「<strong>デプロイ → デプロイを管理</strong>」→ 鉛筆マーク →「バージョン」を「<strong>新バージョン</strong>」→「デプロイ」（URLは変わりません）
             </div>
           </div>
         </div>
@@ -1740,14 +1827,25 @@ function checkContainerAlerts() {
           <div class="step-num">5</div>
           <div class="step-body">
             <div class="step-title">URLを上の入力欄に貼り付けて保存</div>
-            <div class="step-desc">コピーしたURLを、このページ上部の「Google Apps Script の Web アプリURL」欄に貼り付けて「✅ URLを保存・接続テスト」をクリックしてください。</div>
+            <div class="step-desc">コピーしたURLを、このページ上部の「Google Apps Script の Web アプリURL」欄に貼り付けて「✅ URLを保存・接続テスト」をクリックしてください。<br>
+              合言葉はこのパソコンが覚えているので、URLに自動で付け足されます（コードを更新しただけの場合も、このボタンを1回押してください）。</div>
           </div>
         </div>
         <div class="step">
           <div class="step-num">6</div>
           <div class="step-body">
-            <div class="step-title">他の端末でも同じHTMLファイルを開いてURLを設定</div>
-            <div class="step-desc">社内の他のパソコン・タブレットでも、この <code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">配車管理システム.html</code> を開き、同じURLを設定すれば完了です。</div>
+            <div class="step-title">自動バックアップと実績ログのタイマーを設定（最初に1回だけ）</div>
+            <div class="step-desc">Apps Script のエディタ上部で、実行する関数に「<strong>setupTriggers</strong>」を選んで「▶ 実行」をクリックしてください。<br>
+              「承認が必要です」と出たら「権限を確認」→ アカウントを選択 →「詳細」→「（安全ではないページ）に移動」→「許可」の順に進みます。<br>
+              これで毎晩、Googleドライブの「配車管理バックアップ」フォルダに全データが保存されます（30日分）。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">7</div>
+          <div class="step-body">
+            <div class="step-title">他のパソコンでも使う</div>
+            <div class="step-desc">設定済みのパソコンで「📋 他のパソコン用の接続URLをコピー」を押し、そのURLを他のパソコンの同じ欄に貼り付けて「✅ URLを保存・接続テスト」をクリックしてください。<br>
+              ⚠ このURLには合言葉が含まれています。社外の人には絶対に教えないでください。</div>
           </div>
         </div>
       </div><!-- /sp-google -->
@@ -2442,6 +2540,28 @@ const DEMO_DB={
 // ================================================================
 let GAS_URL=localStorage.getItem('gasUrl')||'';
 let db=null;
+// サーバー（GAS）の更新番号。保存時に送り、他のパソコンが先に保存していたら上書きを止める
+let _serverRev=Number(localStorage.getItem('haishaRev')||0);
+function setServerRev(n){_serverRev=Number(n)||0;localStorage.setItem('haishaRev',String(_serverRev));}
+
+// 合言葉は接続URLの key パラメータとして持つ（URL1つを貼れば他のパソコンでも使える）
+function urlKey(u){try{return new URL(u).searchParams.get('key')||'';}catch(e){return '';}}
+function getGasKey(){return urlKey(GAS_URL)||localStorage.getItem('gasPendingKey')||'';}
+function gasUrl(params){
+  const u=new URL(GAS_URL);
+  Object.entries(params||{}).forEach(([k,v])=>u.searchParams.set(k,v));
+  u.searchParams.set('t',Date.now());
+  return u.toString();
+}
+function newGasKey(){
+  const a=new Uint8Array(18);crypto.getRandomValues(a);
+  return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('');
+}
+// GASが返すエラーコードを日本語にする
+function gasResultErr(r){
+  if(r&&r.error==='auth')return '合言葉が一致しません（設定画面で接続URLを設定し直してください）';
+  return 'GAS側のエラー: '+(r&&r.error);
+}
 
 function setSyncStatus(s,msg){
   const dot=document.getElementById('syncDot');
@@ -2452,6 +2572,29 @@ function setSyncStatus(s,msg){
   const m=map[s]||map.none;
   dot.className='sync-dot '+m.cls;
   txt.textContent=msg||m.t;
+}
+
+// GASの応答をJSONとして読む。HTML（Googleのエラー画面）が返った場合は原因を推測して日本語のエラーにする
+async function readGasJson(res){
+  const text=await res.text();
+  try{return JSON.parse(text);}catch(e){}
+  const t=text.toLowerCase();
+  if(res.status===404||t.includes('見つかりません')||t.includes('not found'))
+    throw new Error('GASのURLが見つかりません（デプロイを確認してください）');
+  if(t.includes('accounts.google.com')||t.includes('servicelogin')||t.includes('ログイン')||t.includes('sign in'))
+    throw new Error('GASの公開設定を「全員」にしてください');
+  if(t.includes('too many times')||t.includes('回数が多すぎ')||t.includes('上限'))
+    throw new Error('Googleの1日の利用上限を超えました（翌日まで待ってください）');
+  if(t.includes('ファイルを開くことができません')||t.includes('unable to open the file'))
+    throw new Error('GASの応答を開けません（Apps Scriptを再デプロイしてください）');
+  if(t.includes('execution time')||t.includes('実行時間'))
+    throw new Error('GASの処理時間が長すぎて止まりました');
+  throw new Error('GASから正しい応答がありません（URL・デプロイ設定を確認してください）');
+}
+// fetch自体の失敗（通信エラー）を日本語にする
+function gasErrMsg(e){
+  if(e&&e.name==='TypeError')return 'インターネットまたはGASに接続できません';
+  return (e&&e.message)||'同期エラー';
 }
 
 function updateUrlStatus(){
@@ -2473,23 +2616,34 @@ async function saveGasUrl(){
   if(!v){alert('URLを入力してください');return;}
   if(!v.startsWith('https://script.google.com/')){
     alert('URLが正しくありません。\nhttps://script.google.com/ で始まるURLを入力してください');return;}
-  GAS_URL=v;
+  if(!v.split('?')[0].endsWith('/exec')){
+    alert('URLが正しくありません。\n最後が「/exec」で終わるURLを入力してください。\n（Apps Scriptの「デプロイを管理」に表示されるウェブアプリのURLです）');return;}
+  // 合言葉が付いていないURLなら、このパソコンが覚えている合言葉を付け足す
+  let url;
+  try{url=new URL(v);}catch(e){alert('URLが正しくありません');return;}
+  const key=url.searchParams.get('key')||getGasKey();
+  url.search='';
+  if(key)url.searchParams.set('key',key);
+  GAS_URL=url.toString();
   localStorage.setItem('gasUrl',GAS_URL);
+  if(key)localStorage.removeItem('gasPendingKey');
   updateUrlStatus();
   // Test connection
   setSyncStatus('loading','接続テスト中...');
   try{
-    const res=await fetch(GAS_URL+'?t='+Date.now(),{redirect:'follow'});
-    const data=await res.json();
+    const res=await fetch(gasUrl(),{redirect:'follow'});
+    const data=await readGasJson(res);
+    if(data&&data.error)throw new Error(gasResultErr(data));
     if(data&&typeof data==='object'){
       setSyncStatus('ok');
-      alert('✅ 接続成功！Googleスプレッドシートと連携しました。\n\n続いて「今すぐ同期」を実行してください。');
       // Load from GAS if available
-      if(data.dispatches){db=data;localStorage.setItem('haishaDB2',JSON.stringify(db));render();}
-    } else throw new Error('Invalid response');
+      if(data.dispatches){db=data;normalizeDB();setServerRev(data._rev);localStorage.setItem('haishaDB2',JSON.stringify(db));render();}
+      alert('✅ 接続成功！Googleスプレッドシートと連携しました。'+(key?'\n🔐 合言葉付きで接続しています。':''));
+      checkProtection();
+    } else throw new Error('GASから正しい応答がありません');
   }catch(e){
     setSyncStatus('error','接続エラー');
-    alert('❌ 接続できませんでした。\n\nURLが正しいか確認してください。\nApps Scriptのデプロイ設定で「アクセスできるユーザー」が「全員」になっているか確認してください。\n\nエラー: '+e.message);
+    alert('❌ 接続できませんでした。\n\nURLが正しいか確認してください。\nApps Scriptのデプロイ設定で「アクセスできるユーザー」が「全員」になっているか確認してください。\n\n原因: '+gasErrMsg(e));
   }
 }
 
@@ -2505,11 +2659,12 @@ async function loadDB(){
       // 15秒タイムアウト：GASが応答しない場合はローカルにフォールバック
       const ctrl=new AbortController();
       const tid=setTimeout(()=>ctrl.abort(),15000);
-      const res=await fetch(GAS_URL+'?t='+Date.now(),{redirect:'follow',signal:ctrl.signal});
+      const res=await fetch(gasUrl(),{redirect:'follow',signal:ctrl.signal});
       clearTimeout(tid);
-      const data=await res.json();
+      const data=await readGasJson(res);
+      if(data&&data.error)throw new Error(gasResultErr(data));
       if(data&&Array.isArray(data.dispatches)){
-        db=data;normalizeDB();
+        db=data;normalizeDB();setServerRev(data._rev);
         localStorage.setItem('haishaDB2',JSON.stringify(db));
         setSyncStatus('ok');return;
       }
@@ -2517,7 +2672,7 @@ async function loadDB(){
       if(e.name==='AbortError'){
         setSyncStatus('error','GAS読込タイムアウト（ローカルを使用）');
       }else{
-        setSyncStatus('error','サーバー接続失敗（ローカルを使用）');
+        setSyncStatus('error',gasErrMsg(e)+'（ローカルを使用）');
       }
       console.warn('GAS load failed:',e);
     }
@@ -2564,9 +2719,11 @@ function normalizeDB(){
 }
 
 let _autoSyncTimer=null;
+let _dirty=false; // まだサーバーに送っていない変更があるか
 async function save(){
   localStorage.setItem('haishaDB2',JSON.stringify(db));
   if(GAS_URL){
+    _dirty=true;
     setSyncStatus('pending');
     clearTimeout(_autoSyncTimer);
     _autoSyncTimer=setTimeout(()=>manualSync(),2000);
@@ -2586,13 +2743,16 @@ async function manualSync(){
   try{
     const json=JSON.stringify(db);
     // POST方式：1回の通信で完結（高速）
-    const res=await fetch(GAS_URL,{method:'POST',redirect:'follow',body:json});
-    const result=await res.json();
-    if(result.error) throw new Error(result.error);
+    const res=await fetch(gasUrl({baseRev:_serverRev}),{method:'POST',redirect:'follow',body:json});
+    const result=await readGasJson(res);
+    if(result.conflict){_syncNeeded=false;_syncLock=false;await handleSyncConflict();return;}
+    if(result.error) throw new Error(gasResultErr(result));
     if(result.ok!==true) throw new Error('GASが古いバージョンです。Apps Scriptのコードを更新・再デプロイしてください。');
+    if(result.rev!==undefined)setServerRev(result.rev);
+    if(!_syncNeeded)_dirty=false;
     setSyncStatus('ok');
   }catch(e){
-    setSyncStatus('error',e.message||'同期エラー（ローカルには保存済み）');
+    setSyncStatus('error',gasErrMsg(e)+'（ローカルには保存済み）');
     console.warn('manualSync error:',e);
   }finally{
     _syncLock=false;
@@ -2601,6 +2761,75 @@ async function manualSync(){
       _syncNeeded=false;
       setTimeout(()=>manualSync(),800);
     }
+  }
+}
+
+// 他のパソコンが先に保存していた場合：上書きせずに止め、最新データの読み込みを案内する
+async function handleSyncConflict(){
+  setSyncStatus('error','他のパソコンで先に更新されています（未保存）');
+  // 念のため、このパソコンの未保存データを退避しておく
+  try{localStorage.setItem('haishaDB2_conflict',JSON.stringify(db));}catch(e){}
+  if(confirm('⚠ 他のパソコンで先にデータが更新されていたため、上書きを防ぐために保存を止めました。\n\n'
+    +'［OK］最新のデータを読み込みます。\n　　　この画面で直前に行った変更は反映されていないので、もう一度入力してください。\n'
+    +'［キャンセル］今は読み込みません（このパソコンの変更はまだ保存されていません）。')){
+    await refreshFromServer();
+  }
+}
+
+// サーバーから最新データを読み込み直して画面を描き直す
+async function refreshFromServer(){
+  await loadDB();
+  for(const rs of db.regulars)genRegDisps(rs);
+  _dirty=false;
+  render();
+}
+
+// 他のパソコンで更新されていないか確認し、未保存の変更がなければ自動で最新にする
+async function checkServerUpdate(){
+  if(!GAS_URL||_dirty||_syncLock||document.hidden)return;
+  if(document.querySelector('.ovl:not(.hid)'))return; // 入力画面を開いている間は触らない
+  try{
+    const r=await readGasJson(await fetch(gasUrl({action:'rev'}),{redirect:'follow'}));
+    if(r&&r.ok&&r.rev!==undefined&&Number(r.rev)>_serverRev&&!_dirty){
+      await refreshFromServer();
+      setSyncStatus('ok','他のパソコンの更新を読み込みました');
+    }
+  }catch(e){console.warn('checkServerUpdate:',e);}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkServerUpdate();});
+setInterval(checkServerUpdate,3*60*1000);
+
+// 他のパソコン用の接続URL（合言葉付き）をコピー
+function copyShareUrl(){
+  if(!GAS_URL){alert('まだURLが設定されていません。');return;}
+  if(!urlKey(GAS_URL)&&!confirm('このURLには合言葉が付いていません（データ保護が有効になっていません）。\nこのままコピーしますか？'))return;
+  const done=()=>alert('✅ 接続URLをコピーしました。\n他のパソコンの設定画面の「Google Apps Script の Web アプリURL」欄に貼り付けて、「URLを保存・接続テスト」を押してください。\n\n⚠ 合言葉が含まれているので、社外の人には教えないでください。');
+  navigator.clipboard.writeText(GAS_URL).then(done).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=GAS_URL;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();
+  });
+}
+
+// データ保護の状態（合言葉・自動バックアップ・実績ログ）を表示
+async function checkProtection(){
+  const el=document.getElementById('protectStatus');if(!el)return;
+  if(!GAS_URL){el.textContent='GASのURLが設定されていません。';return;}
+  el.textContent='確認中...';
+  const fmtT=s=>{if(!s)return '';const d=new Date(s);return isNaN(d)?'':`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const row=(ok,label,note)=>`<div>${ok?'✅':'⚠️'} ${label}${note?`<span style="color:#94a3b8">　${note}</span>`:''}</div>`;
+  try{
+    const s=await readGasJson(await fetch(gasUrl({action:'status'}),{redirect:'follow'}));
+    if(s&&s.error)throw new Error(gasResultErr(s));
+    if(!s||s.codeVersion===undefined){
+      el.innerHTML=row(false,'Apps Scriptのコードが古いバージョンです','下の手順3・4でコードを更新してください');return;
+    }
+    const t=s.triggers||{};
+    el.innerHTML=
+      row(s.keyEnabled&&!!urlKey(GAS_URL),'合言葉によるアクセス制限',s.keyEnabled?(urlKey(GAS_URL)?'有効':'このパソコンのURLに合言葉がありません'):'未設定（手順3でコードをコピーし直してください）')
+      +row(t.backup&&!!s.lastBackup,'毎日の自動バックアップ',t.backup?(s.lastBackup?'最終: '+fmtT(s.lastBackup):'まだ実行されていません'):'タイマー未設定（手順6）')
+      +row(t.archive,'実績ログの自動記録',t.archive?(s.lastArchive?'最終: '+fmtT(s.lastArchive):'まだ実行されていません'):'タイマー未設定（手順6）')
+      +row(true,'同時編集の上書き防止','有効（更新番号 '+s.rev+'）');
+  }catch(e){
+    el.innerHTML=row(false,'状態を取得できませんでした',esc(gasErrMsg(e)));
   }
 }
 
@@ -4355,7 +4584,7 @@ function chkLic(){
 // ================================================================
 // SETTINGS
 // ================================================================
-function openSettings(){updateUrlStatus();renderSLists();updateSalesHistoryStatus();openM('mSettings');}
+function openSettings(){updateUrlStatus();renderSLists();updateSalesHistoryStatus();openM('mSettings');checkProtection();}
 function stab(name){
   const ns=['google','drivers','vehicles','customers','sites','data'];
   document.querySelectorAll('.stab').forEach((t,i)=>t.classList.toggle('on',ns[i]===name));
@@ -5126,9 +5355,17 @@ async function resetAll(){
 // GAS CODE COPY
 // ================================================================
 function copyGasCode(){
-  const code=document.getElementById('gasCodeBlock').textContent;
-  navigator.clipboard.writeText(code).then(()=>alert('✅ コードをコピーしました！\nApps Scriptエディタに貼り付けてください。')).catch(()=>{
-    const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('✅ コードをコピーしました！');
+  // 合言葉を入れてコピーする（まだ無ければ新しく作り、URL保存時に使えるよう覚えておく）
+  let key=getGasKey();
+  if(!key){key=newGasKey();localStorage.setItem('gasPendingKey',key);}
+  const code=document.getElementById('gasCodeBlock').textContent.replace("'__API_KEY__'","'"+key+"'");
+  const msg='✅ 合言葉入りのコードをコピーしました！\n\n'
+    +'① Apps Scriptエディタの既存コードを全て消して貼り付け →「保存」\n'
+    +'② 「デプロイ」→「デプロイを管理」→ 鉛筆マーク →「新バージョン」→「デプロイ」\n'
+    +'③ この画面に戻り「✅ URLを保存・接続テスト」を押す\n\n'
+    +'※ ③を行うまで、他のパソコンからは接続できなくなります。';
+  navigator.clipboard.writeText(code).then(()=>alert(msg)).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert(msg);
   });
 }
 
