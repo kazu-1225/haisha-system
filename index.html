@@ -466,6 +466,17 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-fixed-hdr td{background:#fdf4ff;color:#7e22ce;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #d8b4fe}
 .cs-fixed-cell{background:#fdf4ff !important;vertical-align:top;padding:3px;min-height:36px;cursor:pointer}
 .cs-fixed-cell:hover{background:#f5f3ff !important}
+/* 上部固定行：折りたたみ・高さ上限 */
+.fix-hdr{cursor:pointer;user-select:none}
+.fix-hdr:hover{filter:brightness(.96)}
+.fix-arrow{display:inline-block;width:12px;font-size:9px}
+.fix-scrl{max-height:112px}
+.fix-more{font-size:9px;color:#64748b;text-align:center;padding-top:1px;font-weight:600}
+.fix-collapsed td{padding-top:2px !important;padding-bottom:2px !important}
+.fix-sum{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:20px;cursor:pointer;font-size:10px;font-weight:700}
+.fix-sum-empty{min-height:16px}
+.fix-pend{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;padding:0 6px}
+.fix-done{background:#fff;color:#475569;border:1px solid #cbd5e1;border-radius:10px;padding:0 6px}
 .cs-bar-outer{position:relative;height:26px;background:#f3f4f6;border-radius:6px;margin:2px 0;overflow:visible}
 .cs-bar{position:absolute;top:2px;bottom:2px;background:#c4b5fd;border:1.5px solid #7c3aed;border-radius:5px;display:flex;align-items:center;min-width:20px;cursor:pointer;overflow:visible;box-sizing:border-box}
 .cs-bar:hover{background:#a78bfa}
@@ -2951,6 +2962,39 @@ function regularDispsForDate(ds){
 function carryInDispsForDate(ds){
   return(db.dispatches||[]).filter(dp=>dp.isCarryIn&&workDate(dp)===ds);
 }
+
+// ===== 上部固定行（定期便・持込み・委託応援）の折りたたみ =====
+// 開閉状態はパソコンごとに保存。閉じている間は日ごとの件数だけを1行で表示する
+let FIX_COLLAPSED={};
+try{FIX_COLLAPSED=JSON.parse(localStorage.getItem('haishaFixCollapsed')||'{}')||{};}catch(e){}
+function toggleFixRow(k){
+  FIX_COLLAPSED[k]=!FIX_COLLAPSED[k];
+  try{localStorage.setItem('haishaFixCollapsed',JSON.stringify(FIX_COLLAPSED));}catch(e){}
+  render();
+}
+// 行の見出しセル（クリックで開閉）
+function fixHdr(k,label,color,bg,border,sub){
+  const c=!!FIX_COLLAPSED[k];
+  return `<td class="res-cell fix-hdr" style="background:${bg};border-right:2px solid ${border};position:sticky;left:0;z-index:10" onclick="toggleFixRow('${k}')" title="クリックで${c?'開く':'折りたたむ'}">
+    <div style="font-size:11px;font-weight:700;color:${color}"><span class="fix-arrow">${c?'▶':'▼'}</span>${label}</div>${sub&&!c?`<div style="font-size:9px;color:#94a3b8;margin-top:1px">${sub}</div>`:''}</td>`;
+}
+// 折りたたみ時の件数表示（未定は赤で目立たせる）
+function fixSummary(k,items){
+  if(!items.length)return `<div class="fix-sum fix-sum-empty" onclick="event.stopPropagation();toggleFixRow('${k}')"></div>`;
+  let html;
+  if(k==='reg'){
+    const pend=items.filter(dp=>!(dp.driver&&dp.vehicle)).length;
+    const done=items.length-pend;
+    html=(pend?`<span class="fix-pend">🔴未定 ${pend}</span>`:'')+(done?`<span class="fix-done">✔確定 ${done}</span>`:'');
+  }else{
+    html=`<span class="fix-done">${items.length}件</span>`;
+  }
+  return `<div class="fix-sum" onclick="event.stopPropagation();toggleFixRow('${k}')" title="クリックで開く">${html}</div>`;
+}
+// 展開時：一定の高さで止めてマス内スクロール。3件以上なら件数を表示
+function fixScrl(inner,n){
+  return `<div class="cell-scrl fix-scrl">${inner}</div>${n>2?`<div class="fix-more">全${n}件 ↕スクロール</div>`:''}`;
+}
 function onCarryInChange(){
   const isCarryIn=document.getElementById('dCarryIn').checked;
   document.getElementById('dDriverVehicleRow').style.display=isCarryIn?'none':'';
@@ -3113,8 +3157,7 @@ function render(){
   // ===== 定期便専用行（カレンダー最上部） =====
   let tb='';
   {
-    let regRow=`<tr class="reg-fixed-hdr"><td class="res-cell" style="background:#f0fdf4;border-right:2px solid #86efac;position:sticky;left:0;z-index:10">
-      <div style="font-size:11px;font-weight:700;color:#15803d">🔁 定期便</div></td>`;
+    let regRow=`<tr class="reg-fixed-hdr${FIX_COLLAPSED.reg?' fix-collapsed':''}">`+fixHdr('reg','🔁 定期便','#15803d','#f0fdf4','#86efac');
     if(isDay){
       const ds=fmt(dates[0]);
       const holName=HOLIDAYS[ds]||'';
@@ -3130,7 +3173,7 @@ function render(){
       regRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
         ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
         onclick="cellClick(event,'${ds}','')">
-        <div class="day-cell-wrap">${dayHtml||''}</div></td>`;
+        ${FIX_COLLAPSED.reg?fixSummary('reg',sorted):`<div class="day-cell-wrap">${dayHtml||''}</div>`}</td>`;
     } else {
       for(const dt of dates){
         const ds=fmt(dt),dow=dt.getDay();
@@ -3138,10 +3181,11 @@ function render(){
         let cc='reg-fixed-cell ev-cell'+(isMonth?' td-month':'');
         if(ds===today)cc+=' td-now';
         else if(holName)cc+=' td-hol';
-        const regCards=regularDispsForDate(ds).map(dp=>cardHTML(dp,'reg')).join('');
+        const regItems=regularDispsForDate(ds);
+        const regCards=regItems.map(dp=>cardHTML(dp,'reg')).join('');
         regRow+=`<td class="${cc}" data-date="${ds}" data-rid=""
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-          onclick="cellClick(event,'${ds}','')"><div class="cell-scrl">${regCards}</div></td>`;
+          onclick="cellClick(event,'${ds}','')">${FIX_COLLAPSED.reg?fixSummary('reg',regItems):fixScrl(regCards,regItems.length)}</td>`;
       }
     }
     regRow+='</tr>';
@@ -3150,8 +3194,7 @@ function render(){
 
   // ===== 持込み専用行（定期便行の下） =====
   {
-    let carryRow=`<tr class="carry-fixed-hdr"><td class="res-cell" style="background:#eff6ff;border-right:2px solid #93c5fd;position:sticky;left:0;z-index:10">
-      <div style="font-size:11px;font-weight:700;color:#1d4ed8">🏭 持込み</div></td>`;
+    let carryRow=`<tr class="carry-fixed-hdr${FIX_COLLAPSED.carry?' fix-collapsed':''}">`+fixHdr('carry','🏭 持込み','#1d4ed8','#eff6ff','#93c5fd');
     if(isDay){
       const ds=fmt(dates[0]);
       const holName=HOLIDAYS[ds]||'';
@@ -3167,7 +3210,7 @@ function render(){
       carryRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
         ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
         onclick="cellClick(event,'${ds}','')">
-        <div class="day-cell-wrap">${dayHtml||''}</div></td>`;
+        ${FIX_COLLAPSED.carry?fixSummary('carry',sorted):`<div class="day-cell-wrap">${dayHtml||''}</div>`}</td>`;
     } else {
       for(const dt of dates){
         const ds=fmt(dt);
@@ -3175,10 +3218,11 @@ function render(){
         let cc='carry-fixed-cell ev-cell'+(isMonth?' td-month':'');
         if(ds===today)cc+=' td-now';
         else if(holName)cc+=' td-hol';
-        const carryCards=carryInDispsForDate(ds).map(dp=>cardHTML(dp,'carry')).join('');
+        const carryItems=carryInDispsForDate(ds);
+        const carryCards=carryItems.map(dp=>cardHTML(dp,'carry')).join('');
         carryRow+=`<td class="${cc}" data-date="${ds}" data-rid=""
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-          onclick="cellClick(event,'${ds}','')"><div class="cell-scrl">${carryCards}</div></td>`;
+          onclick="cellClick(event,'${ds}','')">${FIX_COLLAPSED.carry?fixSummary('carry',carryItems):fixScrl(carryCards,carryItems.length)}</td>`;
       }
     }
     carryRow+='</tr>';
@@ -3198,20 +3242,20 @@ function render(){
       const safeId=esc(cs.id);const safeTitle=esc(`${label}${cs.note?'\n'+cs.note:''}`);
       return `<div class="cs-bar-outer"><div class="cs-bar" style="left:${leftPct}%;width:${widthPct}%" data-cs-id="${safeId}" onclick="event.stopPropagation();openEditCS(this.dataset.csId)" title="${safeTitle}"><div class="cs-handle cs-handle-l" onmousedown="startCsDrag(event,this.closest('.cs-bar').dataset.csId,'l')" onclick="event.stopPropagation()"></div><div class="cs-bar-inner"><span class="cs-bar-label">${esc(label)}</span></div><div class="cs-handle cs-handle-r" onmousedown="startCsDrag(event,this.closest('.cs-bar').dataset.csId,'r')" onclick="event.stopPropagation()"></div></div></div>`;
     }
-    let csRow=`<tr class="cs-fixed-hdr"><td class="res-cell" style="background:#fdf4ff;border-right:2px solid #d8b4fe;position:sticky;left:0;z-index:10"><div style="font-size:11px;font-weight:700;color:#7e22ce">🏛 委託応援</div><div style="font-size:9px;color:#a78bfa;margin-top:1px">クリックで登録</div></td>`;
+    let csRow=`<tr class="cs-fixed-hdr${FIX_COLLAPSED.cs?' fix-collapsed':''}">`+fixHdr('cs','🏛 委託応援','#7e22ce','#fdf4ff','#d8b4fe','マスをクリックで登録');
     if(isDay){
       const ds=fmt(dates[0]),holName=HOLIDAYS[ds]||'';
       let cc='cs-fixed-cell ev-cell';
       if(ds===today)cc+=' td-now';else if(holName)cc+=' td-hol';
       const csItems=(db.contractSupports||[]).filter(cs=>cs.date===ds);
-      csRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録"><div class="day-cell-wrap" style="min-height:30px">${csItems.map(cs=>csBarHtml(cs)).join('')}</div></td>`;
+      csRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録">${FIX_COLLAPSED.cs?fixSummary('cs',csItems):`<div class="day-cell-wrap" style="min-height:30px">${csItems.map(cs=>csBarHtml(cs)).join('')}</div>`}</td>`;
     } else {
       for(const dt of dates){
         const ds=fmt(dt),holName=HOLIDAYS[ds]||'';
         let cc='cs-fixed-cell'+(isMonth?' td-month':'');
         if(ds===today)cc+=' td-now';else if(holName)cc+=' td-hol';
         const csItems=(db.contractSupports||[]).filter(cs=>cs.date===ds);
-        csRow+=`<td class="${cc}" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録"><div style="min-height:28px;padding:1px">${csItems.map(cs=>csBarHtml(cs)).join('')}</div></td>`;
+        csRow+=`<td class="${cc}" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録">${FIX_COLLAPSED.cs?fixSummary('cs',csItems):`<div style="min-height:28px;padding:1px">${fixScrl(csItems.map(cs=>csBarHtml(cs)).join(''),csItems.length)}</div>`}</td>`;
       }
     }
     csRow+='</tr>';
