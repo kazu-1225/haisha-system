@@ -4330,8 +4330,13 @@ function workTypeLabel(wt){
 // ================================================================
 // HOVER POPUP
 // ================================================================
-function showDispPopup(e,id){
-  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
+// 持込みの指定時間：時間指定があればそれ、なければ備考に書かれた時刻（例 13:00〜14:00）を拾う
+function carryInTime(dp){
+  if(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)return dp.timeSpec.time;
+  const m=(dp.notes||'').match(/\d{1,2}[:：]\d{2}(?:\s*[〜~～ー－-]\s*\d{1,2}[:：]\d{2})?/);
+  return m?m[0]:'';
+}
+function showDispPopup(e,id){  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
   const isShip=dp.dispatchType==='shipment';
   const dr=db.drivers.find(x=>x.id===dp.driver);
   const ve=db.vehicles.find(x=>x.id===dp.vehicle);
@@ -4344,7 +4349,11 @@ function showDispPopup(e,id){
     rows+=`<div class="pop-row"><span class="pop-label" style="color:#ea580c;font-weight:800">出荷日</span><span class="pop-val" style="color:#ea580c;font-weight:700">${dispDateStr}</span></div>`;
     if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">期限</span><span class="pop-val">${dp.deadline}</span></div>`;
     rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
-    if(dp.isCarryIn){rows+=`<div class="pop-row"><span class="pop-label">種別</span><span class="pop-val">🏭 持込み</span></div>`;}
+    if(dp.isCarryIn){
+      const t=carryInTime(dp);
+      rows+=`<div class="pop-row"><span class="pop-label">種別</span><span class="pop-val">🏭 持込み</span></div>`;
+      rows+=`<div class="pop-row"><span class="pop-label" style="color:#1d4ed8;font-weight:800">指定時間</span><span class="pop-val" style="color:#1d4ed8;font-weight:700">${t?'🕐 '+escH(t):'指定なし'}</span></div>`;
+    }
     else{rows+=`<div class="pop-row"><span class="pop-label">ドライバー</span><span class="pop-val">${dr?dr.name:'未定'}</span></div>`;rows+=`<div class="pop-row"><span class="pop-label">車両</span><span class="pop-val">${ve?ve.name:'未定'}${ve&&ve.plate?` (${ve.plate})`:''}</span></div>`;}
     if(dp.destAddr||dp.destContact||dp.destPhone){
       rows+=`<div class="pop-section"><div class="pop-sec-title" style="color:#ea580c">📦 出荷先詳細</div>`;
@@ -4366,8 +4375,15 @@ function showDispPopup(e,id){
   rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
   if(dp.workType&&dp.workType.type)rows+=`<div class="pop-row"><span class="pop-label" style="color:#6d28d9;font-weight:800">作業種別</span><span class="pop-val" style="font-weight:700;color:#6d28d9">${workTypeLabel(dp.workType)}</span></div>`;
   if(dp.custContact)rows+=`<div class="pop-row"><span class="pop-label">お客様担当</span><span class="pop-val">${dp.custContact}</span></div>`;
-  rows+=`<div class="pop-row"><span class="pop-label">ドライバー</span><span class="pop-val">${dr?dr.name:'未定'}</span></div>`;
-  rows+=`<div class="pop-row"><span class="pop-label">車両</span><span class="pop-val">${ve?ve.name:'未定'}${ve&&ve.plate?` (${ve.plate})`:''}</span></div>`;
+  if(dp.isCarryIn){
+    // 持込みはドライバー・車両が不要なので、代わりに持込みの指定時間を表示
+    const t=carryInTime(dp);
+    rows+=`<div class="pop-row"><span class="pop-label">種別</span><span class="pop-val">🏭 持込み${dp.isReg?'（定期）':''}</span></div>`;
+    rows+=`<div class="pop-row"><span class="pop-label" style="color:#1d4ed8;font-weight:800">指定時間</span><span class="pop-val" style="color:#1d4ed8;font-weight:700">${t?'🕐 '+escH(t):'指定なし'}</span></div>`;
+  }else{
+    rows+=`<div class="pop-row"><span class="pop-label">ドライバー</span><span class="pop-val">${dr?dr.name:'未定'}</span></div>`;
+    rows+=`<div class="pop-row"><span class="pop-label">車両</span><span class="pop-val">${ve?ve.name:'未定'}${ve&&ve.plate?` (${ve.plate})`:''}</span></div>`;
+  }
   if(dp.siteName||dp.siteAddr){
     rows+=`<div class="pop-section"><div class="pop-sec-title">📍 収集先</div>`;
     if(dp.siteName)rows+=`<div class="pop-row"><span class="pop-label">名称</span><span class="pop-val">${dp.siteName}</span></div>`;
