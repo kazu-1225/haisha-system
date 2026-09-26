@@ -486,6 +486,16 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
 .cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
 .cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+/* ごみ箱 */
+.trash-item{display:flex;gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px;background:#fff}
+.trash-main{flex:1;min-width:0}
+.trash-name{font-size:12px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trash-kind{font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border-radius:4px;padding:1px 5px;margin-right:6px}
+.trash-sub{font-size:10px;color:#64748b;margin-top:2px}
+.trash-btns{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.undo-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;border-radius:8px;padding:10px 14px;display:flex;gap:14px;align-items:center;font-size:12px;z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.undo-toast.hid{display:none}
+.undo-toast button{background:#fbbf24;color:#1e293b;font-weight:700;border-radius:6px;padding:4px 10px}
 /* 日表示の委託応援：1人1行・0〜24時の横幅いっぱいで表示（端をドラッグで時間変更） */
 .cs-day-list{padding:4px 8px;min-height:30px}
 /* 週・月表示の委託応援（名前＋時間＋時間帯の目安線） */
@@ -644,6 +654,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
   <button class="hbtn" onclick="exportCSV()">📊 CSV</button>
   <button class="hbtn" onclick="exportJSON()">💾 バックアップ</button>
   <button class="hbtn" onclick="document.getElementById('fi-json').click()">📂 復元</button>
+  <button class="hbtn" onclick="openTrash()" title="削除したカードを30日間保管しています">🗑 ごみ箱<span id="trashCnt"></span></button>
   <input id="fi-json" type="file" accept=".json" class="hid" onchange="importJSON(event)">
 </header>
 
@@ -2288,6 +2299,22 @@ function checkContainerAlerts() {
   </div>
 </div>
 
+<!-- ごみ箱 モーダル -->
+<div class="ovl hid" id="mTrash">
+  <div class="mbox" style="max-width:640px">
+    <div class="mhdr"><h2>🗑 ごみ箱</h2><span class="mcls" onclick="closeM('mTrash')">×</span></div>
+    <div class="mbdy">
+      <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.6">削除した配車・出荷のカードを<strong>30日間</strong>保管しています。「元に戻す」で削除前の状態に戻ります。30日を過ぎたものは自動で削除されます。</div>
+      <div id="trashList"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-d" onclick="purgeTrash()">ごみ箱を空にする</button>
+      <button class="btn btn-s" onclick="closeM('mTrash')">閉じる</button>
+    </div>
+  </div>
+</div>
+<div id="undoToast" class="undo-toast hid"></div>
+
 <!-- 委託応援 モーダル -->
 <div class="ovl hid" id="mCS">
   <div class="mbox" style="max-width:480px">
@@ -2737,6 +2764,9 @@ function normalizeDB(){
   });
   if(!db.salesInvoices)db.salesInvoices=[];
   if(!db.wasteUnitPrices)db.wasteUnitPrices=[];
+  if(!db.trash)db.trash=[];
+  if(!db.regSkips)db.regSkips=[];
+  pruneTrash();
 }
 
 let _autoSyncTimer=null;
@@ -3013,6 +3043,7 @@ function onCarryInChange(){
 
 function render(){
   if(!db){return;}
+  updateTrashCnt();
   const dates=getDates();
   const today=fmt(new Date());
   const isMonth=ST.view==='month';
@@ -4627,13 +4658,14 @@ async function saveDispatch(){
   }
   await save();closeM('mDispatch');render();
 }
+const TRASH_MSG='この配車予定を削除しますか？\n（ごみ箱に移動します。'+'30日間は元に戻せます）';
 async function delDispatch(){
-  if(!ST.editId)return;if(!confirm('この配車予定を削除しますか？'))return;
-  db.dispatches=db.dispatches.filter(x=>x.id!==ST.editId);await save();closeM('mDispatch');render();
+  if(!ST.editId)return;if(!confirm(TRASH_MSG))return;
+  const ids=[ST.editId];trashDispatches(ids);await save();closeM('mDispatch');render();showUndo('配車予定をごみ箱に移動しました',ids);
 }
 async function qDel(id){
-  if(!confirm('この配車予定を削除しますか？'))return;
-  db.dispatches=db.dispatches.filter(x=>x.id!==id);await save();render();
+  if(!confirm(TRASH_MSG))return;
+  trashDispatches([id]);await save();render();showUndo('配車予定をごみ箱に移動しました',[id]);
 }
 function chkLic(){
   const dr=db.drivers.find(x=>x.id===document.getElementById('dDriver').value);
@@ -5272,8 +5304,8 @@ async function saveShipment(){
   await save();closeM('mShipment');render();renderPending();
 }
 async function delShipment(){
-  if(!ST.editId)return;if(!confirm('この出荷予定を削除しますか？'))return;
-  db.dispatches=db.dispatches.filter(x=>x.id!==ST.editId);await save();closeM('mShipment');render();renderPending();
+  if(!ST.editId)return;if(!confirm('この出荷予定を削除しますか？\n（ごみ箱に移動します。30日間は元に戻せます）'))return;
+  const ids=[ST.editId];trashDispatches(ids);await save();closeM('mShipment');render();renderPending();showUndo('出荷予定をごみ箱に移動しました',ids);
 }
 function onSCarryInChange(){
   const isCarryIn=document.getElementById('sCarryIn').checked;
@@ -5344,7 +5376,9 @@ function genRegDisps(rs){
       if(rs.freq==='biweekly')ok=getWOM(cur)%2===1;
       if(ok){
         const ds=fmt(cur);
-        const exists=(db.dispatches||[]).some(x=>x.date===ds&&x.customer===rs.cust&&x.isReg&&x.regId===rs.id);
+        // 削除した定期便の予定は、ページを開き直しても再作成しない
+        const exists=(db.dispatches||[]).some(x=>x.date===ds&&x.customer===rs.cust&&x.isReg&&x.regId===rs.id)
+          ||(db.regSkips||[]).includes(rs.id+'|'+ds);
         if(!exists){
           const now=new Date().toISOString();
           db.dispatches.push({id:uid(),customer:rs.cust,date:ds,dispatchDate:ds,status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.driver,vehicle:rs.vehicle,notes:rs.notes,isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,created:now,updated:now});
@@ -5369,13 +5403,114 @@ function renderRegList(){
       <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'🏭 持込み（ドライバー・車両不要）':`ドライバー: ${drvName(rs.driver)} ／ 車両: ${vehName(rs.vehicle)}`}${rs.notes?' ／ '+rs.notes:''}</div>
     </div>`;}).join('');
 }
+// ================================================================
+// ごみ箱（削除した配車・出荷カードを30日間保管し、元に戻せるようにする）
+// ================================================================
+const TRASH_KEEP_DAYS=30;
+function trashDispatches(ids,reason){
+  const set=new Set(ids);
+  const now=new Date().toISOString();
+  if(!db.trash)db.trash=[];
+  if(!db.regSkips)db.regSkips=[];
+  const moved=db.dispatches.filter(x=>set.has(x.id));
+  moved.forEach(dp=>{
+    db.trash.push({dp,deletedAt:now,reason:reason||''});
+    // 定期便から作られた予定は、再作成されないよう印を付ける
+    if(dp.isReg&&dp.regId){
+      const k=dp.regId+'|'+dp.date;
+      if(!db.regSkips.includes(k))db.regSkips.push(k);
+    }
+  });
+  db.dispatches=db.dispatches.filter(x=>!set.has(x.id));
+  return moved;
+}
+// 保管期間を過ぎたものを消す（定期便の印は今月以降の分だけ残す）
+function pruneTrash(){
+  if(!db.trash)db.trash=[];
+  if(!db.regSkips)db.regSkips=[];
+  const limit=Date.now()-TRASH_KEEP_DAYS*86400000;
+  db.trash=db.trash.filter(t=>new Date(t.deletedAt).getTime()>=limit);
+  const t=new Date();const monthStart=fmt(new Date(t.getFullYear(),t.getMonth(),1));
+  db.regSkips=db.regSkips.filter(k=>(k.split('|')[1]||'')>=monthStart);
+}
+function updateTrashCnt(){
+  const el=document.getElementById('trashCnt');if(!el||!db)return;
+  const n=(db.trash||[]).length;
+  el.textContent=n?`(${n})`:'';
+}
+async function restoreTrash(ids){
+  const set=new Set(ids);
+  if(!db.trash)db.trash=[];
+  if(!db.regSkips)db.regSkips=[];
+  const have=new Set(db.dispatches.map(x=>x.id));
+  let n=0;
+  db.trash=db.trash.filter(t=>{
+    if(!set.has(t.dp.id))return true;
+    if(!have.has(t.dp.id)){db.dispatches.push(t.dp);n++;}
+    if(t.dp.isReg&&t.dp.regId){const k=t.dp.regId+'|'+t.dp.date;db.regSkips=db.regSkips.filter(x=>x!==k);}
+    return false;
+  });
+  await save();render();renderPending();renderTrash();
+  return n;
+}
+async function purgeTrash(ids){
+  const all=!ids;
+  const n=all?db.trash.length:ids.length;
+  if(!n)return;
+  if(!confirm(all?`ごみ箱の ${n} 件をすべて完全に削除します。\nこの操作は元に戻せません。よろしいですか？`:'このカードを完全に削除します。\nこの操作は元に戻せません。よろしいですか？'))return;
+  if(all)db.trash=[];else{const set=new Set(ids);db.trash=db.trash.filter(t=>!set.has(t.dp.id));}
+  await save();render();renderTrash();
+}
+function openTrash(){renderTrash();openM('mTrash');}
+function renderTrash(){
+  const el=document.getElementById('trashList');if(!el)return;
+  const items=(db.trash||[]).slice().sort((a,b)=>b.deletedAt<a.deletedAt?-1:1);
+  if(!items.length){el.innerHTML='<div class="empty">ごみ箱は空です</div>';return;}
+  const fmtT=s=>{const d=new Date(s);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  el.innerHTML=items.map(t=>{
+    const dp=t.dp;
+    const isShip=dp.dispatchType==='shipment';
+    const kind=isShip?'📦 出荷':dp.isCarryIn?'🏭 持込み':dp.isReg?'🔁 定期便':'🚛 スポット';
+    const name=isShip?(dp.destName||'（出荷先未入力）'):custName(dp.customer);
+    const wd=workDate(dp)||'日付未定';
+    const who=dp.isCarryIn?'':`👤 ${drvName(dp.driver)}／🚛 ${vehName(dp.vehicle)}`;
+    const left=Math.max(0,Math.ceil((new Date(t.deletedAt).getTime()+TRASH_KEEP_DAYS*86400000-Date.now())/86400000));
+    const id=esc(dp.id);
+    return `<div class="trash-item">
+      <div class="trash-main">
+        <div class="trash-name"><span class="trash-kind">${kind}</span>${esc(name)}</div>
+        <div class="trash-sub">📅 ${esc(wd)}${dp.siteName?' ／ 📍'+esc(dp.siteName):''}${who?' ／ '+esc(who):''}</div>
+        <div class="trash-sub">🗑 ${fmtT(t.deletedAt)} に削除${t.reason?'（'+esc(t.reason)+'）':''} ／ あと${left}日で自動削除</div>
+      </div>
+      <div class="trash-btns">
+        <button class="btn btn-p" style="padding:5px 10px;font-size:11px" data-id="${id}" onclick="restoreTrash([this.dataset.id]).then(()=>alert('✅ 元に戻しました'))">↩ 元に戻す</button>
+        <button class="btn btn-d" style="padding:5px 10px;font-size:11px" data-id="${id}" onclick="purgeTrash([this.dataset.id])">完全に削除</button>
+      </div></div>`;
+  }).join('');
+}
+// 削除直後に「元に戻す」を出す（8秒）
+let _undoTimer=null,_undoIds=null;
+function showUndo(msg,ids){
+  const el=document.getElementById('undoToast');if(!el)return;
+  _undoIds=ids;
+  el.innerHTML=`<span>🗑 ${esc(msg)}</span><button onclick="undoDelete()">↩ 元に戻す</button>`;
+  el.classList.remove('hid');
+  clearTimeout(_undoTimer);
+  _undoTimer=setTimeout(()=>el.classList.add('hid'),8000);
+}
+async function undoDelete(){
+  document.getElementById('undoToast').classList.add('hid');
+  if(_undoIds)await restoreTrash(_undoIds);
+  _undoIds=null;
+}
+
 async function delRegular(id){
   if(!confirm('この定期便設定を削除しますか？'))return;
-  const withDisps=confirm('生成済みの配車予定（今日以降の分）も一緒に削除しますか？\n\n【OK】設定＋未来の配車予定を削除\n【キャンセル】設定のみ削除（カレンダー上の予定は残す）');
+  const withDisps=confirm('生成済みの配車予定（今日以降の分）も一緒に削除しますか？\n\n【OK】設定＋未来の配車予定を削除（配車予定はごみ箱へ移動）\n【キャンセル】設定のみ削除（カレンダー上の予定は残す）');
   db.regulars=db.regulars.filter(x=>x.id!==id);
   if(withDisps){
     const today=fmt(new Date());
-    db.dispatches=db.dispatches.filter(x=>!(x.isReg&&x.regId===id&&(x.dispatchDate||x.date||'')>=today));
+    trashDispatches(db.dispatches.filter(x=>x.isReg&&x.regId===id&&(x.dispatchDate||x.date||'')>=today).map(x=>x.id),'定期便設定の削除');
   }
   await save();renderRegList();render();
 }
