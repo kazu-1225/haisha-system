@@ -486,6 +486,13 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
 .cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
 .cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+/* 日表示の並べ替え */
+.ecard.ec-day{position:relative}
+.ec-ord{position:absolute;right:4px;bottom:3px;display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.ecard:hover .ec-ord{opacity:1}
+.ec-ord button{font-size:9px;line-height:1;padding:3px 5px;border-radius:4px;background:#1e3a5f;color:#fff}
+.ec-ord button:hover{background:#2563eb}
+.ec-day-time.est{background:#f1f5f9 !important;color:#64748b !important;border:1px dashed #94a3b8}
 /* 祝日と重なった定期便 */
 .ecard.ec-hol-ask{outline:2px dashed #dc2626 !important;outline-offset:-2px}
 .ecard.ec-hol-ok{outline:1.5px solid #16a34a !important;outline-offset:-1px}
@@ -3070,11 +3077,71 @@ function getDates(){
 function getResources(){return ST.res==='driver'?db.drivers:db.vehicles;}
 function workDate(dp){return dp.dispatchDate||dp.date;} // 配車確定日 優先、旧データ互換
 function cellDisps(ds,rid){
-  return(db.dispatches||[]).filter(dp=>{
+  return sortDay((db.dispatches||[]).filter(dp=>{
     if(dp.isCarryIn)return false;
     if(!workDate(dp)||workDate(dp)!==ds)return false;
     return ST.res==='driver'?dp.driver===rid:dp.vehicle===rid;
-  });
+  }));
+}
+
+// ================================================================
+// 1日の業務の並び順
+// 並びの基準＝「その日の何時ごろか（分）」
+//  ① 配車係が◀▶で並べ替えたカード → その位置（dp.orderMin）
+//  ② 時間指定あり → その時刻
+//  ③ 注意事項・備考の言葉から推定（朝一・AM早め・AM中・昼・PM・夕方、「10時」「10:30」など）
+//  ④ どれもなし → 12:30（午前の案件の後、午後の案件の前）
+// ================================================================
+const DAY_DEFAULT_MIN=12*60+30;
+const TIME_WORDS=[
+  [/朝一|朝イチ|朝いち|早朝|一番で|1番で|始業/,7*60+30,'朝一'],
+  [/AM早|午前早|朝早|早めの午前/,8*60+30,'AM早め'],
+  [/AM|午前/,10*60,'AM中'],
+  [/昼前|お昼前|昼まで/,11*60,'昼前'],
+  [/正午|お昼|昼頃|昼ごろ|12時頃/,12*60,'昼'],
+  [/PM|午後/,14*60,'PM'],
+  [/夕方|16時以降|17時/,16*60,'夕方']
+];
+function hm2min(s){const m=String(s||'').match(/(\d{1,2})\s*[:：]\s*(\d{2})/);return m?(+m[1])*60+(+m[2]):null;}
+// 注意事項・備考から時間帯を推定（{min,label} または null）
+function guessDayTime(dp){
+  const txt=((dp.caution||'')+' '+(dp.notes||'')).normalize('NFKC').toUpperCase();
+  if(!txt.trim())return null;
+  const t=hm2min(txt);
+  if(t!=null&&t>=5*60&&t<=20*60){const m=txt.match(/(\d{1,2})\s*:\s*(\d{2})/);return {min:t,label:m[0].replace(/\s/g,'')};}
+  const h=txt.match(/(\d{1,2})\s*時/);
+  if(h&&+h[1]>=5&&+h[1]<=20)return {min:+h[1]*60,label:h[1]+'時'};
+  for(const [re,min,label] of TIME_WORDS)if(re.test(txt))return {min,label};
+  return null;
+}
+function dayKey(dp){
+  if(typeof dp.orderMin==='number')return dp.orderMin;
+  const t=dp.timeSpec&&dp.timeSpec.enabled&&hm2min(dp.timeSpec.time);
+  if(t!=null&&t!==false)return t;
+  const g=guessDayTime(dp);
+  return g?g.min:DAY_DEFAULT_MIN;
+}
+function sortDay(arr){return arr.slice().sort((a,b)=>dayKey(a)-dayKey(b)||String(a.created||'').localeCompare(String(b.created||'')));}
+// 日表示の同じ行に並ぶカード（並べ替えの対象）
+function dayGroup(dp,rowCtx){
+  const ds=workDate(dp);
+  if(rowCtx==='reg')return sortDay(regularDispsForDate(ds));
+  if(rowCtx==='carry')return sortDay(carryInDispsForDate(ds));
+  return cellDisps(ds,ST.res==='driver'?dp.driver:dp.vehicle);
+}
+// ◀（前へ）▶（後へ）で1つ動かす。隣のカードと並びの基準を入れ替える
+async function moveDayOrder(id,dir,rowCtx){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
+  const list=dayGroup(dp,rowCtx);
+  const i=list.findIndex(x=>x.id===id),j=i+dir;
+  if(i<0||j<0||j>=list.length)return;
+  // 並べ替えた時点の順番を確定させる（以降の新規カードは時刻の推定で間に入る）
+  list.forEach(x=>{if(typeof x.orderMin!=='number')x.orderMin=dayKey(x);});
+  const a=list[i],b=list[j];
+  let ka=a.orderMin,kb=b.orderMin;
+  if(ka===kb)kb=ka+dir; // 同じ値なら少しだけずらす
+  a.orderMin=kb;b.orderMin=ka;
+  await save();render();
 }
 function isCraneDisp(dp){const wtp=dp.workType||{};return!dp.dispatchType&&wtp.type==='container'&&wtp.containerSize==='1.5box';}
 // 未割当カードのソート：①期限が近い順（なしは最後）②配車確定日が近い順（なしは最後）③登録順
@@ -3292,11 +3359,7 @@ function render(){
       if(ab)cc+=' td-absent';
       const absHtml=ab?absBandHTML(ab):'';
       if(isDay){
-        const sorted=disps.slice().sort((a,b)=>{
-          const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
-          const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
-          return ta<tb2?-1:ta>tb2?1:0;
-        });
+        const sorted=sortDay(disps);
         const parts=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'drv'));
         const dayHtml=parts.join('<div class="day-arrow">›</div>');
         const csBadges=csBands.map(cs=>{
@@ -3339,11 +3402,7 @@ function render(){
       let cc='reg-fixed-cell ev-cell';
       if(ds===today)cc+=' td-now';
       else if(holName)cc+=' td-hol';
-      const sorted=regularDispsForDate(ds).slice().sort((a,b)=>{
-        const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
-        const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
-        return ta<tb2?-1:ta>tb2?1:0;
-      });
+      const sorted=sortDay(regularDispsForDate(ds));
       const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'reg')).join('<div class="day-arrow">›</div>');
       regRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
         ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
@@ -3376,11 +3435,7 @@ function render(){
       let cc='carry-fixed-cell ev-cell';
       if(ds===today)cc+=' td-now';
       else if(holName)cc+=' td-hol';
-      const sorted=carryInDispsForDate(ds).slice().sort((a,b)=>{
-        const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
-        const tb2=(b.timeSpec&&b.timeSpec.enabled&&b.timeSpec.time)||'99:99';
-        return ta<tb2?-1:ta>tb2?1:0;
-      });
+      const sorted=sortDay(carryInDispsForDate(ds));
       const dayHtml=sorted.map((dp,i)=>dayCardHTML(dp,i+1,'carry')).join('<div class="day-arrow">›</div>');
       carryRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid=""
         ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
@@ -3518,7 +3573,12 @@ function withHolDecor(html,dp){
   if(!hd.top)return html;
   return html.replace('class="ecard','class="ecard'+hd.cls).replace(/(<span class="ec-del"[^>]*>×<\/span>)/,'$1'+hd.top);
 }
-function dayCardHTML(dp,seqNo,rowCtx){return withHolDecor(_dayCardHTML(dp,seqNo,rowCtx),dp);}
+function dayCardHTML(dp,seqNo,rowCtx){
+  const html=withHolDecor(_dayCardHTML(dp,seqNo,rowCtx),dp);
+  // 日表示のカードに並べ替えボタン（◀前へ ▶後へ）を付ける
+  const ord=`<div class="ec-ord"><button title="前の業務へ" onclick="event.stopPropagation();moveDayOrder('${dp.id}',-1,'${rowCtx}')">◀</button><button title="後の業務へ" onclick="event.stopPropagation();moveDayOrder('${dp.id}',1,'${rowCtx}')">▶</button></div>`;
+  return html.replace(/<\/div>\s*$/,ord+'</div>');
+}
 function cardHTML(dp,rowCtx){return withHolDecor(_cardHTML(dp,rowCtx),dp);}
 function _dayCardHTML(dp,seqNo,rowCtx){
   const isCarryIn=!!dp.isCarryIn;
@@ -3529,6 +3589,9 @@ function _dayCardHTML(dp,seqNo,rowCtx){
   const drv=drvName(dp.driver)||'未定';
   const time=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'';
   const holBadge=(holName&&!holNeedsStrip(dp)?`<span class="ec-hol-badge">🎌</span>`:'')+absBadge(dp);
+  // 時間指定がなければ、注意事項・備考の言葉から推定した時間帯を薄く表示
+  const guess=time?null:guessDayTime(dp);
+  const timeTag=time?`<span class="ec-day-time">🕐 ${time}</span>`:guess?`<span class="ec-day-time est" title="注意事項・備考から推定した時間帯（並び順に使います）">🕐 ${esc(guess.label)}</span>`:'';
   const statusMark=dp.status==='pending'?'🔴 ':'';
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
@@ -3550,7 +3613,7 @@ function _dayCardHTML(dp,seqNo,rowCtx){
       onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
       onclick="event.stopPropagation();${editFn}">
       <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-      <div class="ec-day-seq">第${seqNo}業務${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div>
+      <div class="ec-day-seq">第${seqNo}業務${holBadge}${timeTag}</div>
       <div class="ec-day-cust">${custName(dp.customer)}</div>
       ${regLabel}
       ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:''}
@@ -3569,7 +3632,7 @@ function _dayCardHTML(dp,seqNo,rowCtx){
   const regBadge=(dp.isReg&&rowCtx==='drv')?`<span class="ec-reg-drv-badge">🔁 定期</span>`:'';
   const titleLine=isShip
     ?`<div class="ec-day-cust">📦 ${statusMark}${escH(dp.destName)||'出荷'}${holBadge}</div>`
-    :`<div class="ec-day-seq">${statusMark}第${seqNo}業務${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${regBadge}${holBadge}${time?`<span class="ec-day-time">🕐 ${time}</span>`:''}</div><div class="ec-day-cust">${custName(dp.customer)}</div>`;
+    :`<div class="ec-day-seq">${statusMark}第${seqNo}業務${isCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${regBadge}${holBadge}${timeTag}</div><div class="ec-day-cust">${custName(dp.customer)}</div>`;
   return`<div class="${cls}" ${dragAttr}
     onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
     onclick="event.stopPropagation();${editFn}">
@@ -4659,7 +4722,7 @@ function printDaySchedule(ds,withUndated){
   const dateLabel=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）`;
   const hol=HOLIDAYS[ds]||'';
   const tm=dp=>(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'';
-  const byTime=(a,b)=>(tm(a)||'99:99')<(tm(b)||'99:99')?-1:(tm(a)||'99:99')>(tm(b)||'99:99')?1:0;
+  const byTime=(a,b)=>dayKey(a)-dayKey(b); // 画面の日表示と同じ並び順
   const isShip=dp=>dp.dispatchType==='shipment';
   const kind=dp=>isShip(dp)?'出荷':dp.isCarryIn?'持込み':isCraneDisp(dp)?'クレーン':dp.isReg?'定期便':'スポット';
   // 行き先（お客様・収集先／出荷先）
@@ -4931,6 +4994,11 @@ async function saveDispatch(){
   const finalStatus=status;
   if(ST.editId){
     const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
+    // 時間指定を変えたら、手で並べ替えた位置は解除して新しい時刻の順に並べる
+    if(dp){
+      const oldT=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'',newT=(timeSpec.enabled&&timeSpec.time)||'';
+      if(oldT!==newT)delete dp.orderMin;
+    }
     if(dp)Object.assign(dp,{customer:cust,date,dispatchDate,deadline,status:finalStatus,driver,vehicle,notes,caution,receptionist,custContact,custPhone,siteName,siteContact,sitePhone,siteAddr,manifest,timeSpec,assistant,measurement,workType,isReg,isCarryIn,updated:new Date().toISOString()});
   } else {
     const now=new Date().toISOString();
