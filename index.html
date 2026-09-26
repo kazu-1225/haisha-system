@@ -771,6 +771,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
     <div class="tsp"></div>
     <button class="reg-btn" onclick="openRegular()">🔁 定期設定</button>
     <button class="plan-btn" onclick="openPlanner()">📅 配車プランナー</button>
+    <button class="plan-btn" style="background:#475569" onclick="openDayPrint()" title="1日分の配車表をA4用紙1枚で印刷">🖨 日次表印刷</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
     <button class="ship-add-btn" onclick="openAddShipment()">📦 出荷追加</button>
     <button class="add-btn" onclick="openAddDispatch()">＋ 配車追加</button>
@@ -2295,6 +2296,22 @@ function checkContainerAlerts() {
       <hr style="margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#475569">📋 登録済み定期便一覧</div>
       <div id="regularList" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 日次表印刷 モーダル -->
+<div class="ovl hid" id="mDayPrint">
+  <div class="mbox" style="max-width:420px">
+    <div class="mhdr"><h2>🖨 日次配車表の印刷</h2><span class="mcls" onclick="closeM('mDayPrint')">×</span></div>
+    <div class="mbdy">
+      <div class="fr"><label>印刷する日</label><input type="date" id="dpDate"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:8px;cursor:pointer"><input type="checkbox" id="dpUndated" checked style="width:auto;margin:0">日付未定の依頼も載せる</label>
+      <div style="font-size:11px;color:#64748b;margin-top:10px;line-height:1.6">確定分（ドライバー別）・持込み・委託応援・未確定分を、A4縦1枚に収まるよう自動で縮小して印刷します。</div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-s" onclick="closeM('mDayPrint')">キャンセル</button>
+      <button class="btn btn-p" onclick="printDaySchedule(document.getElementById('dpDate').value,document.getElementById('dpUndated').checked)">🖨 印刷</button>
     </div>
   </div>
 </div>
@@ -4480,6 +4497,119 @@ window.onload=function(){
 };
 <\/script>
 </body></html>`);
+  w.document.close();
+}
+
+// ================================================================
+// 日次配車表（A4縦1枚）
+// ================================================================
+function openDayPrint(){
+  document.getElementById('dpDate').value=fmt(ST.view==='day'?ST.date:new Date());
+  openM('mDayPrint');
+}
+function printDaySchedule(ds,withUndated){
+  if(!ds){alert('印刷する日を選んでください');return;}
+  const d=pd(ds);
+  const dateLabel=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）`;
+  const hol=HOLIDAYS[ds]||'';
+  const tm=dp=>(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'';
+  const byTime=(a,b)=>(tm(a)||'99:99')<(tm(b)||'99:99')?-1:(tm(a)||'99:99')>(tm(b)||'99:99')?1:0;
+  const isShip=dp=>dp.dispatchType==='shipment';
+  const kind=dp=>isShip(dp)?'出荷':dp.isCarryIn?'持込み':isCraneDisp(dp)?'クレーン':dp.isReg?'定期便':'スポット';
+  // 行き先（お客様・収集先／出荷先）
+  const dest=dp=>{
+    if(isShip(dp))return `<b>${esc(dp.destName||'（出荷先未入力）')}</b>${dp.destAddr?`<div class="sub">${esc(dp.destAddr)}</div>`:''}`;
+    const site=dp.siteName?`<div class="sub">📍${esc(dp.siteName)}${dp.siteAddr?'　'+esc(dp.siteAddr):''}</div>`:'';
+    return `<b>${esc(custName(dp.customer))}</b>${site}`;
+  };
+  const work=dp=>{
+    const p=[];
+    // 1枚に収めるため作業種別は短く表記（例：4tコンテナ交換）
+    const w=dp.workType||{};
+    if(w.type==='manual')p.push('手積み');
+    else if(w.type==='container'){
+      const sz={'1.5box':'1.5BOX','2t':'2t','4t':'4t','large':'大型'}[w.containerSize]||'';
+      const op={set:'設置',swap:'交換',remove:'撤去'}[w.containerOp]||'';
+      p.push(`${sz}コンテナ${op}`);
+    }
+    if(dp.assistant&&dp.assistant.enabled)p.push(`助手${dp.assistant.count||1}名`);
+    if(dp.measurement)p.push('要計量');
+    if(dp.manifest){const m=mfstLabel(dp.manifest);if(m&&!m.startsWith('不要'))p.push('マニ:'+esc(m));}
+    return p.join('／');
+  };
+  const note=dp=>[dp.notes?esc(dp.notes):'',dp.caution?`<span class="warn">⚠${esc(dp.caution)}</span>`:''].filter(Boolean).join('<br>');
+  const pendMark=dp=>dp.status==='pending'?'<span class="hold">保留</span>':'';
+
+  const day=(db.dispatches||[]).filter(dp=>workDate(dp)===ds);
+  const carry=day.filter(dp=>dp.isCarryIn).sort(byTime);
+  const assigned=day.filter(dp=>!dp.isCarryIn&&dp.driver);
+  const unassigned=day.filter(dp=>!dp.isCarryIn&&!dp.driver).sort(byTime);
+  const cs=(db.contractSupports||[]).filter(c=>c.date===ds).sort((a,b)=>a.startHour-b.startHour);
+  const undated=withUndated?(db.dispatches||[]).filter(dp=>!workDate(dp)&&!dp.isReg&&!dp.isCarryIn).sort((a,b)=>(a.deadline||'9999')<(b.deadline||'9999')?-1:1):[];
+
+  // 確定分：画面と同じドライバー順で並べる
+  const drvIds=[...new Set(assigned.map(dp=>dp.driver))];
+  const orderedDrv=getOrderedResources((db.drivers||[]).filter(x=>drvIds.includes(x.id)),'driver');
+  drvIds.filter(id=>!orderedDrv.some(x=>x.id===id)).forEach(id=>orderedDrv.push({id,name:drvName(id)}));
+  let confRows='';
+  orderedDrv.forEach((dr,gi)=>{
+    const list=assigned.filter(dp=>dp.driver===dr.id).sort(byTime);
+    const csOf=cs.filter(c=>c.driverId===dr.id);
+    list.forEach((dp,i)=>{
+      confRows+=`<tr class="${gi%2?'alt':''}">
+        ${i===0?`<td rowspan="${list.length}" class="drv">${esc(dr.name)}${csOf.length?`<div class="sub">🏛委託 ${csOf.map(c=>c.startHour+'-'+c.endHour+'時').join(',')}</div>`:''}</td>`:''}
+        <td class="c">${i+1}</td><td class="c">${esc(tm(dp))}</td><td>${esc(vehName(dp.vehicle))}</td>
+        <td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`;
+    });
+  });
+  const simpleRows=(arr,withDl)=>arr.map(dp=>`<tr><td class="c">${esc(tm(dp))}</td><td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td>${withDl?`<td class="c">${esc(dp.deadline||'')}</td>`:''}<td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('');
+  const sec=(title,cls,count,head,rows)=>`<div class="sec ${cls}"><div class="sec-h">${title}<span class="cnt">${count}件</span></div>
+    ${count?`<table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`:'<div class="none">なし</div>'}</div>`;
+
+  const body=`<div class="page" id="pg">
+  <div class="hdr"><div><div class="co">廃棄物収集・運搬</div><div class="ttl">日次配車表　${dateLabel}${hol?`<span class="hol">${esc(hol)}</span>`:''}</div></div>
+    <div class="meta">印刷日時: ${new Date().toLocaleString('ja-JP')}</div></div>
+  <div class="sum"><span>✅ 確定 <b>${assigned.length}</b>件</span><span>🔴 未確定 <b>${unassigned.length}</b>件</span><span>🏭 持込み <b>${carry.length}</b>件</span><span>🏛 委託応援 <b>${cs.length}</b>名</span>${withUndated?`<span>📋 日付未定 <b>${undated.length}</b>件</span>`:''}</div>
+  ${sec('✅ 確定分（ドライバー別）','s-conf',assigned.length,'<th style="width:13%">ドライバー</th><th style="width:3%">順</th><th style="width:6%">時間</th><th style="width:9%">車両</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:17%">作業内容</th><th style="width:20%">備考・注意</th>',confRows)}
+  ${sec('🔴 未確定分（ドライバー未定）','s-pend',unassigned.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">期限</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',simpleRows(unassigned,true))}
+  ${sec('🏭 持込み','s-carry',carry.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様</th><th style="width:22%">作業内容</th><th style="width:26%">備考・注意</th>',simpleRows(carry,false))}
+  ${sec('🏛 委託応援','s-cs',cs.length,'<th style="width:20%">ドライバー</th><th style="width:15%">車両</th><th style="width:15%">時間</th><th>備考</th>',cs.map(c=>`<tr><td>${esc(drvName(c.driverId))}</td><td>${esc(c.vehicleId?vehName(c.vehicleId):'')}</td><td class="c">${c.startHour}:00〜${c.endHour}:00</td><td>${esc(c.note||'')}</td></tr>`).join(''))}
+  ${withUndated?sec('📋 日付未定の依頼（参考）','s-und',undated.length,'<th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">期限</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',undated.map(dp=>`<tr><td class="c">${kind(dp)}</td><td>${dest(dp)}</td><td class="c">${esc(dp.deadline||'')}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('')):''}
+  </div>`;
+
+  const w=window.open('','_blank','width=900,height=1200');
+  if(!w){alert('ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。');return;}
+  closeM('mDayPrint');
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>日次配車表 ${ds}</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:10px;color:#1e293b;background:#fff}
+.page{width:760px;margin:0 auto;padding:8mm 8mm 6mm}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1e3a5f;padding-bottom:4px;margin-bottom:5px}
+.co{font-size:8px;color:#64748b}.ttl{font-size:16px;font-weight:900;color:#1e3a5f}
+.hol{font-size:10px;color:#dc2626;margin-left:8px}.meta{font-size:8px;color:#94a3b8}
+.sum{display:flex;gap:14px;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:3px 8px;margin-bottom:6px;font-size:10px}
+.sum b{font-size:12px}
+.sec{margin-bottom:6px}
+.sec-h{font-size:11px;font-weight:800;padding:2px 6px;border-radius:3px 3px 0 0;display:flex;justify-content:space-between}
+.cnt{font-weight:700}
+.s-conf .sec-h{background:#dcfce7;color:#15803d}.s-pend .sec-h{background:#fee2e2;color:#b91c1c}
+.s-carry .sec-h{background:#dbeafe;color:#1d4ed8}.s-cs .sec-h{background:#f3e8ff;color:#7e22ce}.s-und .sec-h{background:#f1f5f9;color:#475569}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{background:#f8fafc;font-size:8px;color:#64748b;border:1px solid #cbd5e1;padding:2px 3px;text-align:left}
+td{border:1px solid #cbd5e1;padding:2px 4px;vertical-align:top;word-break:break-all;line-height:1.35}
+td.c{text-align:center}td.drv{font-weight:800;font-size:11px;background:#f0fdf4}
+tr.alt td{background:#fcfcfd}tr.alt td.drv{background:#e7f8ec}
+.sub{font-size:8px;color:#64748b;font-weight:400}
+.warn{color:#b45309;font-weight:700}
+.hold{display:block;font-size:8px;color:#dc2626;font-weight:700}
+.none{border:1px solid #e2e8f0;border-top:none;padding:3px 6px;color:#94a3b8;font-size:9px}
+@media print{@page{size:A4 portrait;margin:0}.page{width:100%}}
+</style></head><body>${body}<script>
+window.onload=function(){
+  var p=document.getElementById('pg');var maxH=1090;var h=p.scrollHeight;
+  if(h>maxH){var z=maxH/h;var s=document.createElement('style');s.textContent='@media print{#pg{zoom:'+z+'}}';document.head.appendChild(s);}
+  setTimeout(function(){window.print();},400);
+};<\/script></body></html>`);
   w.document.close();
 }
 
