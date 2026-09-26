@@ -486,6 +486,16 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
 .cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
 .cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+/* 日表示の委託応援：1人1行・0〜24時の横幅いっぱいで表示（端をドラッグで時間変更） */
+.cs-day-list{padding:4px 8px;min-height:30px}
+/* 週・月表示の委託応援（名前＋時間＋時間帯の目安線） */
+.cs-chip{background:#ede9fe;border:1px solid #a78bfa;border-radius:5px;padding:2px 5px 3px;margin:2px 0;cursor:pointer}
+.cs-chip:hover{background:#ddd6fe}
+.cs-chip-txt{display:flex;justify-content:space-between;gap:4px;font-size:10px;font-weight:700;color:#4c1d95;white-space:nowrap}
+.cs-chip-name{overflow:hidden;text-overflow:ellipsis}
+.cs-chip-time{flex-shrink:0;color:#6d28d9}
+.cs-chip-line{position:relative;height:3px;background:#f3f4f6;border-radius:2px;margin-top:2px}
+.cs-chip-line div{position:absolute;top:0;bottom:0;background:#7c3aed;border-radius:2px}
 .ec-cs-badge{display:inline-block;font-size:9px;font-weight:800;color:#6b21a8;background:#f3e8ff;border-radius:3px;padding:0 4px;margin-bottom:2px;line-height:1.6;border:1px solid #d8b4fe;white-space:nowrap;cursor:pointer}
 .cs-cell-band{height:4px;border-radius:2px;background:#ede9fe;margin-bottom:2px;position:relative;overflow:hidden}
 .cs-cell-band-inner{position:absolute;top:0;bottom:0;background:#7c3aed;border-radius:2px}
@@ -3240,6 +3250,12 @@ function render(){
       const leftPct=(cs.startHour/24*100).toFixed(1);
       const widthPct=((cs.endHour-cs.startHour)/24*100).toFixed(1);
       const safeId=esc(cs.id);const safeTitle=esc(`${label}${cs.note?'\n'+cs.note:''}`);
+      // 週・月表示はマスが狭く、ドラッグで時間が大きくずれるため、名前と時間を表示するだけにする（変更はクリックして編集画面で）
+      if(!isDay){
+        return `<div class="cs-chip" data-cs-id="${safeId}" onclick="event.stopPropagation();openEditCS(this.dataset.csId)" title="${safeTitle}">
+          <div class="cs-chip-txt"><span class="cs-chip-name">${esc(drvName)}</span><span class="cs-chip-time">${cs.startHour}-${cs.endHour}時</span></div>
+          <div class="cs-chip-line"><div style="left:${leftPct}%;width:${widthPct}%"></div></div></div>`;
+      }
       return `<div class="cs-bar-outer"><div class="cs-bar" style="left:${leftPct}%;width:${widthPct}%" data-cs-id="${safeId}" onclick="event.stopPropagation();openEditCS(this.dataset.csId)" title="${safeTitle}"><div class="cs-handle cs-handle-l" onmousedown="startCsDrag(event,this.closest('.cs-bar').dataset.csId,'l')" onclick="event.stopPropagation()"></div><div class="cs-bar-inner"><span class="cs-bar-label">${esc(label)}</span></div><div class="cs-handle cs-handle-r" onmousedown="startCsDrag(event,this.closest('.cs-bar').dataset.csId,'r')" onclick="event.stopPropagation()"></div></div></div>`;
     }
     let csRow=`<tr class="cs-fixed-hdr${FIX_COLLAPSED.cs?' fix-collapsed':''}">`+fixHdr('cs','🏛 委託応援','#7e22ce','#fdf4ff','#d8b4fe','マスをクリックで登録');
@@ -3248,7 +3264,7 @@ function render(){
       let cc='cs-fixed-cell ev-cell';
       if(ds===today)cc+=' td-now';else if(holName)cc+=' td-hol';
       const csItems=(db.contractSupports||[]).filter(cs=>cs.date===ds);
-      csRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録">${FIX_COLLAPSED.cs?fixSummary('cs',csItems):`<div class="day-cell-wrap" style="min-height:30px">${csItems.map(cs=>csBarHtml(cs)).join('')}</div>`}</td>`;
+      csRow+=`<td class="${cc} day-ev-cell" data-date="${ds}" onclick="openAddCS('${ds}')" title="${ds} 委託応援を登録">${FIX_COLLAPSED.cs?fixSummary('cs',csItems):`<div class="cs-day-list">${csItems.map(cs=>csBarHtml(cs)).join('')}</div>`}</td>`;
     } else {
       for(const dt of dates){
         const ds=fmt(dt),holName=HOLIDAYS[ds]||'';
@@ -5519,7 +5535,11 @@ function onCsDragMove(e){
   const cs=(db.contractSupports||[]).find(x=>x.id===_csDrag.csId);
   if(!cs)return;
   const pxPerHour=_csDrag.outerW/24;
-  const dh=Math.round((e.clientX-_csDrag.startX)/pxPerHour);
+  const dx=e.clientX-_csDrag.startX;
+  // クリックのつもりの小さな手ぶれでは時間を変えない
+  if(!_csDrag.moved&&Math.abs(dx)<Math.max(8,pxPerHour/2))return;
+  _csDrag.moved=true;
+  const dh=Math.round(dx/pxPerHour);
   if(_csDrag.side==='l'){
     cs.startHour=Math.max(0,Math.min(_csDrag.origEnd-1,_csDrag.origStart+dh));
   } else {
@@ -5543,7 +5563,11 @@ async function endCsDrag(){
   if(!_csDrag)return;
   document.removeEventListener('mousemove',onCsDragMove);
   document.removeEventListener('mouseup',endCsDrag);
+  const cs=(db.contractSupports||[]).find(x=>x.id===_csDrag.csId);
+  const changed=cs&&(cs.startHour!==_csDrag.origStart||cs.endHour!==_csDrag.origEnd);
   _csDrag=null;
+  if(!changed)return;
+  cs.updated=new Date().toISOString();
   await save();
   render();
 }
