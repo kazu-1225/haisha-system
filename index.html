@@ -4563,6 +4563,8 @@ function printWorkOrder(id,mode){
   if(dp.measurement)condItems.push('⚖ 計量：要');
   const condStr=condItems.length?condItems.join('　／　'):'なし';
 
+  // 作業種別の帯（一般廃・資源物は上の欄に出すので、ここでは作業タイプだけ）
+  const woLabel=(dp.workType&&dp.workType.waste==='general')?_workTypeBody(dp.workType):workTypeLabel(dp.workType);
   // 1ページ分のHTML生成関数
   function buildPage(title,copyType){
     // copyType: 'collect' | 'customer' | 'office'
@@ -4666,7 +4668,10 @@ function printWorkOrder(id,mode){
   ${cond1Col}${cond2Col}${cond3Col}
 </div>
 <div class="meta-row">
-  <div class="meta-item"><span class="meta-label">📋 マニフェスト:</span><span class="meta-val" style="font-size:13px;font-weight:800;color:#1e293b">${mfstLabel(dp.manifest)}</span></div>
+  ${(dp.workType&&dp.workType.waste==='general')
+    // 一般廃・資源物はマニフェスト不要のため、マニフェスト欄の代わりに区分を表示
+    ?`<div class="meta-item"><span class="meta-val" style="font-size:13px;font-weight:800;color:#15803d">♻ 一般廃・資源物</span></div>`
+    :`<div class="meta-item"><span class="meta-label">📋 マニフェスト:</span><span class="meta-val" style="font-size:13px;font-weight:800;color:#1e293b">${mfstLabel(dp.manifest)}</span></div>`}
   <div class="meta-item"><span class="meta-label">種別:</span><span class="meta-val">${typeStr}</span></div>
   ${dp.receptionist&&!isCustomer?`<div class="meta-item"><span class="meta-label">受付担当:</span><span class="meta-val">${dp.receptionist}</span></div>`:''}
 </div>`;
@@ -4685,7 +4690,7 @@ function printWorkOrder(id,mode){
   </div>
 </div>
 ${metaTop}
-${workTypeLabel(dp.workType)?`<div style="background:#ede9fe;border:1px solid #ddd6fe;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10px;font-weight:700;color:#6d28d9">🔧 作業種別：${workTypeLabel(dp.workType)}</div>`:''}
+${woLabel?`<div style="background:#ede9fe;border:1px solid #ddd6fe;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10px;font-weight:700;color:#6d28d9">🔧 作業種別：${woLabel}</div>`:''}
 ${custSec}${siteSec}${drvSec}${notesSec}${cautionSec}${collectSec}${otherSec}${signSec}
 <div class="footer">
   <span>廃棄物収集・運搬 配車管理システム　${footerLabel}</span>
