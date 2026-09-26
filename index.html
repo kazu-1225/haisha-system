@@ -1122,6 +1122,12 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
       <!-- 🔧 作業種別 -->
       <div style="font-size:11px;font-weight:700;color:#6d28d9;margin-bottom:6px;background:#ede9fe;padding:4px 8px;border-radius:4px">🔧 作業種別</div>
       <div style="border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;margin-bottom:10px;background:#faf5ff">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">廃棄物区分：</span>
+          <!-- もう一度押すと選択解除（未選択に戻る） -->
+          <label class="mfst-btn type-yes"><input type="radio" name="wkWaste" value="general" onclick="toggleWasteCat(this)">♻ 一般廃・資源物</label>
+          <label class="mfst-btn type-sys"><input type="radio" name="wkWaste" value="industrial" onclick="toggleWasteCat(this)">🏭 産業廃棄物</label>
+        </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">作業タイプ：</span>
           <label class="mfst-btn"><input type="radio" name="wkType" value="" onchange="onWkTypeChange()" checked>未選択</label>
@@ -1131,9 +1137,9 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         <div id="containerOpts" style="display:none;padding-top:8px;border-top:1px dashed #ddd6fe;margin-top:4px">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">コンテナ作業：</span>
-            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="set" checked>📥 設置</label>
-            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="swap">🔄 交換</label>
-            <label class="mfst-btn type-no"><input type="radio" name="wkContainerOp" value="remove">📤 撤去</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="set" checked onchange="applyMfstRules()">📥 設置</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="swap" onchange="applyMfstRules()">🔄 交換</label>
+            <label class="mfst-btn type-no"><input type="radio" name="wkContainerOp" value="remove" onchange="applyMfstRules()">📤 撤去</label>
           </div>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">サイズ：</span>
@@ -1145,13 +1151,14 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         </div>
       </div>
       <hr style="margin:10px 0">
-      <!-- マニフェスト -->
+      <!-- マニフェスト（廃棄物区分・作業タイプによって表示を切り替える） -->
+      <div id="mfstSection">
       <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;background:#f1f5f9;padding:4px 8px;border-radius:4px">📋 マニフェスト</div>
       <div class="mfst-wrap">
         <div class="mfst-row">
           <span class="mfst-row-label">必要性：</span>
           <label class="mfst-btn type-yes"><input type="radio" name="mfstNeeded" value="yes" onchange="onMfstChange()">要</label>
-          <label class="mfst-btn type-no"><input type="radio" name="mfstNeeded" value="no" onchange="onMfstChange()" checked>不要</label>
+          <label class="mfst-btn type-no" id="mfstNoBtn"><input type="radio" name="mfstNeeded" value="no" onchange="onMfstChange()" checked>不要</label>
           <label class="mfst-btn type-yes"><input type="radio" name="mfstNeeded" value="bring" onchange="onMfstChange()">持参</label>
           <label class="mfst-btn type-yes"><input type="radio" name="mfstNeeded" value="receive" onchange="onMfstChange()">受領</label>
         </div>
@@ -1166,6 +1173,8 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
           <label class="mfst-btn type-sys"><input type="radio" name="mfstSys" value="ereverse">イーリバース</label>
         </div>
       </div>
+      </div>
+      <div id="mfstHiddenNote" class="hid" style="font-size:11px;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;padding:5px 10px"></div>
       <hr style="margin:10px 0">
       <!-- ⑤ 作業条件 -->
       <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;background:#ede9fe;padding:4px 8px;border-radius:4px">⚙ 作業条件</div>
@@ -4382,8 +4391,59 @@ function mfstLabel(m){
 function onWkTypeChange(){
   const v=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
   document.getElementById('containerOpts').style.display=v==='container'?'block':'none';
+  applyMfstRules();
+}
+// 廃棄物区分：同じボタンをもう一度押すと選択解除
+let _wasteCatPrev='';
+function toggleWasteCat(el){
+  if(_wasteCatPrev===el.value){el.checked=false;_wasteCatPrev='';}
+  else _wasteCatPrev=el.value;
+  applyMfstRules();
+}
+function getWasteCat(){return (document.querySelector('input[name="wkWaste"]:checked')||{}).value||'';}
+function setWasteCat(v){
+  document.querySelectorAll('input[name="wkWaste"]').forEach(r=>{r.checked=r.value===v;});
+  _wasteCatPrev=v||'';
+}
+// 廃棄物区分・作業タイプに応じたマニフェスト欄の表示
+//  'hide' … 欄ごと消す（一般廃・資源物／コンテナ設置）
+//  'noNo' … 「不要」を消す（手積み／コンテナ交換・撤去）
+//  'all'  … そのまま（未選択など）
+function mfstRule(){
+  const waste=getWasteCat();
+  const wk=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
+  const op=(document.querySelector('input[name="wkContainerOp"]:checked')||{}).value||'set';
+  if(waste==='general')return {mode:'hide',why:'一般廃・資源物のため、マニフェストは不要です。'};
+  if(wk==='container'&&op==='set')return {mode:'hide',why:'コンテナ設置のため、マニフェストは不要です。'};
+  if(wk==='manual'||wk==='container')return {mode:'noNo'};
+  return {mode:'all'};
+}
+function applyMfstRules(){
+  const r=mfstRule();
+  const sec=document.getElementById('mfstSection'),note=document.getElementById('mfstHiddenNote');
+  if(!sec)return;
+  sec.classList.toggle('hid',r.mode==='hide');
+  note.classList.toggle('hid',r.mode!=='hide');
+  note.textContent=r.mode==='hide'?'📋 '+r.why:'';
+  const noBtn=document.getElementById('mfstNoBtn');
+  noBtn.classList.toggle('hid',r.mode==='noNo');
+  // 「不要」を消したときに「不要」が選ばれていたら「要」に切り替える
+  if(r.mode==='noNo'){
+    const cur=document.querySelector('input[name="mfstNeeded"]:checked');
+    if(!cur||cur.value==='no'){document.querySelector('input[name="mfstNeeded"][value="yes"]').checked=true;onMfstChange();}
+  }
+}
+// 保存用：欄が消えているときはマニフェスト不要として保存
+function getMfstForSave(){
+  return mfstRule().mode==='hide'?{needed:'no',type:'paper',sys:'jwnet'}:getMfst();
 }
 function workTypeLabel(wt){
+  if(!wt)return '';
+  const wl={general:'♻ 一般廃・資源物',industrial:'🏭 産業廃棄物'}[wt.waste]||'';
+  const body=_workTypeBody(wt);
+  return [wl,body].filter(Boolean).join('／');
+}
+function _workTypeBody(wt){
   if(!wt||!wt.type)return '';
   if(wt.type==='manual')return '🖐 手積み';
   if(wt.type==='container'){
@@ -4443,7 +4503,7 @@ function showDispPopup(e,id){  const dp=(db.dispatches||[]).find(x=>x.id===id);i
   rows+=`<div class="pop-row"><span class="pop-label">受付日</span><span class="pop-val" style="font-size:10px;color:#94a3b8">${rcvDateStr}</span></div>`;
   if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">期限</span><span class="pop-val">${dp.deadline}</span></div>`;
   rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
-  if(dp.workType&&dp.workType.type)rows+=`<div class="pop-row"><span class="pop-label" style="color:#6d28d9;font-weight:800">作業種別</span><span class="pop-val" style="font-weight:700;color:#6d28d9">${workTypeLabel(dp.workType)}</span></div>`;
+  if(workTypeLabel(dp.workType))rows+=`<div class="pop-row"><span class="pop-label" style="color:#6d28d9;font-weight:800">作業種別</span><span class="pop-val" style="font-weight:700;color:#6d28d9">${workTypeLabel(dp.workType)}</span></div>`;
   if(dp.custContact)rows+=`<div class="pop-row"><span class="pop-label">お客様担当</span><span class="pop-val">${dp.custContact}</span></div>`;
   if(dp.isCarryIn){
     // 持込みはドライバー・車両が不要なので、代わりに持込みの指定時間を表示
@@ -4625,7 +4685,7 @@ function printWorkOrder(id,mode){
   </div>
 </div>
 ${metaTop}
-${dp.workType&&dp.workType.type?`<div style="background:#ede9fe;border:1px solid #ddd6fe;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10px;font-weight:700;color:#6d28d9">🔧 作業種別：${workTypeLabel(dp.workType)}</div>`:''}
+${workTypeLabel(dp.workType)?`<div style="background:#ede9fe;border:1px solid #ddd6fe;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10px;font-weight:700;color:#6d28d9">🔧 作業種別：${workTypeLabel(dp.workType)}</div>`:''}
 ${custSec}${siteSec}${drvSec}${notesSec}${cautionSec}${collectSec}${otherSec}${signSec}
 <div class="footer">
   <span>廃棄物収集・運搬 配車管理システム　${footerLabel}</span>
@@ -4754,6 +4814,7 @@ function printDaySchedule(ds,withUndated,mode){
     const p=[];
     // 1枚に収めるため作業種別は短く表記（例：4tコンテナ交換）
     const w=dp.workType||{};
+    if(w.waste)p.push(w.waste==='general'?'一廃・資源':'産廃');
     if(w.type==='manual')p.push('手積み');
     else if(w.type==='container'){
       const sz={'1.5box':'1.5BOX','2t':'2t','4t':'4t','large':'大型'}[w.containerSize]||'';
@@ -4922,8 +4983,9 @@ function openAddDispatch(date,rid,pending){
   document.querySelectorAll('input[name="wkType"]').forEach(r=>{r.checked=r.value==='';});
   document.querySelector('input[name="wkContainerOp"][value="set"]').checked=true;
   document.querySelector('input[name="wkContainerSize"][value="1.5box"]').checked=true;
-  onWkTypeChange();
+  setWasteCat('');
   setMfst({needed:'no',type:'paper',sys:'jwnet'});
+  onWkTypeChange();
   fillSiteSel();
   document.getElementById('dSiteSelect').value='';
   document.getElementById('dDelBtn').classList.add('hid');
@@ -4972,8 +5034,9 @@ function editDisp(id){
   if(coEl)coEl.checked=true;
   const csEl=document.querySelector('input[name="wkContainerSize"][value="'+(wt.containerSize||'1.5box')+'"]');
   if(csEl)csEl.checked=true;
-  onWkTypeChange();
+  setWasteCat(wt.waste||'');
   setMfst(dp.manifest||{needed:'no',type:'paper',sys:'jwnet'});
+  onWkTypeChange();
   fillSiteSel();
   document.getElementById('dSiteSelect').value='';
   document.getElementById('dDelBtn').classList.remove('hid');
@@ -5017,12 +5080,12 @@ async function saveDispatch(){
   const siteContact=document.getElementById('dSiteContact').value.trim();
   const sitePhone=document.getElementById('dSitePhone').value.trim();
   const siteAddr=document.getElementById('dSiteAddr').value.trim();
-  const manifest=getMfst();
+  const manifest=getMfstForSave();
   const timeSpec={enabled:document.getElementById('dTimeEnabled').checked,time:document.getElementById('dTimeVal').value};
   const assistant={enabled:document.getElementById('dAssistEnabled').checked,count:parseInt(document.getElementById('dAssistCount').value)||1};
   const measurement=document.getElementById('dMeasure').checked;
   const wt_type=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
-  const workType={type:wt_type,containerOp:'',containerSize:''};
+  const workType={type:wt_type,containerOp:'',containerSize:'',waste:getWasteCat()};
   if(wt_type==='container'){
     workType.containerOp=(document.querySelector('input[name="wkContainerOp"]:checked')||{}).value||'set';
     workType.containerSize=(document.querySelector('input[name="wkContainerSize"]:checked')||{}).value||'1.5box';
