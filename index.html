@@ -486,6 +486,18 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
 .cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
 .cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+/* 休み・車両不在 */
+td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6px 12px) !important}
+.abs-band{background:#6b7280;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px;margin:2px 2px 3px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.abs-band:hover{background:#4b5563}
+.abs-note{font-weight:400;margin-left:6px;opacity:.85}
+.abs-reg-btn{font-size:11px;opacity:.35;padding:0 2px;margin-left:2px}
+.abs-reg-btn:hover{opacity:1}
+.ec-abs-badge{display:inline-block;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:3px;font-size:9px;font-weight:700;padding:0 3px;margin-left:3px}
+.abs-item{border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;margin-bottom:4px;font-size:11px;cursor:pointer}
+.abs-item:hover{background:#f8fafc}
+.abs-item .abs-note{color:#64748b}
+.abs-item-r{color:#475569;font-weight:700}
 /* ごみ箱 */
 .trash-item{display:flex;gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px;background:#fff}
 .trash-main{flex:1;min-width:0}
@@ -1230,6 +1242,7 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
         <div class="cdlg-msg" id="cMsg">この予定で確定しますか？</div>
         <div class="cdlg-det" id="cDet"></div>
         <div class="warn-txt" id="cLicWarn">⚠ 免許の条件が合わない可能性があります。確認してください。</div>
+        <div class="warn-txt" id="cAbsWarn"></div>
       </div>
     </div>
     <div class="mftr ctr">
@@ -2300,6 +2313,34 @@ function checkContainerAlerts() {
   </div>
 </div>
 
+<!-- 休み・車両不在 モーダル -->
+<div class="ovl hid" id="mAbsence">
+  <div class="mbox" style="max-width:480px">
+    <div class="mhdr"><h2 id="mAbsTitle">🌴 休みの登録</h2><span class="mcls" onclick="closeM('mAbsence')">×</span></div>
+    <div class="mbdy">
+      <div class="r2">
+        <div class="fr"><label>種類</label><select id="abKind" onchange="onAbsKindChange()"><option value="driver">ドライバーの休み</option><option value="vehicle">車両の不在（車検・修理など）</option></select></div>
+        <div class="fr"><label id="abResLbl">ドライバー</label><select id="abRes"></select></div>
+      </div>
+      <div class="r2">
+        <div class="fr"><label>開始日</label><input type="date" id="abFrom" onchange="if(!document.getElementById('abTo').value||document.getElementById('abTo').value<this.value)document.getElementById('abTo').value=this.value"></div>
+        <div class="fr"><label>終了日</label><input type="date" id="abTo"></div>
+      </div>
+      <div class="r2">
+        <div class="fr"><label>理由</label><select id="abReason"></select></div>
+        <div class="fr"><label>メモ（任意）</label><input type="text" id="abNote" placeholder="例: ○○自動車へ入庫" autocomplete="off"></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#475569;margin:12px 0 6px">📋 登録済み（今日以降）</div>
+      <div id="abList" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-s" onclick="closeM('mAbsence')">キャンセル</button>
+      <button class="btn btn-d" id="abDelBtn" onclick="deleteAbsence()">🗑 削除</button>
+      <button class="btn btn-p" onclick="saveAbsence()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 日次表印刷 モーダル -->
 <div class="ovl hid" id="mDayPrint">
   <div class="mbox" style="max-width:420px">
@@ -2783,6 +2824,7 @@ function normalizeDB(){
   if(!db.wasteUnitPrices)db.wasteUnitPrices=[];
   if(!db.trash)db.trash=[];
   if(!db.regSkips)db.regSkips=[];
+  if(!db.absences)db.absences=[];
   pruneTrash();
 }
 
@@ -3146,6 +3188,7 @@ function render(){
             <div class="res-name" style="display:flex;align-items:center;gap:4px">
               <button class="usage-star-btn" style="color:${starColor}" onclick="event.stopPropagation();toggleUsageGroup('${rid}')" title="${starTitle}">${starIcon}</button>
               ${res.name}${kenBadge}
+              <button class="abs-reg-btn" onclick="event.stopPropagation();openAddAbsence('driver','${rid}')" title="休み（有給など）を登録">🗓</button>
             </div>
             ${grpTxt?`<div style="font-size:10px;color:#64748b">${grpTxt}</div>`:''}
             <div class="res-meta">${lbs}</div>
@@ -3158,7 +3201,7 @@ function render(){
         <div class="res-cell-inner">
           <span class="row-drag-handle" draggable="true" ondragstart="onRowDragStart(event,'${rid}','vehicle')" title="ドラッグで行を移動">⠿</span>
           <div>
-            <div class="res-name">${res.name}</div>
+            <div class="res-name">${res.name}<button class="abs-reg-btn" onclick="event.stopPropagation();openAddAbsence('vehicle','${rid}')" title="車検・修理などの不在予定を登録">🗓</button></div>
             <div class="res-meta"><span class="bdg ${bc}">${r}以上</span><br><span style="font-size:10px;color:#94a3b8">${res.plate||''}</span></div>
           </div>
         </div>
@@ -3174,6 +3217,10 @@ function render(){
       else if(dow===6)cc+=' td-sat';
       const disps=cellDisps(ds,rid);
       const csBands=(db.contractSupports||[]).filter(cs=>cs.date===ds&&cs.driverId===rid);
+      // 休み（ドライバー）・不在（車両）の日はグレー表示＋理由
+      const ab=absenceOf(type,rid,ds);
+      if(ab)cc+=' td-absent';
+      const absHtml=ab?absBandHTML(ab):'';
       if(isDay){
         const sorted=disps.slice().sort((a,b)=>{
           const ta=(a.timeSpec&&a.timeSpec.enabled&&a.timeSpec.time)||'99:99';
@@ -3196,7 +3243,7 @@ function render(){
         row+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','${rid}')">
-          <div class="day-cell-wrap">${csBadges}${dayHtml||`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`}</div></td>`;
+          ${absHtml}<div class="day-cell-wrap">${csBadges}${dayHtml||(ab?'':`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`)}</div></td>`;
       } else {
         const bandHtml=csBands.map(cs=>{
           const lp=(cs.startHour/24*100).toFixed(1);
@@ -3206,7 +3253,7 @@ function render(){
         const cards=disps.map(dp=>cardHTML(dp,'drv')).join('');
         row+=`<td class="${cc}" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-          onclick="cellClick(event,'${ds}','${rid}')"><div class="cell-scrl">${bandHtml}${cards}</div></td>`;
+          onclick="cellClick(event,'${ds}','${rid}')">${absHtml}<div class="cell-scrl">${bandHtml}${cards}</div></td>`;
       }
     }
     return row+'</tr>';
@@ -3403,7 +3450,7 @@ function dayCardHTML(dp,seqNo,rowCtx){
   const veh=!isCarryIn?(vehName(dp.vehicle)||'未定'):'';
   const drv=drvName(dp.driver)||'未定';
   const time=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'';
-  const holBadge=holName?`<span class="ec-hol-badge">🎌</span>`:'';
+  const holBadge=(holName?`<span class="ec-hol-badge">🎌</span>`:'')+absBadge(dp);
   const statusMark=dp.status==='pending'?'🔴 ':'';
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
@@ -3464,7 +3511,7 @@ function cardHTML(dp,rowCtx){
   const wdate=workDate(dp)||'';
   const holName=HOLIDAYS[wdate]||'';
   const statusMark=dp.status==='pending'?'🔴 ':'';
-  const holBadge=holName?`<span class="ec-hol-badge">🎌 祝</span>`:'';
+  const holBadge=(holName?`<span class="ec-hol-badge">🎌 祝</span>`:'')+absBadge(dp);
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
@@ -3888,6 +3935,7 @@ function onDropToPending(e,elId){
   document.getElementById('cMsg').textContent='この案件を未割当に戻しますか？';
   document.getElementById('cDet').textContent=`案件: ${nameLabel}\n\nドライバー・車両・配車日をクリアして\n未割当エリアに戻します。`;
   document.getElementById('cLicWarn').classList.remove('show');
+  document.getElementById('cAbsWarn').classList.remove('show');
   ST.drop={date:null,id:dp.id,newDriver:null,newVehicle:null,returnToPending:true};
   openM('mConfirm');
 }
@@ -3909,6 +3957,10 @@ function onDrop(e,cell){
   document.getElementById('cMsg').textContent='この予定で確定しますか？';
   document.getElementById('cDet').textContent=det;
   document.getElementById('cLicWarn').classList.toggle('show',!!(dr&&ve&&!canDrive(dr,ve)));
+  const absMsg=absenceWarn(newDriver,newVehicle,date);
+  const aw=document.getElementById('cAbsWarn');
+  aw.textContent=absMsg?'⚠ '+absMsg.replace(/\n/g,'　'):'';
+  aw.classList.toggle('show',!!absMsg);
   ST.drop={date,id:dp.id,newDriver,newVehicle};
   openM('mConfirm');
 }
@@ -4759,6 +4811,10 @@ async function saveDispatch(){
   const status=document.getElementById('dStatus').value;
   const driver=isCarryIn?null:document.getElementById('dDriver').value||null;
   const vehicle=isCarryIn?null:document.getElementById('dVehicle').value||null;
+  {
+    const absMsg=absenceWarn(driver,vehicle,dispatchDate);
+    if(absMsg&&!confirm('⚠ '+absMsg+'\n\nこのまま保存しますか？'))return;
+  }
   const notes=document.getElementById('dNotes').value.trim();
   const caution=document.getElementById('dCaution').value.trim();
   const receptionist=document.getElementById('dReceptionist').value.trim();
@@ -5266,6 +5322,9 @@ function generatePlan(){
         if(!vehId)vehId=_findVehId(aiSug.vehicle);
         if(drvId||vehId)aiUsed=true;
       }
+      // 休み・車両不在の日は提案しない（未定にする）
+      if(drvId&&absenceOf('driver',drvId,ds))drvId='';
+      if(vehId&&absenceOf('vehicle',vehId,ds))vehId='';
       planItems.push({id:uid(),date:ds,custId:rs.cust,site:rs.site||'',notes:rs.notes||'',driver:drvId,vehicle:vehId,aiSuggested:aiUsed,aiPattern:aiSug,source:'regular',regId:rs.id,isReg:true});
     }
     cur.setDate(cur.getDate()+1);
@@ -5533,6 +5592,110 @@ function renderRegList(){
       <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'🏭 持込み（ドライバー・車両不要）':`ドライバー: ${drvName(rs.driver)} ／ 車両: ${vehName(rs.vehicle)}`}${rs.notes?' ／ '+rs.notes:''}</div>
     </div>`;}).join('');
 }
+// ================================================================
+// 休み（ドライバー）・不在予定（車両）
+// db.absences: {id, kind:'driver'|'vehicle', resId, from, to, reason, note}
+// ================================================================
+const ABS_REASONS={driver:['有給休暇','公休','特別休暇','欠勤','その他'],vehicle:['車検','修理','定期点検','代車貸出','その他']};
+function absenceOf(kind,resId,ds){
+  if(!resId||!ds)return null;
+  return (db.absences||[]).find(a=>a.kind===kind&&a.resId===resId&&a.from<=ds&&ds<=a.to)||null;
+}
+function absLabel(a){return (a.kind==='driver'?'🌴 ':'🔧 ')+a.reason;}
+function absBandHTML(a){
+  const t=`${absLabel(a)}（${a.from.slice(5).replace('-','/')}〜${a.to.slice(5).replace('-','/')}）${a.note?'\n'+a.note:''}`;
+  return `<div class="abs-band" data-id="${esc(a.id)}" onclick="event.stopPropagation();openEditAbsence(this.dataset.id)" title="${esc(t)}\nクリックで編集">${esc(absLabel(a))}${a.note?`<span class="abs-note">${esc(a.note)}</span>`:''}</div>`;
+}
+// 配車カードに付ける警告（担当ドライバーが休み／車両が不在）
+function absBadge(dp){
+  const ds=workDate(dp);if(!ds||dp.isCarryIn)return '';
+  const a=absenceOf('driver',dp.driver,ds),b=absenceOf('vehicle',dp.vehicle,ds);
+  let h='';
+  if(a)h+=`<span class="ec-abs-badge" title="${esc(drvName(dp.driver))}：${esc(a.reason)}">🌴休</span>`;
+  if(b)h+=`<span class="ec-abs-badge" title="${esc(vehName(dp.vehicle))}：${esc(b.reason)}">🔧${esc(b.reason)}</span>`;
+  return h;
+}
+// 割り当て時の警告文（なければ空）
+function absenceWarn(driverId,vehicleId,ds){
+  if(!ds)return '';
+  const m=[];
+  const a=absenceOf('driver',driverId,ds);if(a)m.push(`${drvName(driverId)} さんは ${ds} は「${a.reason}」です。`);
+  const b=absenceOf('vehicle',vehicleId,ds);if(b)m.push(`車両 ${vehName(vehicleId)} は ${ds} は「${b.reason}」で使えません。`);
+  return m.join('\n');
+}
+let _absEditId=null;
+function fillAbsForm(kind,resId){
+  document.getElementById('abKind').value=kind;
+  const list=kind==='driver'?(db.drivers||[]):(db.vehicles||[]);
+  document.getElementById('abRes').innerHTML='<option value="">-- 選択 --</option>'+list.map(r=>`<option value="${esc(r.id)}">${esc(r.name)}${r.plate?'（'+esc(r.plate)+'）':''}</option>`).join('');
+  document.getElementById('abRes').value=resId||'';
+  document.getElementById('abReason').innerHTML=ABS_REASONS[kind].map(r=>`<option>${r}</option>`).join('');
+  document.getElementById('abResLbl').textContent=kind==='driver'?'ドライバー':'車両';
+}
+function onAbsKindChange(){fillAbsForm(document.getElementById('abKind').value,'');renderAbsList();}
+function openAddAbsence(kind,resId){
+  _absEditId=null;
+  fillAbsForm(kind,resId);
+  const t=fmt(ST.view==='day'?ST.date:new Date());
+  document.getElementById('abFrom').value=t;document.getElementById('abTo').value=t;
+  document.getElementById('abNote').value='';
+  document.getElementById('mAbsTitle').textContent=kind==='driver'?'🌴 休みの登録':'🔧 車両の不在予定の登録';
+  document.getElementById('abDelBtn').style.display='none';
+  renderAbsList();openM('mAbsence');
+}
+function openEditAbsence(id){
+  const a=(db.absences||[]).find(x=>x.id===id);if(!a)return;
+  _absEditId=id;
+  fillAbsForm(a.kind,a.resId);
+  if(!ABS_REASONS[a.kind].includes(a.reason))document.getElementById('abReason').insertAdjacentHTML('beforeend',`<option>${esc(a.reason)}</option>`);
+  document.getElementById('abReason').value=a.reason;
+  document.getElementById('abFrom').value=a.from;document.getElementById('abTo').value=a.to;
+  document.getElementById('abNote').value=a.note||'';
+  document.getElementById('mAbsTitle').textContent=a.kind==='driver'?'🌴 休みの編集':'🔧 車両の不在予定の編集';
+  document.getElementById('abDelBtn').style.display='';
+  renderAbsList();openM('mAbsence');
+}
+async function saveAbsence(){
+  const kind=document.getElementById('abKind').value;
+  const resId=document.getElementById('abRes').value;
+  const from=document.getElementById('abFrom').value;
+  let to=document.getElementById('abTo').value||from;
+  const reason=document.getElementById('abReason').value;
+  const note=document.getElementById('abNote').value.trim();
+  if(!resId){alert((kind==='driver'?'ドライバー':'車両')+'を選択してください');return;}
+  if(!from){alert('開始日を入力してください');return;}
+  if(to<from){alert('終了日は開始日以降にしてください');return;}
+  const now=new Date().toISOString();
+  if(_absEditId){
+    const a=db.absences.find(x=>x.id===_absEditId);
+    if(a)Object.assign(a,{kind,resId,from,to,reason,note,updated:now});
+  }else{
+    db.absences.push({id:uid(),kind,resId,from,to,reason,note,created:now,updated:now});
+  }
+  // すでにこの期間に割り当て済みの配車があれば知らせる
+  const hit=(db.dispatches||[]).filter(dp=>{const w=workDate(dp);return w&&w>=from&&w<=to&&(kind==='driver'?dp.driver===resId:dp.vehicle===resId);});
+  await save();closeM('mAbsence');render();
+  if(hit.length){
+    const lines=hit.slice(0,5).map(dp=>`・${workDate(dp)} ${dp.dispatchType==='shipment'?(dp.destName||'出荷'):custName(dp.customer)}`).join('\n');
+    alert(`⚠ 登録しました。\nこの期間に割り当て済みの配車が ${hit.length} 件あります。付け替えを確認してください。\n\n${lines}${hit.length>5?'\n...他'+(hit.length-5)+'件':''}\n\n（カレンダーのカードに「🌴休」「🔧${reason}」の印が付いています）`);
+  }
+}
+async function deleteAbsence(){
+  if(!_absEditId||!confirm('この予定を削除しますか？'))return;
+  db.absences=db.absences.filter(x=>x.id!==_absEditId);
+  await save();closeM('mAbsence');render();
+}
+// 選択中の種類の登録一覧（今日以降の分）
+function renderAbsList(){
+  const kind=document.getElementById('abKind').value;
+  const today=fmt(new Date());
+  const list=(db.absences||[]).filter(a=>a.kind===kind&&a.to>=today).sort((a,b)=>a.from<b.from?-1:1);
+  const nm=a=>kind==='driver'?drvName(a.resId):vehName(a.resId);
+  document.getElementById('abList').innerHTML=list.length
+    ?list.map(a=>`<div class="abs-item" data-id="${esc(a.id)}" onclick="openEditAbsence(this.dataset.id)"><b>${esc(nm(a))}</b>　${a.from}${a.to!==a.from?' 〜 '+a.to:''}　<span class="abs-item-r">${esc(absLabel(a))}</span>${a.note?`<span class="abs-note">${esc(a.note)}</span>`:''}</div>`).join('')
+    :'<div class="empty" style="padding:8px">今日以降の登録はありません</div>';
+}
+
 // ================================================================
 // ごみ箱（削除した配車・出荷カードを30日間保管し、元に戻せるようにする）
 // ================================================================
