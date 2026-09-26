@@ -2392,12 +2392,19 @@ function checkContainerAlerts() {
     <div class="mhdr"><h2>🖨 日次配車表の印刷</h2><span class="mcls" onclick="closeM('mDayPrint')">×</span></div>
     <div class="mbdy">
       <div class="fr"><label>印刷する日</label><input type="date" id="dpDate"></div>
+      <div class="fr" style="margin-top:8px"><label>確定分の並べ方</label>
+        <div class="reg-kind-row" style="flex-direction:column;gap:6px">
+          <label class="reg-kind"><input type="radio" name="dpMode" value="driver" checked><span>👤 ドライバー別<small>ドライバーごとに第1業務から順に</small></span></label>
+          <label class="reg-kind"><input type="radio" name="dpMode" value="vehicle"><span>🚛 車両別<small>車両ごとに、その車で回る順に</small></span></label>
+          <label class="reg-kind"><input type="radio" name="dpMode" value="time"><span>🕐 時間順<small>その日の全業務を早い順に1本のリストで</small></span></label>
+        </div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:8px;cursor:pointer"><input type="checkbox" id="dpUndated" checked style="width:auto;margin:0">日付未定の依頼も載せる</label>
-      <div style="font-size:11px;color:#64748b;margin-top:10px;line-height:1.6">確定分（ドライバー別）・持込み・委託応援・未確定分を、A4縦1枚に収まるよう自動で縮小して印刷します。</div>
+      <div style="font-size:11px;color:#64748b;margin-top:10px;line-height:1.6">確定分・未確定分・持込み・委託応援を、A4縦1枚に収まるよう自動で縮小して印刷します。</div>
     </div>
     <div class="mftr">
       <button class="btn btn-s" onclick="closeM('mDayPrint')">キャンセル</button>
-      <button class="btn btn-p" onclick="printDaySchedule(document.getElementById('dpDate').value,document.getElementById('dpUndated').checked)">🖨 印刷</button>
+      <button class="btn btn-p" onclick="printDaySchedule(document.getElementById('dpDate').value,document.getElementById('dpUndated').checked,(document.querySelector('input[name=dpMode]:checked')||{}).value)">🖨 印刷</button>
     </div>
   </div>
 </div>
@@ -4714,10 +4721,22 @@ window.onload=function(){
 // ================================================================
 function openDayPrint(){
   document.getElementById('dpDate').value=fmt(ST.view==='day'?ST.date:new Date());
+  // 前回選んだ並べ方を初期値にする
+  let m='driver';try{m=localStorage.getItem('dayPrintMode')||'driver';}catch(e){}
+  const r=document.querySelector(`input[name="dpMode"][value="${m}"]`);if(r)r.checked=true;
   openM('mDayPrint');
 }
-function printDaySchedule(ds,withUndated){
+function printDaySchedule(ds,withUndated,mode){
   if(!ds){alert('印刷する日を選んでください');return;}
+  mode=mode||'driver';
+  try{localStorage.setItem('dayPrintMode',mode);}catch(e){}
+  // 時間欄：時間指定があればその時刻、なければ注意事項・備考から推定した時間帯を薄く表示
+  const tmCell=dp=>{
+    const t=dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time;
+    if(t)return esc(t);
+    const g=guessDayTime(dp);
+    return g?`<span class="sub">(${esc(g.label)})</span>`:'';
+  };
   const d=pd(ds);
   const dateLabel=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）`;
   const hol=HOLIDAYS[ds]||'';
@@ -4756,22 +4775,39 @@ function printDaySchedule(ds,withUndated){
   const cs=(db.contractSupports||[]).filter(c=>c.date===ds).sort((a,b)=>a.startHour-b.startHour);
   const undated=withUndated?(db.dispatches||[]).filter(dp=>!workDate(dp)&&!dp.isReg&&!dp.isCarryIn).sort((a,b)=>(a.deadline||'9999')<(b.deadline||'9999')?-1:1):[];
 
-  // 確定分：画面と同じドライバー順で並べる
-  const drvIds=[...new Set(assigned.map(dp=>dp.driver))];
-  const orderedDrv=getOrderedResources((db.drivers||[]).filter(x=>drvIds.includes(x.id)),'driver');
-  drvIds.filter(id=>!orderedDrv.some(x=>x.id===id)).forEach(id=>orderedDrv.push({id,name:drvName(id)}));
-  let confRows='';
-  orderedDrv.forEach((dr,gi)=>{
-    const list=assigned.filter(dp=>dp.driver===dr.id).sort(byTime);
-    const csOf=cs.filter(c=>c.driverId===dr.id);
-    list.forEach((dp,i)=>{
-      confRows+=`<tr class="${gi%2?'alt':''}">
-        ${i===0?`<td rowspan="${list.length}" class="drv">${esc(dr.name)}${csOf.length?`<div class="sub">🏛委託 ${csOf.map(c=>c.startHour+'-'+c.endHour+'時').join(',')}</div>`:''}</td>`:''}
-        <td class="c">${i+1}</td><td class="c">${esc(tm(dp))}</td><td>${esc(vehName(dp.vehicle))}</td>
+  // 確定分：並べ方（ドライバー別／車両別／時間順）を切り替える
+  let confRows='',confTitle,confHead;
+  if(mode==='time'){
+    // 時間順：その日の全業務を、画面の日表示と同じ基準で早い順に1本のリストにする
+    confTitle='✅ 確定分（時間順）';
+    confHead='<th style="width:3%">順</th><th style="width:7%">時間</th><th style="width:11%">ドライバー</th><th style="width:9%">車両</th><th style="width:8%">種別</th><th>お客様・収集先</th><th style="width:16%">作業内容</th><th style="width:19%">備考・注意</th>';
+    assigned.slice().sort(byTime).forEach((dp,i)=>{
+      confRows+=`<tr class="${i%2?'alt':''}"><td class="c">${i+1}</td><td class="c">${tmCell(dp)}</td><td><b>${esc(drvName(dp.driver))}</b></td><td>${esc(vehName(dp.vehicle))}</td>
         <td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`;
     });
-  });
-  const simpleRows=(arr,withDl)=>arr.map(dp=>`<tr><td class="c">${esc(tm(dp))}</td><td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td>${withDl?`<td class="c">${esc(dp.deadline||'')}</td>`:''}<td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('');
+  }else{
+    // ドライバー別・車両別：画面と同じ並び順でグループにし、グループ内は業務順
+    const isVeh=mode==='vehicle';
+    const keyOf=dp=>(isVeh?dp.vehicle:dp.driver)||'';
+    const ids=[...new Set(assigned.map(keyOf))];
+    const master=isVeh?(db.vehicles||[]):(db.drivers||[]);
+    const ordered=getOrderedResources(master.filter(x=>ids.includes(x.id)),isVeh?'vehicle':'driver');
+    ids.filter(id=>!ordered.some(x=>x.id===id)).forEach(id=>ordered.push({id,name:id?(isVeh?vehName(id):drvName(id)):(isVeh?'車両未定':'ドライバー未定')}));
+    confTitle=isVeh?'✅ 確定分（車両別）':'✅ 確定分（ドライバー別）';
+    confHead=`<th style="width:13%">${isVeh?'車両':'ドライバー'}</th><th style="width:3%">順</th><th style="width:7%">時間</th><th style="width:10%">${isVeh?'ドライバー':'車両'}</th><th style="width:8%">種別</th><th>お客様・収集先</th><th style="width:16%">作業内容</th><th style="width:19%">備考・注意</th>`;
+    ordered.forEach((r,gi)=>{
+      const list=assigned.filter(dp=>keyOf(dp)===r.id).sort(byTime);
+      const csOf=isVeh?cs.filter(c=>c.vehicleId===r.id):cs.filter(c=>c.driverId===r.id);
+      const plate=isVeh&&r.plate?`<div class="sub">${esc(r.plate)}</div>`:'';
+      list.forEach((dp,i)=>{
+        confRows+=`<tr class="${gi%2?'alt':''}">
+          ${i===0?`<td rowspan="${list.length}" class="drv">${esc(r.name)}${plate}${csOf.length?`<div class="sub">🏛委託 ${csOf.map(c=>(isVeh?drvName(c.driverId).replace(/\s+/g,'')+' ':'')+c.startHour+'-'+c.endHour+'時').join(',')}</div>`:''}</td>`:''}
+          <td class="c">${i+1}</td><td class="c">${tmCell(dp)}</td><td>${esc(isVeh?drvName(dp.driver):vehName(dp.vehicle))}</td>
+          <td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`;
+      });
+    });
+  }
+  const simpleRows=(arr,withDl)=>arr.map(dp=>`<tr><td class="c">${tmCell(dp)}</td><td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td>${withDl?`<td class="c">${esc(dp.deadline||'')}</td>`:''}<td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('');
   const sec=(title,cls,count,head,rows)=>`<div class="sec ${cls}"><div class="sec-h">${title}<span class="cnt">${count}件</span></div>
     ${count?`<table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`:'<div class="none">なし</div>'}</div>`;
 
@@ -4779,7 +4815,7 @@ function printDaySchedule(ds,withUndated){
   <div class="hdr"><div><div class="co">廃棄物収集・運搬</div><div class="ttl">日次配車表　${dateLabel}${hol?`<span class="hol">${esc(hol)}</span>`:''}</div></div>
     <div class="meta">印刷日時: ${new Date().toLocaleString('ja-JP')}</div></div>
   <div class="sum"><span>✅ 確定 <b>${assigned.length}</b>件</span><span>🔴 未確定 <b>${unassigned.length}</b>件</span><span>🏭 持込み <b>${carry.length}</b>件</span><span>🏛 委託応援 <b>${cs.length}</b>名</span>${withUndated?`<span>📋 日付未定 <b>${undated.length}</b>件</span>`:''}</div>
-  ${sec('✅ 確定分（ドライバー別）','s-conf',assigned.length,'<th style="width:13%">ドライバー</th><th style="width:3%">順</th><th style="width:6%">時間</th><th style="width:9%">車両</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:17%">作業内容</th><th style="width:20%">備考・注意</th>',confRows)}
+  ${sec(confTitle,'s-conf',assigned.length,confHead,confRows)}
   ${sec('🔴 未確定分（ドライバー未定）','s-pend',unassigned.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">期限</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',simpleRows(unassigned,true))}
   ${sec('🏭 持込み','s-carry',carry.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様</th><th style="width:22%">作業内容</th><th style="width:26%">備考・注意</th>',simpleRows(carry,false))}
   ${sec('🏛 委託応援','s-cs',cs.length,'<th style="width:20%">ドライバー</th><th style="width:15%">車両</th><th style="width:15%">時間</th><th>備考</th>',cs.map(c=>`<tr><td>${esc(drvName(c.driverId))}</td><td>${esc(c.vehicleId?vehName(c.vehicleId):'')}</td><td class="c">${c.startHour}:00〜${c.endHour}:00</td><td>${esc(c.note||'')}</td></tr>`).join(''))}
