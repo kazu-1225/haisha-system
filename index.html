@@ -486,6 +486,10 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
 .cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
 .cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+/* コンテナ管理：配車からの予定 */
+.con-plan{background:#fff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:12px;overflow:hidden}
+.con-plan-h{background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:800;padding:6px 12px;display:flex;justify-content:space-between}
+.con-plan tbody tr:hover{background:#f8fafc}
 /* 日表示の並べ替え */
 .ecard.ec-day{position:relative}
 .ec-ord{position:absolute;right:4px;bottom:3px;display:flex;gap:2px;opacity:0;transition:opacity .15s}
@@ -934,6 +938,8 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
   </div>
   <!-- メインボディ -->
   <div class="con-body">
+    <!-- 配車カードからの予定（未反映のコンテナ作業） -->
+    <div id="conPlanWrap"></div>
     <!-- タブ -->
     <div class="stabs" style="background:#fff;border-radius:8px 8px 0 0;border:1px solid #e2e8f0;border-bottom:none;margin-bottom:-1px">
       <div class="stab on" id="contab-active" onclick="switchConTab('active')">稼働中</div>
@@ -1137,17 +1143,30 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         <div id="containerOpts" style="display:none;padding-top:8px;border-top:1px dashed #ddd6fe;margin-top:4px">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">コンテナ作業：</span>
-            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="set" checked onchange="applyMfstRules()">📥 設置</label>
-            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="swap" onchange="applyMfstRules()">🔄 交換</label>
-            <label class="mfst-btn type-no"><input type="radio" name="wkContainerOp" value="remove" onchange="applyMfstRules()">📤 撤去</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="set" checked onchange="applyMfstRules();refreshConTargets()">📥 設置</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="wkContainerOp" value="swap" onchange="applyMfstRules();refreshConTargets()">🔄 交換</label>
+            <label class="mfst-btn type-no"><input type="radio" name="wkContainerOp" value="remove" onchange="applyMfstRules();refreshConTargets()">📤 撤去</label>
           </div>
+          <!-- サイズはコンテナ管理と同じ分け方（値＝コンテナ管理の種類名） -->
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">サイズ：</span>
-            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="1.5box" checked>1.5BOX <span style="font-size:9px;color:#fca5a5;font-weight:800">クレーン</span></label>
-            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="2t">2tコンテナ</label>
-            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="4t">4tコンテナ</label>
-            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="large">大型コンテナ</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="1㎥BOX">1㎥BOX</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="1.5㎥BOX" checked>1.5㎥BOX <span style="font-size:9px;color:#fca5a5;font-weight:800">クレーン</span></label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="2㎥BOX">2㎥BOX</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="4㎥（2DR）コンテナ">4㎥（2DR）</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="8㎥（4DR）コンテナ">8㎥（4DR）</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="12㎥コンテナ">12㎥</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="16㎥コンテナ">16㎥</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="wkContainerSize" value="フレコンバッグ">フレコンバッグ</label>
+            <label class="mfst-btn type-sys hid" id="wkSizeLargeLbl"><input type="radio" name="wkContainerSize" value="大型コンテナ">大型（サイズ未確認）</label>
           </div>
+          <!-- コンテナ管理との連携：設置はコンテナNo.、交換・撤去は対象のコンテナを選ぶ -->
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px">
+            <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0" id="dConNoLbl">コンテナNo.：</span>
+            <input type="number" id="dConNo" min="0" placeholder="例: 12（任意）" style="width:120px">
+            <select id="dConTarget" class="hid" style="flex:1;min-width:220px"></select>
+          </div>
+          <div style="font-size:10px;color:#7c3aed;margin-top:4px">📦 配車が確定すると、コンテナ管理に「予定」として表示され、作業日にコンテナ管理へ反映されます。</div>
         </div>
       </div>
       <hr style="margin:10px 0">
@@ -2886,12 +2905,16 @@ function normalizeDB(){
   if(!db.trash)db.trash=[];
   if(!db.regSkips)db.regSkips=[];
   if(!db.absences)db.absences=[];
+  // 旧コンテナサイズ → コンテナ管理の種類名に読み替え
+  const LEG={'1.5box':'1.5㎥BOX','2t':'4㎥（2DR）コンテナ','4t':'8㎥（4DR）コンテナ','large':'大型コンテナ'};
+  [...db.dispatches,...db.trash.map(t=>t.dp)].forEach(dp=>{const w=dp&&dp.workType;if(w&&LEG[w.containerSize])w.containerSize=LEG[w.containerSize];});
   pruneTrash();
 }
 
 let _autoSyncTimer=null;
 let _dirty=false; // まだサーバーに送っていない変更があるか
 async function save(){
+  syncContainers(); // 配車カードのコンテナ作業をコンテナ管理へ反映
   localStorage.setItem('haishaDB2',JSON.stringify(db));
   if(GAS_URL){
     _dirty=true;
@@ -3159,7 +3182,7 @@ async function moveDayOrder(id,dir,rowCtx){
   a.orderMin=kb;b.orderMin=ka;
   await save();render();
 }
-function isCraneDisp(dp){const wtp=dp.workType||{};return!dp.dispatchType&&wtp.type==='container'&&wtp.containerSize==='1.5box';}
+function isCraneDisp(dp){const wtp=dp.workType||{};return!dp.dispatchType&&wtp.type==='container'&&isCraneSize(wtp.containerSize);}
 // 未割当カードのソート：①期限が近い順（なしは最後）②配車確定日が近い順（なしは最後）③登録順
 function _sortPending(list){
   return list.sort((a,b)=>{
@@ -3613,7 +3636,7 @@ function _dayCardHTML(dp,seqNo,rowCtx){
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
   const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
-  const wt1=dp.workType||{};const isCrane=!isCarryIn&&!isShip&&wt1.type==='container'&&wt1.containerSize==='1.5box';
+  const wt1=dp.workType||{};const isCrane=!isCarryIn&&!isShip&&wt1.type==='container'&&isCraneSize(wt1.containerSize);
   // 持込み行ではドラッグ無効
   const dragAttr=(isCarryIn&&rowCtx==='carry')
     ?''
@@ -3726,7 +3749,7 @@ function _cardHTML(dp,rowCtx){
     </div>`;
   }
   // ─── 通常案件（スポット・クレーン・持込み） ───────────────────
-  const wt2=dp.workType||{};const isCrane=!isCarryIn&&wt2.type==='container'&&wt2.containerSize==='1.5box';
+  const wt2=dp.workType||{};const isCrane=!isCarryIn&&wt2.type==='container'&&isCraneSize(wt2.containerSize);
   let cls='ecard '+(isCarryIn?'ec-carry':isCrane?'ec-crane':isUnass?'ec-pend':dp.isReg?'ec-reg':'ec-spot');
   if(holName)cls+=' ec-hol';
   const sub=isCarryIn?(dp.isReg?'🏭 持込み（定期）':'🏭 持込み'):(ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`);
@@ -4392,6 +4415,7 @@ function onWkTypeChange(){
   const v=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
   document.getElementById('containerOpts').style.display=v==='container'?'block':'none';
   applyMfstRules();
+  refreshConTargets();
 }
 // 廃棄物区分：同じボタンをもう一度押すと選択解除
 let _wasteCatPrev='';
@@ -4448,10 +4472,11 @@ function _workTypeBody(wt){
   if(wt.type==='manual')return '🖐 手積み';
   if(wt.type==='container'){
     const opMap={set:'設置',swap:'交換',remove:'撤去'};
-    const szMap={'1.5box':'1.5BOX（クレーン対応）','2t':'2tコンテナ','4t':'4tコンテナ','large':'大型コンテナ'};
+    const szMap={'1.5㎥BOX':'1.5㎥BOX（クレーン対応）','大型コンテナ':'大型コンテナ（サイズ未確認）'};
     const parts=[];
     if(wt.containerOp)parts.push(opMap[wt.containerOp]);
-    if(wt.containerSize)parts.push(szMap[wt.containerSize]);
+    if(wt.containerSize)parts.push(szMap[wt.containerSize]||wt.containerSize);
+    if(wt.conNo)parts.push('No.'+wt.conNo);
     return '🗃 コンテナ：'+parts.join(' / ');
   }
   return '';
@@ -4822,9 +4847,9 @@ function printDaySchedule(ds,withUndated,mode){
     if(w.waste)p.push(w.waste==='general'?'一廃・資源':'産廃');
     if(w.type==='manual')p.push('手積み');
     else if(w.type==='container'){
-      const sz={'1.5box':'1.5BOX','2t':'2t','4t':'4t','large':'大型'}[w.containerSize]||'';
+      const sz=conShort(w.containerSize);
       const op={set:'設置',swap:'交換',remove:'撤去'}[w.containerOp]||'';
-      p.push(`${sz}コンテナ${op}`);
+      p.push(`${sz}${op}${w.conNo?' No.'+w.conNo:''}`);
     }
     if(dp.assistant&&dp.assistant.enabled)p.push(`助手${dp.assistant.count||1}名`);
     if(dp.measurement)p.push('要計量');
@@ -4941,6 +4966,7 @@ function fillDSel(){
 }
 function syncMPTrigger(selId){
   const sel=document.getElementById(selId);if(!sel)return;
+  if(selId==='dCust')refreshConTargets(); // お客様が変わったら対象コンテナの候補を更新
   const opt=sel.options[sel.selectedIndex];
   const map={dCust:'dCustTxt',dDriver:'dDriverTxt',dVehicle:'dVehicleTxt',sDriver:'sDriverTxt',sVehicle:'sVehicleTxt'};
   const txtEl=document.getElementById(map[selId]);if(!txtEl)return;
@@ -4987,7 +5013,9 @@ function openAddDispatch(date,rid,pending){
   onCarryInChange();
   document.querySelectorAll('input[name="wkType"]').forEach(r=>{r.checked=r.value==='';});
   document.querySelector('input[name="wkContainerOp"][value="set"]').checked=true;
-  document.querySelector('input[name="wkContainerSize"][value="1.5box"]').checked=true;
+  document.querySelector('input[name="wkContainerSize"][value="1.5㎥BOX"]').checked=true;
+  document.getElementById('wkSizeLargeLbl').classList.add('hid');
+  document.getElementById('dConNo').value='';_conTargetInit='';document.getElementById('dConTarget').innerHTML='';
   setWasteCat('');
   setMfst({needed:'no',type:'paper',sys:'jwnet'});
   onWkTypeChange();
@@ -5037,7 +5065,10 @@ function editDisp(id){
   document.querySelectorAll('input[name="wkType"]').forEach(r=>{r.checked=r.value===(wt.type||'');});
   const coEl=document.querySelector('input[name="wkContainerOp"][value="'+(wt.containerOp||'set')+'"]');
   if(coEl)coEl.checked=true;
-  const csEl=document.querySelector('input[name="wkContainerSize"][value="'+(wt.containerSize||'1.5box')+'"]');
+  // 旧データの「大型コンテナ」はサイズ未確認として表示（選び直してもらう）
+  document.getElementById('wkSizeLargeLbl').classList.toggle('hid',wt.containerSize!=='大型コンテナ');
+  document.getElementById('dConNo').value=wt.conNo||'';_conTargetInit=wt.conPlacementId||'';document.getElementById('dConTarget').innerHTML='';
+  const csEl=document.querySelector('input[name="wkContainerSize"][value="'+(wt.containerSize||'1.5㎥BOX')+'"]');
   if(csEl)csEl.checked=true;
   setWasteCat(wt.waste||'');
   setMfst(dp.manifest||{needed:'no',type:'paper',sys:'jwnet'});
@@ -5076,6 +5107,16 @@ async function saveDispatch(){
     const absMsg=absenceWarn(driver,vehicle,dispatchDate);
     if(absMsg&&!confirm('⚠ '+absMsg+'\n\nこのまま保存しますか？'))return;
   }
+  // コンテナの交換・撤去で、対象のコンテナが決められない場合は知らせる
+  {
+    const wk=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
+    const op=(document.querySelector('input[name="wkContainerOp"]:checked')||{}).value||'set';
+    if(!isCarryIn&&wk==='container'&&op!=='set'&&!document.getElementById('dConTarget').value){
+      const sz=(document.querySelector('input[name="wkContainerSize"]:checked')||{}).value||'';
+      const r=conResolveTarget({customer:cust},{target:'',type:sz});
+      if(r.err&&!(op==='swap'&&r.none)&&!confirm('⚠ '+r.err+'。\nこのままだとコンテナ管理に反映されません（コンテナ管理画面の予定欄に⚠で表示されます）。\n\nこのまま保存しますか？'))return;
+    }
+  }
   const notes=document.getElementById('dNotes').value.trim();
   const caution=document.getElementById('dCaution').value.trim();
   const receptionist=document.getElementById('dReceptionist').value.trim();
@@ -5093,7 +5134,9 @@ async function saveDispatch(){
   const workType={type:wt_type,containerOp:'',containerSize:'',waste:getWasteCat()};
   if(wt_type==='container'){
     workType.containerOp=(document.querySelector('input[name="wkContainerOp"]:checked')||{}).value||'set';
-    workType.containerSize=(document.querySelector('input[name="wkContainerSize"]:checked')||{}).value||'1.5box';
+    workType.containerSize=(document.querySelector('input[name="wkContainerSize"]:checked')||{}).value||'1.5㎥BOX';
+    if(workType.containerOp==='set')workType.conNo=parseInt(document.getElementById('dConNo').value)||0;
+    else workType.conPlacementId=document.getElementById('dConTarget').value||'';
   }
   const finalStatus=status;
   if(ST.editId){
@@ -6092,6 +6135,7 @@ function trashDispatches(ids,reason){
   if(!db.trash)db.trash=[];
   if(!db.regSkips)db.regSkips=[];
   const moved=db.dispatches.filter(x=>set.has(x.id));
+  moved.forEach(dp=>conRevert(dp)); // コンテナ管理への反映を取り消す（元に戻せば再反映）
   moved.forEach(dp=>{
     db.trash.push({dp,deletedAt:now,reason:reason||''});
     // 定期便から作られた予定は、再作成されないよう印を付ける
@@ -7342,6 +7386,161 @@ function switchConTab(tab) {
 }
 
 // ── アラート計算 ──
+// コンテナ管理画面の保存（以前は未定義で保存されていなかった）
+function saveDB(){return save();}
+
+// ================================================================
+// 配車カード → コンテナ管理 の自動連携
+//  ・配車が確定（作業日＋ドライバー）したコンテナ作業は「予定」としてコンテナ管理に表示
+//  ・作業日を迎えたら稼働中一覧・設置履歴に反映（dp.conApplied に反映内容を記録）
+//  ・カードの日付・内容の変更や削除があれば、反映を取り消して作り直す
+// ================================================================
+const CON_OP={set:'install',swap:'exchange',remove:'remove'};
+const CON_OP_LABEL={install:'📦 設置',exchange:'🔄 交換',remove:'🚛 撤去'};
+function isCraneSize(sz){return sz==='1.5㎥BOX'||sz==='1.5box';}
+function conShort(sz){return ({'4㎥（2DR）コンテナ':'4㎥(2DR)','8㎥（4DR）コンテナ':'8㎥(4DR)','12㎥コンテナ':'12㎥','16㎥コンテナ':'16㎥','大型コンテナ':'大型'})[sz]||sz||'';}
+// お客様の稼働中コンテナ（顧客IDか、会社形態を除いた名前で照合）
+function conPlacementsOfCust(custId){
+  if(!custId)return [];
+  const c=(db.customers||[]).find(x=>x.id===custId);
+  const n=c?_normName(c.name):'';
+  const act=(db.containerPlacements||[]).filter(p=>p.status==='active');
+  let hit=act.filter(p=>p.customerId===custId||(n&&_normName(p.customerName)===n));
+  if(!hit.length&&n.length>=2)hit=act.filter(p=>{const pn=_normName(p.customerName);return pn.length>=2&&(pn.includes(n)||n.includes(pn));});
+  return hit;
+}
+// このカードのコンテナ作業（反映対象でなければ null）
+function conIntent(dp){
+  const w=dp.workType||{};
+  if(dp.dispatchType||dp.isCarryIn||w.type!=='container')return null;
+  if(!dp.driver||!workDate(dp))return null; // 配車確定前
+  return {op:CON_OP[w.containerOp||'set'],date:workDate(dp),type:w.containerSize||'',no:w.conNo||0,target:w.conPlacementId||''};
+}
+function conSig(it){return it?[it.op,it.date,it.type,it.no,it.target].join('|'):'';}
+// 交換・撤去の対象コンテナを決める
+function conResolveTarget(dp,it){
+  if(it.target){const p=(db.containerPlacements||[]).find(x=>x.id===it.target);if(p)return {p};}
+  const list=conPlacementsOfCust(dp.customer);
+  const same=list.filter(p=>p.containerType===it.type);
+  const cand=same.length?same:list;
+  if(cand.length===1)return {p:cand[0]};
+  if(cand.length>1)return {err:'このお客様の稼働中コンテナが複数あります。配車カードで対象を選んでください'};
+  return {none:true,err:'このお客様の稼働中コンテナが見つかりません'};
+}
+function conApply(dp,it){
+  const now=new Date().toISOString(),st=db.containerSettings||{};
+  const cust=custName(dp.customer),site=dp.siteName||'';
+  if(!db.containerPlacements)db.containerPlacements=[];
+  if(!db.containerActions)db.containerActions=[];
+  const note='配車より自動登録';
+  const newPlacement=(no,memo)=>{
+    const pid=uid();
+    db.containerPlacements.push({id:pid,containerType:it.type,containerNo:no,customerName:cust,customerId:dp.customer,siteName:site,
+      installDate:it.date,targetDays:st.defaultTargetDays||90,warnBeforeDays:st.defaultWarnDays||7,status:'active',removeDate:'',notes:memo||'',fromDispatch:dp.id,created:now,updated:now});
+    return pid;
+  };
+  let pid,prev=null,op=it.op;
+  if(op==='install'){pid=newPlacement(it.no,'');}
+  else{
+    const r=conResolveTarget(dp,it);
+    if(!r.p){
+      // 交換で記録がない場合は、新しく設置されたものとして登録する
+      if(op==='exchange'&&r.none){pid=newPlacement(it.no,'交換（以前の設置記録なし）');op='install';}
+      else return false;
+    }else{
+      const p=r.p;
+      prev={installDate:p.installDate,status:p.status,removeDate:p.removeDate,containerType:p.containerType};
+      if(op==='exchange'){p.installDate=it.date;if(it.type)p.containerType=it.type;}
+      else{p.status='removed';p.removeDate=it.date;}
+      if(!p.customerId)p.customerId=dp.customer;
+      p.updated=now;pid=p.id;
+    }
+  }
+  const p=db.containerPlacements.find(x=>x.id===pid);
+  const aid=uid();
+  db.containerActions.push({id:aid,placementId:pid,actionType:op,containerType:p.containerType,containerNo:p.containerNo,
+    customerName:p.customerName,siteName:p.siteName||site,actionDate:it.date,notes:note,dispatchId:dp.id,created:now});
+  dp.conApplied={sig:conSig(it),op,placementId:pid,actionId:aid,prev};
+  return true;
+}
+function conRevert(dp){
+  const a=dp.conApplied;if(!a)return;
+  db.containerActions=(db.containerActions||[]).filter(x=>x.id!==a.actionId);
+  const p=(db.containerPlacements||[]).find(x=>x.id===a.placementId);
+  if(p){
+    if(a.op==='install'){
+      // ほかの作業の記録がなければ、設置ごと取り消す
+      if(!(db.containerActions||[]).some(x=>x.placementId===p.id))db.containerPlacements=db.containerPlacements.filter(x=>x.id!==p.id);
+    }else if(a.prev)Object.assign(p,a.prev,{updated:new Date().toISOString()});
+  }
+  delete dp.conApplied;
+}
+// 全カードを見て、作業日を迎えたものを反映・変更があったものを作り直す（変更があれば true）
+function syncContainers(){
+  if(!db||!db.dispatches)return false;
+  const today=fmt(new Date());let changed=false;
+  for(const dp of db.dispatches){
+    const it=conIntent(dp);
+    const want=it&&it.date<=today?conSig(it):'';
+    const have=dp.conApplied?dp.conApplied.sig:'';
+    if(want===have)continue;
+    if(dp.conApplied){conRevert(dp);changed=true;}
+    if(want&&conApply(dp,it))changed=true;
+  }
+  return changed;
+}
+// コンテナ管理画面の「配車からの予定」（未反映分）
+function conPlanItems(){
+  const today=fmt(new Date());
+  return (db.dispatches||[]).map(dp=>{
+    const it=conIntent(dp);if(!it||dp.conApplied)return null;
+    let target=null,err='';
+    if(it.op!=='install'){const r=conResolveTarget(dp,it);target=r.p||null;if(!r.p&&!(it.op==='exchange'&&r.none))err=r.err;}
+    return {dp,it,target,err,late:it.date<=today};
+  }).filter(Boolean).sort((a,b)=>a.it.date.localeCompare(b.it.date));
+}
+function renderConPlan(){
+  const el=document.getElementById('conPlanWrap');if(!el)return;
+  const items=conPlanItems();
+  if(!items.length){el.innerHTML='';return;}
+  const rows=items.map(x=>{
+    const {dp,it,target,err}=x;
+    const d=pd(it.date);
+    const no=it.op==='install'?(it.no?'No.'+it.no:'-'):(target?'No.'+(target.containerNo||'-'):'-');
+    return `<tr data-id="${esc(dp.id)}" onclick="editDisp(this.dataset.id)" style="cursor:pointer" title="クリックで配車カードを開く">
+      <td>${it.date.slice(5).replace('-','/')}（${DOW_JP[d.getDay()]}）</td>
+      <td>${CON_OP_LABEL[it.op]}</td>
+      <td style="font-weight:600">${esc(custName(dp.customer))}</td>
+      <td style="color:#64748b">${esc(dp.siteName||(target&&target.siteName)||'')}</td>
+      <td>${esc(it.type)}</td><td style="text-align:center">${no}</td>
+      <td>${esc(drvName(dp.driver))}</td>
+      <td>${err?`<span style="color:#dc2626;font-weight:700">⚠ ${esc(err)}</span>`:'<span style="color:#2563eb">予定</span>'}</td></tr>`;
+  }).join('');
+  el.innerHTML=`<div class="con-plan"><div class="con-plan-h">📅 配車からの予定（作業日にコンテナ管理へ反映）<span>${items.length}件</span></div>
+    <table class="con-tbl"><thead><tr><th>作業日</th><th>作業</th><th>顧客名</th><th>事業場</th><th>コンテナ種類</th><th>管理番号</th><th>ドライバー</th><th>状態</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+// 稼働中一覧に出す「交換予定・撤去予定」の印
+function conUpcomingBadge(p){
+  const hit=conPlanItems().filter(x=>x.target&&x.target.id===p.id);
+  return hit.map(x=>`<div style="font-size:10px;color:#2563eb;font-weight:700">${CON_OP_LABEL[x.it.op]}予定 ${x.it.date.slice(5).replace('-','/')}</div>`).join('');
+}
+// 配車カードの「対象コンテナ」欄（交換・撤去のとき）
+let _conTargetInit='';
+function refreshConTargets(){
+  const op=(document.querySelector('input[name="wkContainerOp"]:checked')||{}).value||'set';
+  const sel=document.getElementById('dConTarget'),no=document.getElementById('dConNo'),lbl=document.getElementById('dConNoLbl');
+  if(!sel)return;
+  if(op==='set'){no.classList.remove('hid');sel.classList.add('hid');lbl.textContent='コンテナNo.：';return;}
+  no.classList.add('hid');sel.classList.remove('hid');lbl.textContent='対象コンテナ：';
+  const cur=sel.value||_conTargetInit;
+  const list=conPlacementsOfCust(document.getElementById('dCust').value);
+  // 反映済み（撤去済みなど）のコンテナも、このカードの対象なら選択肢に残す
+  if(cur&&!list.some(p=>p.id===cur)){const p=(db.containerPlacements||[]).find(x=>x.id===cur);if(p)list.push(p);}
+  sel.innerHTML=`<option value="">${list.length===1?'自動（このお客様のコンテナ1台）':list.length?'-- 対象のコンテナを選んでください --':'稼働中のコンテナなし'+(op==='swap'?'（新規として登録）':'')}</option>`
+    +list.map(p=>`<option value="${esc(p.id)}">No.${esc(p.containerNo||'-')}　${esc(p.containerType)}　${esc(p.siteName||'')}（設置 ${esc(p.installDate||'')}）</option>`).join('');
+  sel.value=cur&&list.some(p=>p.id===cur)?cur:'';
+}
+
 function calcConStatus(placement) {
   if (placement.status === 'removed') return { cls: 'removed', label: '撤去済み', elapsed: null, remain: null };
   const today = new Date(); today.setHours(0,0,0,0);
@@ -7359,6 +7558,9 @@ function calcConStatus(placement) {
 
 // ── メインレンダリング ──
 function renderConView() {
+  // 日付が変わって作業日を迎えた予定があれば反映してから表示
+  if (syncContainers()) save();
+  renderConPlan();
   const placements = db.containerPlacements || [];
   const actions = db.containerActions || [];
   const settings = db.containerSettings || {};
@@ -7403,7 +7605,7 @@ function renderConView() {
         <td style="color:#64748b">${esc(p.siteName||'')}</td>
         <td>${esc(p.containerType||'')}</td>
         <td style="text-align:center">${p.containerNo||'-'}</td>
-        <td>${p.installDate||''}</td>
+        <td>${p.installDate||''}${conUpcomingBadge(p)}</td>
         <td>${barHtml}</td>
         <td style="text-align:center">${s.target}日</td>
         <td style="text-align:center;font-weight:600;color:${s.cls==='over'?'#dc2626':s.cls==='warn'?'#d97706':'#16a34a'}">${s.remain !== null ? (s.remain<=0?'超過':`${s.remain}日`):'-'}</td>
@@ -7821,6 +8023,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('loadOvl').classList.remove('hid');
   await Promise.all([loadDB(),loadHolidays()]);
   for(const rs of db.regulars)genRegDisps(rs);
+  if(syncContainers())save();
+  document.getElementById('dCust').addEventListener('change',refreshConTargets);
   document.getElementById('loadOvl').classList.add('hid');
   setView('week');
   updateUrlStatus();
