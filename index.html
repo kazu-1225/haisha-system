@@ -412,6 +412,7 @@ tr.row-dragging .res-cell{opacity:.35}
 tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b82f6;outline-offset:-2px}
 
 /* ===== USAGE GROUPS ===== */
+.usage-lbl{position:sticky;left:14px;display:inline-block} /* 横スクロールしても見出しを左端に残す */
 .usage-hdr-row td{font-size:11px;font-weight:700;padding:4px 14px;cursor:pointer;user-select:none;border-bottom:none}
 .usage-freq td{background:#e0f2fe;color:#0369a1}
 .usage-freq td:hover{background:#bae6fd}
@@ -456,14 +457,14 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .sc-add-btn:hover{background:#0284c7}
 
 /* ===== 定期便ROW ===== */
-.reg-fixed-hdr td{background:#f0fdf4;color:#15803d;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #86efac}
+.reg-fixed-hdr td{background:#f0fdf4;color:#15803d;font-size:11px;font-weight:700;padding:4px 10px;border-right:2px solid #86efac}
 .reg-fixed-cell{background:#f0fdf4 !important;vertical-align:top;padding:3px;min-height:36px}
 /* ===== 持込みROW ===== */
-.carry-fixed-hdr td{background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #93c5fd}
+.carry-fixed-hdr td{background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;padding:4px 10px;border-right:2px solid #93c5fd}
 .carry-fixed-cell{background:#eff6ff !important;vertical-align:top;padding:3px;min-height:36px}
 .ec-carry{border:1.5px solid #3b82f6 !important;background:#dbeafe !important}
 /* ===== 委託応援ROW ===== */
-.cs-fixed-hdr td{background:#fdf4ff;color:#7e22ce;font-size:11px;font-weight:700;padding:4px 10px;position:sticky;left:0;z-index:10;border-right:2px solid #d8b4fe}
+.cs-fixed-hdr td{background:#fdf4ff;color:#7e22ce;font-size:11px;font-weight:700;padding:4px 10px;border-right:2px solid #d8b4fe}
 .cs-fixed-cell{background:#fdf4ff !important;vertical-align:top;padding:3px;min-height:36px;cursor:pointer}
 .cs-fixed-cell:hover{background:#f5f3ff !important}
 /* 上部固定行：折りたたみ・高さ上限 */
@@ -3545,11 +3546,11 @@ function render(){
     const infreqRes=resources.filter(r=>(r.usageGroup||'frequent')==='infrequent');
     const cols=dates.length+1;
     // よく使う section
-    tb+=`<tr class="usage-hdr-row usage-freq"><td colspan="${cols}">⭐ よく使うドライバー（${freqRes.length}名）</td></tr>`;
+    tb+=`<tr class="usage-hdr-row usage-freq"><td colspan="${cols}"><span class="usage-lbl">⭐ よく使うドライバー（${freqRes.length}名）</span></td></tr>`;
     for(const res of freqRes)tb+=renderResRow(res,'driver');
     // あまり使わない section
     if(infreqRes.length){
-      tb+=`<tr class="usage-hdr-row usage-infreq" onclick="toggleInfreqSection()"><td colspan="${cols}">${ST.collapsedInfreq?'▶':'▼'} あまり使わないドライバー（${infreqRes.length}名）</td></tr>`;
+      tb+=`<tr class="usage-hdr-row usage-infreq" onclick="toggleInfreqSection()"><td colspan="${cols}"><span class="usage-lbl">${ST.collapsedInfreq?'▶':'▼'} あまり使わないドライバー（${infreqRes.length}名）</span></td></tr>`;
       if(!ST.collapsedInfreq)for(const res of infreqRes)tb+=renderResRow(res,'driver');
     }
   } else {
