@@ -3720,14 +3720,16 @@ function _cardHTML(dp,rowCtx){
   }
   // ─── 定期便 in ドライバー行（緑カード＋定期バッジ） ───────────
   if(dp.isReg&&rowCtx==='drv'){
-    const cls='ecard ec-spot'+(holName?' ec-hol':'');
+    // クレーン作業の定期便は、臨時と同じクレーン用の縞模様カードにする
+    const regCrane=isCraneDisp(dp);
+    const cls='ecard '+(regCrane?'ec-crane':'ec-spot')+(holName?' ec-hol':'');
     const sub=ST.res==='driver'?`🚛 ${vehName(dp.vehicle)}`:`👤 ${drvName(dp.driver)}`;
     const cb=dp.contactStatus==='notified'?'<span class="ec-contact-badge" title="連絡済み">✅</span>':'<span class="ec-contact-badge" title="連絡未済">📞</span>';
     return`<div class="${cls}" ${dragPart} data-did="${dp.id}"
       onmouseenter="showDispPopup(event,'${dp.id}')" onmouseleave="hideDispPopup()"
       onclick="event.stopPropagation();editDisp('${dp.id}')">
       <span class="ec-del" onclick="event.stopPropagation();qDel('${dp.id}')">×</span>
-      <div class="ec-cust">${custName(dp.customer)}<span class="ec-reg-drv-badge">🔁 定期</span>${cb}${holBadge}</div>
+      <div class="ec-cust">${custName(dp.customer)}<span class="ec-reg-drv-badge">🔁 定期</span>${regCrane?`<span class="ec-crane-badge">🏗 クレーン</span>`:''}${cb}${holBadge}</div>
       <div class="ec-sub">${sub}</div>
       ${holName&&!holNeedsStrip(dp)?`<div class="ec-sub" style="font-size:9px;color:#dc2626;font-weight:700">🎌 ${holName}</div>`:''}
       ${dlHtml}
