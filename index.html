@@ -685,7 +685,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
 <header class="app-header">
   <div class="app-title">🚛 廃棄物収集・運搬 配車管理システム</div>
   <div class="hsp"></div>
-  <div class="sync-badge" id="syncBadge" title="同期ステータス">
+  <div class="sync-badge" id="syncBadge" title="同期ステータス" onclick="onSyncBadgeClick()">
     <div class="sync-dot none" id="syncDot"></div>
     <span id="syncTxt">未設定</span>
   </div>
@@ -2839,29 +2839,38 @@ function clearGasUrl(){
   GAS_URL='';localStorage.removeItem('gasUrl');updateUrlStatus();setSyncStatus('none');
 }
 
+// 読み込みに失敗してローカルのデータで表示しているか（同期表示のクリックで再読込できる）
+let _loadFailed=false;
+const LOAD_TIMEOUT_MS=30000,LOAD_TRIES=2;
 async function loadDB(){
   if(GAS_URL){
-    try{
-      setSyncStatus('loading');
-      // 15秒タイムアウト：GASが応答しない場合はローカルにフォールバック
-      const ctrl=new AbortController();
-      const tid=setTimeout(()=>ctrl.abort(),15000);
-      const res=await fetch(gasUrl(),{redirect:'follow',signal:ctrl.signal});
-      clearTimeout(tid);
-      const data=await readGasJson(res);
-      if(data&&data.error)throw new Error(gasResultErr(data));
-      if(data&&Array.isArray(data.dispatches)){
-        db=data;normalizeDB();setServerRev(data._rev);
-        localStorage.setItem('haishaDB2',JSON.stringify(db));
-        setSyncStatus('ok');return;
+    // 30秒待っても応答がなければ、もう1回だけ読み込み直す（GASの起動待ち対策）
+    for(let t=1;t<=LOAD_TRIES;t++){
+      try{
+        setSyncStatus('loading',t===1?'読込中...':`読込中...（再試行 ${t}/${LOAD_TRIES}）`);
+        const ctrl=new AbortController();
+        const tid=setTimeout(()=>ctrl.abort(),LOAD_TIMEOUT_MS);
+        const res=await fetch(gasUrl(),{redirect:'follow',signal:ctrl.signal});
+        clearTimeout(tid);
+        const data=await readGasJson(res);
+        if(data&&data.error)throw new Error(gasResultErr(data));
+        if(data&&Array.isArray(data.dispatches)){
+          db=data;normalizeDB();setServerRev(data._rev);
+          localStorage.setItem('haishaDB2',JSON.stringify(db));
+          _loadFailed=false;
+          setSyncStatus('ok');return;
+        }
+        throw new Error('GASから正しい応答がありません');
+      }catch(e){
+        console.warn(`GAS load failed (${t}/${LOAD_TRIES}):`,e);
+        // 合言葉違いなど、やり直しても直らないエラーはすぐにあきらめる
+        const retryable=e.name==='AbortError'||e.name==='TypeError';
+        if(t<LOAD_TRIES&&retryable)continue;
+        _loadFailed=true;
+        const why=e.name==='AbortError'?'GASの応答が遅く読み込めませんでした':gasErrMsg(e);
+        setSyncStatus('error',why+'（ローカルを使用・ここをクリックで再読込）');
+        break;
       }
-    }catch(e){
-      if(e.name==='AbortError'){
-        setSyncStatus('error','GAS読込タイムアウト（ローカルを使用）');
-      }else{
-        setSyncStatus('error',gasErrMsg(e)+'（ローカルを使用）');
-      }
-      console.warn('GAS load failed:',e);
     }
   }
   try{const s=localStorage.getItem('haishaDB2');if(s){db=JSON.parse(s);normalizeDB();return;}}catch(e){}
@@ -2987,9 +2996,18 @@ async function checkServerUpdate(){
     const r=await readGasJson(await fetch(gasUrl({action:'rev'}),{redirect:'follow'}));
     if(r&&r.ok&&r.rev!==undefined&&Number(r.rev)>_serverRev&&!_dirty){
       await refreshFromServer();
-      setSyncStatus('ok','他のパソコンの更新を読み込みました');
+      if(!_loadFailed)setSyncStatus('ok','他のパソコンの更新を読み込みました');
+    }else if(r&&r.ok&&_loadFailed){
+      // 読み込み失敗中でも、サーバーの内容がこのパソコンと同じなら「同期済み」に戻す
+      _loadFailed=false;setSyncStatus('ok');
     }
   }catch(e){console.warn('checkServerUpdate:',e);}
+}
+// 同期表示のクリック：読み込みに失敗しているときは読み込み直す
+async function onSyncBadgeClick(){
+  if(!GAS_URL||!_loadFailed)return;
+  if(_dirty&&!confirm('このパソコンにまだ保存していない変更があります。\n読み込み直すと、その変更は反映されません。\n\n読み込み直しますか？'))return;
+  await refreshFromServer();
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkServerUpdate();});
 setInterval(checkServerUpdate,3*60*1000);
