@@ -2434,10 +2434,12 @@ function checkContainerAlerts() {
           <label class="reg-kind"><input type="radio" name="dpMode" value="driver" checked><span>👤 ドライバー別<small>ドライバーごとに第1業務から順に</small></span></label>
           <label class="reg-kind"><input type="radio" name="dpMode" value="vehicle"><span>🚛 車両別<small>車両ごとに、その車で回る順に</small></span></label>
           <label class="reg-kind"><input type="radio" name="dpMode" value="time"><span>🕐 時間順<small>その日の全業務を早い順に1本のリストで</small></span></label>
+          <label class="reg-kind"><input type="radio" name="dpMode" value="ampm-a4"><span>🌅 午前・午後（A4横）<small>今の配車予定表と同じく、左に午前・右に午後</small></span></label>
+          <label class="reg-kind"><input type="radio" name="dpMode" value="ampm-a3"><span>🌅 午前・午後（A3横）<small>A4横と同じ内容を大きな文字で</small></span></label>
         </div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:8px;cursor:pointer"><input type="checkbox" id="dpUndated" checked style="width:auto;margin:0">日付未定の依頼も載せる</label>
-      <div style="font-size:11px;color:#64748b;margin-top:10px;line-height:1.6">確定分・未確定分・持込み・委託応援を、A4縦1枚に収まるよう自動で縮小して印刷します。</div>
+      <div style="font-size:11px;color:#64748b;margin-top:10px;line-height:1.6">確定分・未確定分・持込み・委託応援を、用紙1枚に収まるよう自動で縮小して印刷します（ドライバー別・車両別・時間順はA4縦）。</div>
     </div>
     <div class="mftr">
       <button class="btn btn-s" onclick="closeM('mDayPrint')">キャンセル</button>
@@ -4967,7 +4969,7 @@ function printDaySchedule(ds,withUndated,mode){
   const sec=(title,cls,count,head,rows)=>`<div class="sec ${cls}"><div class="sec-h">${title}<span class="cnt">${count}件</span></div>
     ${count?`<table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`:'<div class="none">なし</div>'}</div>`;
 
-  const body=`<div class="page" id="pg">
+  let body=`<div class="page" id="pg">
   <div class="hdr"><div><div class="co">廃棄物収集・運搬</div><div class="ttl">日次配車表　${dateLabel}${hol?`<span class="hol">${esc(hol)}</span>`:''}</div></div>
     <div class="meta">印刷日時: ${new Date().toLocaleString('ja-JP')}</div></div>
   <div class="sum"><span>✅ 確定 <b>${assigned.length}</b>件</span><span>🔴 未確定 <b>${unassigned.length}</b>件</span><span>🏭 持込み <b>${carry.length}</b>件</span><span>🏛 委託応援 <b>${cs.length}</b>名</span>${withUndated?`<span>📋 日付未定 <b>${undated.length}</b>件</span>`:''}</div>
@@ -4978,14 +4980,90 @@ function printDaySchedule(ds,withUndated,mode){
   ${withUndated?sec('📋 日付未定の依頼（参考）','s-und',undated.length,'<th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">期限</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',undated.map(dp=>`<tr><td class="c">${kind(dp)}</td><td>${dest(dp)}</td><td class="c">${esc(dp.deadline||'')}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('')):''}
   </div>`;
 
-  const w=window.open('','_blank','width=900,height=1200');
+  // 用紙（ドライバー別・車両別・時間順はA4縦、午前・午後はA4横／A3横）
+  let paper={size:'A4 portrait',w:760,maxH:1090};
+  if(mode==='ampm-a4'||mode==='ampm-a3'){
+    paper=mode==='ampm-a3'?{size:'A3 landscape',w:1540,maxH:1080}:{size:'A4 landscape',w:1090,maxH:760};
+    body=buildAmPmBody();
+  }
+
+  // ── 午前・午後（今の配車予定表と同じ左右2列） ──
+  function buildAmPmBody(){
+    const hm=dp=>{const t=dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time;if(t)return hm2min(t);const g=guessDayTime(dp);return g?g.min:null;};
+    // 午前・午後の振り分け：時間がわかる業務はその時刻で、わからない業務は同じドライバーの前の業務に合わせる（最初は午前）
+    const isPm={};
+    const byDrv={};
+    day.filter(dp=>!dp.isCarryIn&&dp.driver).forEach(dp=>(byDrv[dp.driver]=byDrv[dp.driver]||[]).push(dp));
+    Object.values(byDrv).forEach(list=>{let pm=false;list.sort(byTime).forEach(dp=>{const t=hm(dp);if(t!=null)pm=t>=12*60;isPm[dp.id]=pm;});});
+    const drvOrder=getOrderedResources((db.drivers||[]).slice(),'driver').map(d=>d.id);
+    const ordIdx=id=>{const i=drvOrder.indexOf(id);return i<0?9999:i;};
+    const sortRows=arr=>arr.slice().sort((a,b)=>ordIdx(a.driver)-ordIdx(b.driver)||byTime(a,b));
+    const vParts=id=>{const n=id?vehName(id):'';const m=n.match(/^(.+?)\s*[（(](.+)[）)]\s*$/);return m?{no:m[1],type:m[2]}:{no:n,type:''};};
+    const surname=id=>id?drvName(id).split(/[\s　]+/)[0]:'';
+    const head='<th style="width:9%">時間</th><th style="width:21%">物件名（お客様・収集先）</th><th style="width:8%">車種</th><th style="width:6%">行先</th><th style="width:8%">氏名</th><th style="width:7%">車番</th><th style="width:16%">作業内容</th><th>備考・注意</th>';
+    const rows=arr=>{let prev=null;return sortRows(arr).map(dp=>{
+      const v=vParts(dp.vehicle);const brk=prev!==null&&prev!==dp.driver;prev=dp.driver;
+      return `<tr class="${brk?'brk':''}"><td class="c t">${tmCell(dp)}</td><td>${dest(dp)}${pendMark(dp)}</td><td class="c">${esc(v.type)}</td><td></td><td class="c b">${esc(surname(dp.driver))}</td><td class="c t">${esc(v.no)}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`;
+    }).join('')+'<tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';};
+    const block=(title,arr)=>`<tr class="bh"><td colspan="8">${title}${arr.length?`（${arr.length}件）`:''}</td></tr>${rows(arr)}`;
+    const side=pm=>{
+      const list=assigned.filter(dp=>!!isPm[dp.id]===pm);
+      const crane=list.filter(dp=>isCraneDisp(dp));
+      const reg=list.filter(dp=>dp.isReg&&!isCraneDisp(dp));
+      const spot=list.filter(dp=>!dp.isReg&&!isCraneDisp(dp));
+      return `<div class="side"><div class="half">${pm?'午　後':'午　前'}</div>
+        <table><thead><tr>${head}</tr></thead><tbody>${block('臨時業務',spot)}${block('定期便',reg)}${block('ユニック（クレーン）',crane)}</tbody></table></div>`;
+    };
+    const carryRows=carry.map(dp=>`<tr><td class="c">${tmCell(dp)}</td><td>${dest(dp)}</td><td>${note(dp)}</td></tr>`).join('')||'<tr><td></td><td></td><td></td></tr>';
+    const pendRows=unassigned.map(dp=>`<tr><td class="c">${tmCell(dp)}</td><td>${dest(dp)}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('');
+    const csRows=cs.map(c=>`<tr><td class="b">${esc(drvName(c.driverId))}</td><td>${esc(c.vehicleId?vehName(c.vehicleId):'')}</td><td class="c">${c.startHour}:00〜${c.endHour}:00</td><td>${esc(c.note||'')}</td></tr>`).join('');
+    return `<div class="page ampm" id="pg">
+      <div class="ap-hdr"><span class="ap-date">${dateLabel}${hol?`<span class="hol">${esc(hol)}</span>`:''}</span><span class="ap-ttl">配車予定表</span><span class="meta">印刷日時: ${new Date().toLocaleString('ja-JP')}</span></div>
+      <div class="sides">${side(false)}${side(true)}</div>
+      <div class="sides bottom">
+        <div class="side">
+          <table class="mini"><thead><tr><th colspan="3" class="bt">持　込（${carry.length}件）</th></tr><tr><th style="width:14%">時間</th><th style="width:44%">お客様</th><th>備考・注意</th></tr></thead><tbody>${carryRows}</tbody></table>
+          ${unassigned.length?`<table class="mini pend"><thead><tr><th colspan="4" class="bt">未確定（ドライバー未定・${unassigned.length}件）</th></tr><tr><th style="width:12%">時間</th><th style="width:36%">お客様・収集先</th><th style="width:20%">作業内容</th><th>備考・注意</th></tr></thead><tbody>${pendRows}</tbody></table>`:''}
+        </div>
+        <div class="side">
+          <table class="mini stock"><tbody>
+            <tr><th>バッカン<br>1㎥</th><td></td><th>バッカン<br>2㎥</th><td></td><th>バッカン<br>1.5㎥</th><td></td></tr>
+            <tr><th>フレコン</th><td colspan="5"></td></tr>
+          </tbody></table>
+          ${cs.length?`<table class="mini"><thead><tr><th colspan="4" class="bt">委託応援（${cs.length}名）</th></tr><tr><th style="width:22%">ドライバー</th><th style="width:22%">車両</th><th style="width:20%">時間</th><th>備考</th></tr></thead><tbody>${csRows}</tbody></table>`:''}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const w=window.open('','_blank','width=1200,height=900');
   if(!w){alert('ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。');return;}
   closeM('mDayPrint');
   w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>日次配車表 ${ds}</title><style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:10px;color:#1e293b;background:#fff}
-.page{width:760px;margin:0 auto;padding:8mm 8mm 6mm}
+.page{width:${paper.w}px;margin:0 auto;padding:8mm 8mm 6mm}
 .hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1e3a5f;padding-bottom:4px;margin-bottom:5px}
+/* 午前・午後レイアウト */
+.ampm{padding:6mm 7mm 5mm}
+.ap-hdr{display:flex;align-items:flex-end;margin-bottom:4px}
+.ap-date{font-size:14px;font-weight:800;flex:1}.ap-ttl{font-size:17px;font-weight:900;flex:1;text-align:center;letter-spacing:.2em}.ampm .meta{flex:1;text-align:right}
+.sides{display:flex;gap:14px;align-items:flex-start}
+.side{flex:1;min-width:0}
+.half{border:2px solid #1e293b;border-bottom:none;text-align:center;font-size:13px;font-weight:900;padding:1px;letter-spacing:.3em}
+.ampm table{border:2px solid #1e293b}
+.ampm th{background:#f1f5f9;color:#1e293b;font-size:9px;text-align:center;border:1px solid #475569}
+.ampm td{border:1px solid #94a3b8;font-size:10px}
+.ampm td.b{font-weight:800}
+.ampm td.t{white-space:nowrap;font-weight:700}
+.ampm tr.bh td{background:#e2e8f0;text-align:center;font-weight:800;font-size:11px;border-top:2px solid #1e293b;border-bottom:1.5px solid #1e293b}
+.ampm tr.brk td{border-top:1.5px solid #475569}
+.ampm tr.blank td{height:14px}
+.bottom{margin-top:8px}
+.ampm table.mini{margin-bottom:6px}
+.ampm th.bt{background:#e2e8f0;font-size:11px;font-weight:800}
+.ampm table.stock th{width:12%;font-size:10px}.ampm table.stock td{height:34px}
+.ampm table.pend th.bt{background:#fee2e2;color:#b91c1c}
 .co{font-size:8px;color:#64748b}.ttl{font-size:16px;font-weight:900;color:#1e3a5f}
 .hol{font-size:10px;color:#dc2626;margin-left:8px}.meta{font-size:8px;color:#94a3b8}
 .sum{display:flex;gap:14px;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:3px 8px;margin-bottom:6px;font-size:10px}
@@ -5004,10 +5082,10 @@ tr.alt td{background:#fcfcfd}tr.alt td.drv{background:#e7f8ec}
 .warn{color:#b45309;font-weight:700}
 .hold{display:block;font-size:8px;color:#dc2626;font-weight:700}
 .none{border:1px solid #e2e8f0;border-top:none;padding:3px 6px;color:#94a3b8;font-size:9px}
-@media print{@page{size:A4 portrait;margin:0}.page{width:100%}}
+@media print{@page{size:${paper.size};margin:0}.page{width:100%}}
 </style></head><body>${body}<script>
 window.onload=function(){
-  var p=document.getElementById('pg');var maxH=1090;var h=p.scrollHeight;
+  var p=document.getElementById('pg');var maxH=${paper.maxH};var h=p.scrollHeight;
   if(h>maxH){var z=maxH/h;var s=document.createElement('style');s.textContent='@media print{#pg{zoom:'+z+'}}';document.head.appendChild(s);}
   setTimeout(function(){window.print();},400);
 };<\/script></body></html>`);
