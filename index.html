@@ -3845,9 +3845,22 @@ function renderPending(){
 // ================================================================
 function contactWaitingDisps(){
   // 配車確定（driver+vehicle+dispatchDate が揃っている）かつ連絡未済・持込み以外
+  // 定期便はいつもどおりの予定なら連絡不要。祝日と重なる・日付が変わったものだけ連絡待ちにする
   return (db.dispatches||[])
     .filter(dp=>dp.driver&&dp.vehicle&&dp.dispatchDate&&dp.contactStatus!=='notified'&&!dp.isCarryIn)
+    .filter(dp=>!dp.isReg||regContactReason(dp))
     .sort((a,b)=>a.dispatchDate<b.dispatchDate?-1:a.dispatchDate>b.dispatchDate?1:0);
+}
+// 定期便でお客様への連絡が必要な理由（不要なら空）
+function regContactReason(dp){
+  if(!dp.isReg)return '';
+  const wd=workDate(dp);
+  if(holNeedsStrip(dp))return `🎌 祝日（${HOLIDAYS[wd]}）と重なっています`;
+  if(dp.date&&wd!==dp.date){
+    const o=pd(dp.date);
+    return `📅 いつもの${o.getMonth()+1}/${o.getDate()}（${DOW_JP[o.getDay()]}）から変更${dp.holShift?`（${dp.holShift}の振替）`:''}`;
+  }
+  return '';
 }
 // ================================================================
 // 展開処理待ちパネル
@@ -4024,6 +4037,7 @@ function renderContactWaiting(){
       <div class="ccrd-name">${isShip?'📦 ':isPast?'⚠️ ':'📞 '}${name}</div>
       <div class="ccrd-date" style="color:${dateColor}">📅 ${dtStr}</div>
       <div class="ccrd-drv">👤 ${dr?dr.name:'未定'}　🚛 ${ve?ve.name:'未定'}</div>
+      ${dp.isReg?`<div style="font-size:10px;font-weight:700;color:#b91c1c;margin-top:2px">🔁 定期便：${esc(regContactReason(dp))}</div>`:''}
       <button class="ccrd-btn" onclick="event.stopPropagation();markContacted('${dp.id}')">✅ 連絡済み</button>
     </div>`;
   }).join('');
