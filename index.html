@@ -487,6 +487,10 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
 .cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
 .cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+/* お客様連絡待ちのポップアップ：連絡担当を目立たせる */
+.pop-contact-who{background:#dbeafe;color:#1e3a8a;border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:13px}
+.pop-contact-who b{font-size:15px}
+.pop-contact-why{background:#fef2f2;color:#b91c1c;border-radius:6px;padding:4px 10px;margin-bottom:6px;font-size:11px;font-weight:700}
 /* コンテナ管理：配車からの予定 */
 .con-plan{background:#fff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:12px;overflow:hidden}
 .con-plan-h{background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:800;padding:6px 12px;display:flex;justify-content:space-between}
@@ -2366,6 +2370,10 @@ function checkContainerAlerts() {
         <div class="fr"><label>固定ドライバー（任意）</label><select id="rDriver"><option value="">都度配車</option></select></div>
         <div class="fr"><label>固定車両（任意）</label><select id="rVehicle"><option value="">都度配車</option></select></div>
       </div>
+      <div class="fr"><label>連絡担当（受付） <span style="font-size:10px;color:#94a3b8;font-weight:400">この定期便から作られるカードの受付担当になります</span></label>
+        <input type="text" id="rReceptionist" list="rReceptionistList" placeholder="例: 福島（スタッフから選択または入力）" autocomplete="off">
+        <datalist id="rReceptionistList"></datalist>
+      </div>
       <div class="fr"><label>祝日と重なった日</label>
         <select id="rHoliday">
           <option value="ask">予定を作り「🎌 要確認」と表示する</option>
@@ -4033,7 +4041,7 @@ function renderContactWaiting(){
     const dateColor=isPast?'#dc2626':'#2563eb';
     const dr=db.drivers.find(x=>x.id===dp.driver);
     const ve=db.vehicles.find(x=>x.id===dp.vehicle);
-    return`<div class="ccrd" onclick="editDisp('${dp.id}')">
+    return`<div class="ccrd" onclick="editDisp('${dp.id}')" onmouseenter="showDispPopup(event,'${dp.id}','contact')" onmouseleave="hideDispPopup()">
       <div class="ccrd-name">${isShip?'📦 ':isPast?'⚠️ ':'📞 '}${name}</div>
       <div class="ccrd-date" style="color:${dateColor}">📅 ${dtStr}</div>
       <div class="ccrd-drv">👤 ${dr?dr.name:'未定'}　🚛 ${ve?ve.name:'未定'}</div>
@@ -4526,7 +4534,8 @@ function carryInTime(dp){
   const m=(dp.notes||'').match(/\d{1,2}[:：]\d{2}(?:\s*[〜~～ー－-]\s*\d{1,2}[:：]\d{2})?/);
   return m?m[0]:'';
 }
-function showDispPopup(e,id){  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
+function showDispPopup(e,id,ctx){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
   const isShip=dp.dispatchType==='shipment';
   const dr=db.drivers.find(x=>x.id===dp.driver);
   const ve=db.vehicles.find(x=>x.id===dp.vehicle);
@@ -4587,6 +4596,12 @@ function showDispPopup(e,id){  const dp=(db.dispatches||[]).find(x=>x.id===id);i
   if(dp.notes){rows+=`<div class="pop-section"><div class="pop-sec-title">📝 備考</div><div style="color:#475569;white-space:pre-wrap">${dp.notes}</div></div>`;}
   if(dp.caution){rows+=`<div class="pop-section" style="background:#fffbeb;border-radius:6px;padding:6px 8px;margin-top:6px"><div class="pop-sec-title" style="color:#b45309">⚠ 注意事項</div><div style="color:#92400e;white-space:pre-wrap">${dp.caution}</div></div>`;}
   if(dp.receptionist)rows+=`<div class="pop-row" style="margin-top:4px"><span class="pop-label">受付担当</span><span class="pop-val">${dp.receptionist}</span></div>`;
+  }
+  // お客様連絡待ちのカードでは、誰が連絡するかすぐわかるよう受付担当を一番上に大きく出す
+  if(ctx==='contact'){
+    const who=dp.receptionist?escH(dp.receptionist):'（受付担当の記録なし）';
+    rows=`<div class="pop-contact-who">📞 連絡担当（受付）：<b>${who}</b></div>`
+      +(dp.isReg&&regContactReason(dp)?`<div class="pop-contact-why">🔁 定期便：${esc(regContactReason(dp))}</div>`:'')+rows;
   }
   const popup=document.getElementById('dispPopup');
   popup.innerHTML=rows;
@@ -5885,6 +5900,9 @@ function resetRegForm(){
   document.getElementById('rVehicle').value='';
   document.getElementById('rHoliday').value='ask';
   document.getElementById('rNotes').value='';
+  document.getElementById('rReceptionistList').innerHTML=(db.staffs||[]).map(s=>`<option value="${esc(s.name)}">`).join('');
+  let last='';try{last=localStorage.getItem('regReceptionistLast')||'';}catch(e){}
+  document.getElementById('rReceptionist').value=last;
   document.getElementById('rEditBanner').classList.add('hid');
   document.getElementById('rCancelBtn').classList.add('hid');
   document.getElementById('rSaveBtn').textContent='🔁 定期便を登録する';
@@ -5904,6 +5922,7 @@ function editRegular(id){
   document.getElementById('rDriver').value=rs.driver||'';
   document.getElementById('rVehicle').value=rs.vehicle||'';
   document.getElementById('rHoliday').value=rs.holidayMode||'ask';
+  document.getElementById('rReceptionist').value=rs.receptionist||'';
   document.getElementById('rNotes').value=rs.notes||'';
   document.getElementById('rEditBanner').classList.remove('hid');
   document.getElementById('rCancelBtn').classList.remove('hid');
@@ -5934,7 +5953,10 @@ async function saveRegular(){
   const site=document.getElementById('rSite').value.trim();
   const time=document.getElementById('rTime').value||'';
   const holidayMode=document.getElementById('rHoliday').value;
-  const fields={cust,freq,dows,wom,driver,vehicle,notes,isCarryIn,site,time,holidayMode};
+  const receptionist=document.getElementById('rReceptionist').value.trim();
+  if(!receptionist&&!confirm('連絡担当（受付）が空欄です。\nこの定期便から作られるカードには受付担当が入りません。\n\nこのまま保存しますか？'))return;
+  try{if(receptionist)localStorage.setItem('regReceptionistLast',receptionist);}catch(e){}
+  const fields={cust,freq,dows,wom,driver,vehicle,notes,isCarryIn,site,time,holidayMode,receptionist};
   let msg;
   if(_regEditId){
     const rs=db.regulars.find(x=>x.id===_regEditId);
@@ -5986,6 +6008,7 @@ function applyRegularChange(rs,fields){
   let updated=0;
   future.filter(x=>valid.has(x.date)).forEach(x=>{
     x.customer=rs.cust;x.notes=rs.notes;x.isCarryIn=!!rs.isCarryIn;
+    if(!x.receptionist||x.receptionist===(old.receptionist||''))x.receptionist=rs.receptionist||'';
     if(rs.site||old.site)x.siteName=rs.site;
     if(rs.time||old.time)x.timeSpec=regTimeSpec(rs);
     if(rs.isCarryIn){x.driver=null;x.vehicle=null;}
@@ -6036,7 +6059,7 @@ function genRegDisps(rs){
     const now=new Date().toISOString();
     const target=regTarget(rs,ds);
     // date＝ルール上の日（重複判定用）、dispatchDate＝実際に行く日
-    db.dispatches.push({id:uid(),customer:rs.cust,date:ds,dispatchDate:target,holShift:target!==ds?HOLIDAYS[ds]:'',status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.isCarryIn?null:rs.driver,vehicle:rs.isCarryIn?null:rs.vehicle,notes:rs.notes,siteName:rs.site||'',timeSpec:regTimeSpec(rs),isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,created:now,updated:now});
+    db.dispatches.push({id:uid(),customer:rs.cust,date:ds,dispatchDate:target,holShift:target!==ds?HOLIDAYS[ds]:'',status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.isCarryIn?null:rs.driver,vehicle:rs.isCarryIn?null:rs.vehicle,notes:rs.notes,siteName:rs.site||'',timeSpec:regTimeSpec(rs),receptionist:rs.receptionist||'',isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,created:now,updated:now});
   }
 }
 function renderRegList(){
@@ -6053,7 +6076,7 @@ function renderRegList(){
         <span class="bdg bdg-b">${fn[rs.freq]||rs.freq}${wLabel} ${rs.dows.map(d=>DOW_JP[d]).join('・')}曜${rs.time?' '+esc(rs.time):''}</span>
         <span class="ritem-del" data-id="${esc(rs.id)}" onclick="event.stopPropagation();delRegular(this.dataset.id)">🗑</span>
       </div>
-      <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'':`ドライバー: ${esc(drvName(rs.driver))} ／ 車両: ${esc(vehName(rs.vehicle))} ／ `}${holL}${rs.site?' ／ 📍'+esc(rs.site):''}${rs.notes?' ／ '+esc(rs.notes):''}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'':`ドライバー: ${esc(drvName(rs.driver))} ／ 車両: ${esc(vehName(rs.vehicle))} ／ `}${holL}${rs.receptionist?' ／ 📞担当 '+esc(rs.receptionist):' ／ <span style="color:#dc2626">📞担当 未設定</span>'}${rs.site?' ／ 📍'+esc(rs.site):''}${rs.notes?' ／ '+esc(rs.notes):''}</div>
     </div>`;}).join('');
 }
 // ================================================================
