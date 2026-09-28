@@ -529,6 +529,13 @@ body.signage #signageRoot{display:flex;flex-direction:column;height:100vh;paddin
 .sg-foot{display:flex;align-items:center;gap:.4em;flex-wrap:wrap}
 .sg-foot.warn b{color:#fca5a5}
 .sg-chip{background:#1e293b;border-radius:.4em;padding:.1em .5em}
+.sg-ctrl{position:fixed;left:50%;bottom:2vh;transform:translateX(-50%);display:flex;gap:.6em;align-items:center;background:rgba(15,23,42,.95);border:1px solid #334155;border-radius:.8em;padding:.5em .8em;opacity:0;pointer-events:none;transition:opacity .3s;font-size:.9em}
+body.sg-active{cursor:default}
+body.sg-active .sg-ctrl{opacity:1;pointer-events:auto}
+.sg-ctrl button{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:.5em;padding:.3em .9em;font-size:1em;font-weight:700;cursor:pointer}
+.sg-ctrl button:hover{background:#334155}
+.sg-ctrl button.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.sg-ctrl span{color:#94a3b8;font-size:.8em;margin-left:.4em}
 .sg-setup{margin:auto;text-align:center;font-size:2em;font-weight:900;color:#fff;line-height:1.6}
 .sg-setup small{display:block;font-size:.45em;font-weight:400;color:#cbd5e1;margin-top:1em}
 /* お客様連絡待ちのポップアップ：連絡担当を目立たせる */
@@ -8234,7 +8241,12 @@ function executeConImport() {
 const SG_PARAMS=new URLSearchParams(location.search);
 const SIGNAGE=SG_PARAMS.has('signage');
 let _sgLastLoad=null,_sgLoadErr=false,_sgScrollTimers=[];
+// 手で選んだ表示日（null のときは自動）。最後の操作から30分で自動に戻る
+let _sgManualDate=null,_sgManualAt=0;
+const SG_MANUAL_MS=30*60*1000;
 function sgTargetDate(){
+  if(_sgManualDate&&Date.now()-_sgManualAt<SG_MANUAL_MS)return _sgManualDate;
+  _sgManualDate=null;
   const now=new Date(),sw=parseInt(SG_PARAMS.get('switch')||'17',10);
   let ds=fmt(now);
   if(now.getHours()>=sw){ds=shiftBizDay(ds,1);}
@@ -8309,14 +8321,31 @@ function renderSignage(){
   const prevScroll=[...root.querySelectorAll('.sg-body')].map(e=>e.scrollTop);
   const upd=_sgLastLoad?`${String(_sgLastLoad.getHours()).padStart(2,'0')}:${String(_sgLastLoad.getMinutes()).padStart(2,'0')}`:'--:--';
   root.innerHTML=`<div class="sg-top">
-      <div class="sg-date">${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）${ds!==today?'<span class="sg-next">翌営業日の予定</span>':''}${hol?`<span class="sg-hol">🎌 ${esc(hol)}</span>`:''}</div>
+      <div class="sg-date">${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）${ds===today?'':`<span class="sg-next">${ds<today?'過去の予定':_sgManualDate?'先の予定':'翌営業日の予定'}</span>`}${hol?`<span class="sg-hol">🎌 ${esc(hol)}</span>`:''}</div>
       <div class="sg-title">配車予定</div>
       <div class="sg-clock">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}<small>${_sgLoadErr?`<span class="sg-err">⚠ 接続エラー（${upd}時点の内容）</span>`:`最終更新 ${upd}`}</small></div>
     </div>
     <div class="sg-cols">${col(false)}${col(true)}</div>
-    ${bottom?`<div class="sg-bottom">${bottom}</div>`:''}`;
+    ${bottom?`<div class="sg-bottom">${bottom}</div>`:''}
+    <div class="sg-ctrl" id="sgCtrl">
+      <button onclick="sgMove(-1)">◀ 前の日</button>
+      <button onclick="sgGo('today')" class="${ds===today&&_sgManualDate?'on':''}">今日</button>
+      <button onclick="sgMove(1)">次の日 ▶</button>
+      <button onclick="sgGo('auto')" class="${_sgManualDate?'':'on'}">自動${_sgManualDate?'':'（表示中）'}</button>
+      <span>${_sgManualDate?'手動で選んだ日を表示中（30分操作がないと自動に戻ります）':'自動：'+(SG_PARAMS.get('switch')||'17')+'時以降は翌営業日を表示'}</span>
+    </div>`;
   root.querySelectorAll('.sg-body').forEach((e,i)=>{if(prevScroll[i])e.scrollTop=prevScroll[i];});
   sgStartScroll(prevScroll.some(Boolean));
+}
+// 表示日の切り替え（マウスを動かすと下にボタンが出る・キーボードでも可）
+function sgSetDate(ds){_sgManualDate=ds;_sgManualAt=Date.now();renderSignage();document.querySelectorAll('#signageRoot .sg-body').forEach(e=>e.scrollTop=0);sgShowCtrl();}
+function sgMove(n){sgSetDate(fmt(addD(pd(sgTargetDate()),n)));}
+function sgGo(w){if(w==='auto'){_sgManualDate=null;renderSignage();sgShowCtrl();}else sgSetDate(fmt(new Date()));}
+let _sgCtrlTimer=null;
+function sgShowCtrl(){
+  document.body.classList.add('sg-active');
+  clearTimeout(_sgCtrlTimer);
+  _sgCtrlTimer=setTimeout(()=>document.body.classList.remove('sg-active'),5000);
 }
 // 画面に入りきらないときは、各列をゆっくり自動スクロール（下まで行ったら上に戻る）
 function sgStartScroll(resume){
@@ -8350,6 +8379,14 @@ async function initSignage(){
   }
   await loadHolidays();
   await sgReload();
+  // マウスを動かしたらボタンとカーソルを出す。キーボード：← → 日を移動、T 今日、A 自動
+  document.addEventListener('mousemove',sgShowCtrl);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowLeft')sgMove(-1);
+    else if(e.key==='ArrowRight')sgMove(1);
+    else if(e.key==='t'||e.key==='T')sgGo('today');
+    else if(e.key==='a'||e.key==='A')sgGo('auto');
+  });
   // 1分ごと：他のパソコンで更新があれば読み込み直し、時計と日付の切り替えを更新
   setInterval(async()=>{
     try{
