@@ -1123,7 +1123,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px">🤖 AI配車提案 <span style="font-weight:400;color:#64748b">（過去9ヶ月の実績から）</span></div>
         <div id="aiSuggestList"></div>
       </div>
-      <div class="warn-txt" id="licWarn">⚠ このドライバーは選択車両の必要免許を持っていない可能性があります。</div>
+      <div class="warn-txt" id="licWarn">⛔ このドライバーの免許では、選んだ車両を運転できません。このままでは保存できません。</div>
       <div class="r2">
         <div class="fr"><label>受付担当者</label><input type="text" id="dReceptionist" placeholder="受付した担当者名"></div>
         <div class="fr"><label>ステータス</label>
@@ -1296,13 +1296,13 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         <div class="cdlg-ico" id="cIco">🚛</div>
         <div class="cdlg-msg" id="cMsg">この予定で確定しますか？</div>
         <div class="cdlg-det" id="cDet"></div>
-        <div class="warn-txt" id="cLicWarn">⚠ 免許の条件が合わない可能性があります。確認してください。</div>
+        <div class="warn-txt" id="cLicWarn">⛔ ドライバーの免許では、この車両を運転できません。確定できないので、ドライバーか車両を変えてください。</div>
         <div class="warn-txt" id="cAbsWarn"></div>
       </div>
     </div>
     <div class="mftr ctr">
       <button class="btn btn-s" onclick="cancelDrop()">キャンセル</button>
-      <button class="btn btn-g" onclick="confirmDrop()">OK・確定</button>
+      <button class="btn btn-g" id="cOkBtn" onclick="confirmDrop()">OK・確定</button>
     </div>
   </div>
 </div>
@@ -2241,7 +2241,7 @@ function checkContainerAlerts() {
           <select id="sVehicle" style="display:none" onchange="chkSLic()"><option value="">-- 未定 --</option></select>
         </div>
       </div>
-      <div class="warn-txt" id="sLicWarn">⚠ このドライバーは選択車両の必要免許を持っていない可能性があります。</div>
+      <div class="warn-txt" id="sLicWarn">⛔ このドライバーの免許では、選んだ車両を運転できません。このままでは保存できません。</div>
       <!-- ステータス・受付担当 -->
       <div class="r2">
         <div class="fr"><label>受付担当者</label><input type="text" id="sReceptionist" placeholder="担当者名"></div>
@@ -4159,6 +4159,7 @@ function onDropToPending(e,elId){
   document.getElementById('cDet').textContent=`案件: ${nameLabel}\n\nドライバー・車両・配車日をクリアして\n未割当エリアに戻します。`;
   document.getElementById('cLicWarn').classList.remove('show');
   document.getElementById('cAbsWarn').classList.remove('show');
+  setConfirmOk(true);
   ST.drop={date:null,id:dp.id,newDriver:null,newVehicle:null,returnToPending:true};
   openM('mConfirm');
 }
@@ -4179,7 +4180,10 @@ function onDrop(e,cell){
   document.getElementById('cIco').textContent='🚛';
   document.getElementById('cMsg').textContent='この予定で確定しますか？';
   document.getElementById('cDet').textContent=det;
-  document.getElementById('cLicWarn').classList.toggle('show',!!(dr&&ve&&!canDrive(dr,ve)));
+  // 免許が合わない組み合わせは確定できない（ボタンを押せなくする）
+  const licNg=!!(dr&&ve&&!canDrive(dr,ve));
+  document.getElementById('cLicWarn').classList.toggle('show',licNg);
+  setConfirmOk(!licNg);
   const absMsg=absenceWarn(newDriver,newVehicle,date);
   const aw=document.getElementById('cAbsWarn');
   aw.textContent=absMsg?'⚠ '+absMsg.replace(/\n/g,'　'):'';
@@ -4187,8 +4191,19 @@ function onDrop(e,cell){
   ST.drop={date,id:dp.id,newDriver,newVehicle};
   openM('mConfirm');
 }
+// 保存前の免許チェック：運転できない組み合わせなら止めて知らせる（OKなら true）
+function licenseOk(driverId,vehicleId){
+  const dr=(db.drivers||[]).find(x=>x.id===driverId),ve=(db.vehicles||[]).find(x=>x.id===vehicleId);
+  if(canDrive(dr,ve))return true;
+  alert(`⛔ ${dr.name} さんの免許（${(dr.license||[]).join('・')||'登録なし'}）では、\n車両「${ve.name}」（${ve.req}以上が必要）を運転できません。\n\nドライバーか車両を変えてから保存してください。`);
+  return false;
+}
+function setConfirmOk(ok){const b=document.getElementById('cOkBtn');b.disabled=!ok;b.style.opacity=ok?'':'.4';b.style.cursor=ok?'':'not-allowed';}
 async function confirmDrop(){
   const{date,id,newDriver,newVehicle,returnToPending}=ST.drop;
+  if(!returnToPending&&!canDrive(db.drivers.find(x=>x.id===newDriver),db.vehicles.find(x=>x.id===newVehicle))){
+    alert('⛔ ドライバーの免許では、この車両を運転できないため確定できません。');return;
+  }
   const dp=(db.dispatches||[]).find(x=>x.id===id);
   if(dp){
     if(returnToPending){
@@ -5153,6 +5168,7 @@ async function saveDispatch(){
   const status=document.getElementById('dStatus').value;
   const driver=isCarryIn?null:document.getElementById('dDriver').value||null;
   const vehicle=isCarryIn?null:document.getElementById('dVehicle').value||null;
+  if(!licenseOk(driver,vehicle))return;
   {
     const absMsg=absenceWarn(driver,vehicle,dispatchDate);
     if(absMsg&&!confirm('⚠ '+absMsg+'\n\nこのまま保存しますか？'))return;
@@ -5753,7 +5769,7 @@ async function applyPlan(){
   const valid=planItems.filter(p=>p.custId||p.site);
   if(!valid.length){alert('登録できる行がありません（お客様か収集先が未入力です）');return;}
   if(!confirm(`${valid.length}件を配車表に登録しますか？\n（同じ定期便が既に登録済みの日は重複スキップされます）`))return;
-  let added=0;
+  let added=0,licSkipped=0;
   const now=new Date().toISOString();
   for(const item of valid){
     /* 定期便の重複チェック */
@@ -5762,13 +5778,17 @@ async function applyPlan(){
       const dup=(db.dispatches||[]).some(x=>x.date===rd&&x.isReg&&x.regId===item.regId);
       if(dup)continue;
     }
+    // 免許が合わない組み合わせは確定せず、車両を外して「未定」で登録する
+    if(item.driver&&item.vehicle&&!canDrive(db.drivers.find(x=>x.id===item.driver),db.vehicles.find(x=>x.id===item.vehicle))){
+      item.vehicle='';licSkipped++;
+    }
     const dp={id:uid(),customer:item.custId||null,date:item.ruleDate||item.date,dispatchDate:item.date,holShift:item.ruleDate&&item.ruleDate!==item.date?(HOLIDAYS[item.ruleDate]||''):'',siteName:item.site||'',driver:item.driver||null,vehicle:item.vehicle||null,notes:item.notes||'',status:(item.driver&&item.vehicle)?'confirmed':'pending',isReg:item.isReg||false,regId:item.regId||null,created:now,updated:now};
     (db.dispatches||(db.dispatches=[])).push(dp);
     added++;
   }
   await save();render();
   closeM('mPlanner');
-  alert(`✅ ${added}件を配車表に登録しました！`);
+  alert(`✅ ${added}件を配車表に登録しました！`+(licSkipped?`\n\n⛔ うち${licSkipped}件は、ドライバーの免許で運転できない車両だったため、車両を「未定」にして保留で登録しました。車両を選び直してください。`:''));
   if(planItems.length){const d=new Date(planItems[0].date+'T00:00:00');ST.date=d;setView('week');}
 }
 
@@ -5839,6 +5859,7 @@ async function saveShipment(){
   const isCarryIn=document.getElementById('sCarryIn').checked;
   const driver=isCarryIn?null:document.getElementById('sDriver').value||null;
   const vehicle=isCarryIn?null:document.getElementById('sVehicle').value||null;
+  if(!licenseOk(driver,vehicle))return;
   const receptionist=document.getElementById('sReceptionist').value.trim();
   const status=document.getElementById('sStatus').value;
   const notes=document.getElementById('sNotes').value.trim();
