@@ -487,6 +487,50 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .cs-bar:hover .cs-handle,.cs-handle:hover{opacity:.8 !important}
 .cs-handle-l{left:-1px;border-radius:4px 0 0 4px}
 .cs-handle-r{right:-1px;border-radius:0 4px 4px 0}
+/* ===== サイネージ画面 ===== */
+#signageRoot{display:none}
+body.signage{background:#0b1220;overflow:hidden;cursor:none}
+body.signage > *:not(#signageRoot){display:none !important}
+body.signage #signageRoot{display:flex;flex-direction:column;height:100vh;padding:1vh 1vw;gap:1vh;color:#e2e8f0;font-size:clamp(13px,1.15vw,30px);font-family:'Meiryo','Yu Gothic',sans-serif}
+.sg-top{display:flex;align-items:center;gap:2vw}
+.sg-date{flex:1;font-size:2em;font-weight:900;color:#fff;display:flex;align-items:center;gap:.6em;flex-wrap:wrap}
+.sg-next{font-size:.45em;background:#f59e0b;color:#111827;border-radius:.4em;padding:.15em .6em}
+.sg-hol{font-size:.5em;color:#fca5a5}
+.sg-title{font-size:1.5em;font-weight:900;letter-spacing:.3em;color:#94a3b8}
+.sg-clock{flex:1;text-align:right;font-size:2em;font-weight:900;color:#fff;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+.sg-clock small{font-size:.35em;font-weight:400;color:#94a3b8}
+.sg-err{color:#fca5a5;font-weight:700}
+.sg-cols{flex:1;display:flex;gap:1vw;min-height:0}
+.sg-col{flex:1;display:flex;flex-direction:column;min-width:0;background:#111a2e;border-radius:.6em;overflow:hidden;border:1px solid #1e293b}
+.sg-half{font-size:1.35em;font-weight:900;text-align:center;padding:.2em;letter-spacing:.4em;display:flex;justify-content:center;gap:1em;align-items:center}
+.sg-half span{font-size:.6em;letter-spacing:0;opacity:.85}
+.sg-half.am{background:#b45309;color:#fff}.sg-half.pm{background:#1d4ed8;color:#fff}
+.sg-head,.sg-row{display:grid;grid-template-columns:5.2em 1fr 4.2em 4.6em 1.15fr;gap:.6em;align-items:start}
+.sg-head{font-size:.75em;color:#94a3b8;padding:.3em .8em;border-bottom:1px solid #334155}
+.sg-body{flex:1;overflow:hidden}
+.sg-sec{background:#1e293b;color:#cbd5e1;font-weight:800;padding:.2em .8em;font-size:.9em;display:flex;justify-content:space-between}
+.sg-sec.crane{background:repeating-linear-gradient(135deg,#854d0e 0 10px,#713f12 10px 20px);color:#fef3c7}
+.sg-sec.reg{background:#14532d;color:#dcfce7}
+.sg-row{padding:.35em .8em;border-bottom:1px solid #1e293b}
+.sg-row:nth-child(even){background:#0f1a2e}
+.sg-row.pend{opacity:.75}
+.sg-time{font-size:1.05em;color:#fde68a;white-space:nowrap}
+.sg-est{color:#94a3b8;font-size:.85em}
+.sg-cust{font-weight:800;color:#fff;font-size:1.05em}
+.sg-site{font-size:.78em;color:#94a3b8}
+.sg-drv{font-weight:900;font-size:1.1em;color:#fff;white-space:nowrap}
+.sg-veh{font-weight:800;white-space:nowrap}.sg-veh small{display:block;font-size:.7em;color:#94a3b8;font-weight:400}
+.sg-work{font-size:.85em;color:#cbd5e1}
+.sg-note{color:#94a3b8}.sg-caution{color:#fb923c;font-weight:800}
+.sg-tag{font-size:.65em;background:#334155;color:#e2e8f0;border-radius:.3em;padding:.05em .4em;margin-left:.4em;vertical-align:middle}
+.sg-tag.red{background:#b91c1c;color:#fff}
+.sg-empty{padding:2em;text-align:center;color:#64748b}
+.sg-bottom{display:flex;flex-wrap:wrap;gap:.6em 1.6em;background:#111a2e;border:1px solid #1e293b;border-radius:.6em;padding:.5em 1em;font-size:.9em}
+.sg-foot{display:flex;align-items:center;gap:.4em;flex-wrap:wrap}
+.sg-foot.warn b{color:#fca5a5}
+.sg-chip{background:#1e293b;border-radius:.4em;padding:.1em .5em}
+.sg-setup{margin:auto;text-align:center;font-size:2em;font-weight:900;color:#fff;line-height:1.6}
+.sg-setup small{display:block;font-size:.45em;font-weight:400;color:#cbd5e1;margin-top:1em}
 /* お客様連絡待ちのポップアップ：連絡担当を目立たせる */
 .pop-contact-who{background:#dbeafe;color:#1e3a8a;border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:13px}
 .pop-contact-who b{font-size:15px}
@@ -815,6 +859,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
     <button class="reg-btn" onclick="openRegular()">🔁 定期設定</button>
     <button class="plan-btn" onclick="openPlanner()">📅 配車プランナー</button>
     <button class="plan-btn" style="background:#475569" onclick="openDayPrint()" title="1日分の配車表をA4用紙1枚で印刷">🖨 日次表印刷</button>
+    <button class="plan-btn" style="background:#0f172a" onclick="openSignage()" title="工場などのモニター用に、今日の配車を大きく表示する画面を開きます（見るだけ）">📺 サイネージ</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
     <button class="ship-add-btn" onclick="openAddShipment()">📦 出荷追加</button>
     <button class="add-btn" onclick="openAddDispatch()">＋ 配車追加</button>
@@ -1236,6 +1281,8 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
 
 <!-- ===== DISPATCH HOVER POPUP ===== -->
 <div class="disp-popup" id="dispPopup"></div>
+<!-- サイネージ画面（?signage=1 のときだけ使う） -->
+<div id="signageRoot"></div>
 
 <!-- ===== MODAL: 展開処理入力 ===== -->
 <div class="ovl hid" id="mTENKAI">
@@ -4876,6 +4923,15 @@ window.onload=function(){
 // ================================================================
 // 日次配車表（A4縦1枚）
 // ================================================================
+// 午前・午後の振り分け（印刷とサイネージで共通）
+// 時間がわかる業務はその時刻で、わからない業務は同じドライバーの前の業務に合わせる（最初は午前）
+function amPmFlags(dayList){
+  const hm=dp=>{const t=dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time;if(t)return hm2min(t);const g=guessDayTime(dp);return g?g.min:null;};
+  const isPm={},byDrv={};
+  dayList.filter(dp=>!dp.isCarryIn&&dp.driver).forEach(dp=>(byDrv[dp.driver]=byDrv[dp.driver]||[]).push(dp));
+  Object.values(byDrv).forEach(list=>{let pm=false;sortDay(list).forEach(dp=>{const t=hm(dp);if(t!=null)pm=t>=12*60;isPm[dp.id]=pm;});});
+  return isPm;
+}
 function openDayPrint(){
   document.getElementById('dpDate').value=fmt(ST.view==='day'?ST.date:new Date());
   // 前回選んだ並べ方を初期値にする
@@ -4989,12 +5045,7 @@ function printDaySchedule(ds,withUndated,mode){
 
   // ── 午前・午後（今の配車予定表と同じ左右2列） ──
   function buildAmPmBody(){
-    const hm=dp=>{const t=dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time;if(t)return hm2min(t);const g=guessDayTime(dp);return g?g.min:null;};
-    // 午前・午後の振り分け：時間がわかる業務はその時刻で、わからない業務は同じドライバーの前の業務に合わせる（最初は午前）
-    const isPm={};
-    const byDrv={};
-    day.filter(dp=>!dp.isCarryIn&&dp.driver).forEach(dp=>(byDrv[dp.driver]=byDrv[dp.driver]||[]).push(dp));
-    Object.values(byDrv).forEach(list=>{let pm=false;list.sort(byTime).forEach(dp=>{const t=hm(dp);if(t!=null)pm=t>=12*60;isPm[dp.id]=pm;});});
+    const isPm=amPmFlags(day);
     const drvOrder=getOrderedResources((db.drivers||[]).slice(),'driver').map(d=>d.id);
     const ordIdx=id=>{const i=drvOrder.indexOf(id);return i<0?9999:i;};
     const sortRows=arr=>arr.slice().sort((a,b)=>ordIdx(a.driver)-ordIdx(b.driver)||byTime(a,b));
@@ -8174,9 +8225,151 @@ function executeConImport() {
 }
 
 // ================================================================
+// サイネージ画面（工場などのモニターに今日の配車を表示する・見るだけ）
+//  アドレスの末尾に ?signage=1 を付けて開く
+//    &switch=17 … 17時以降は翌営業日の配車を表示（既定17時）
+//  このパソコンで一度、通常画面でGoogle連携（接続URL）を設定しておく必要がある
+//  データの書き込みは一切しない
+// ================================================================
+const SG_PARAMS=new URLSearchParams(location.search);
+const SIGNAGE=SG_PARAMS.has('signage');
+let _sgLastLoad=null,_sgLoadErr=false,_sgScrollTimers=[];
+function sgTargetDate(){
+  const now=new Date(),sw=parseInt(SG_PARAMS.get('switch')||'17',10);
+  let ds=fmt(now);
+  if(now.getHours()>=sw){ds=shiftBizDay(ds,1);}
+  return ds;
+}
+function sgTime(dp){
+  const t=dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time;
+  if(t)return `<b>${esc(t)}</b>`;
+  const g=guessDayTime(dp);
+  return g?`<span class="sg-est">${esc(g.label)}</span>`:'';
+}
+function sgWork(dp){
+  const w=dp.workType||{},p=[];
+  if(w.waste==='general')p.push('一廃・資源');
+  if(w.type==='manual')p.push('手積み');
+  else if(w.type==='container'){
+    const op={set:'設置',swap:'交換',remove:'撤去'}[w.containerOp]||'';
+    p.push(`${conShort(w.containerSize)}${op}${w.conNo?' No.'+w.conNo:''}`);
+  }
+  if(dp.assistant&&dp.assistant.enabled)p.push(`助手${dp.assistant.count||1}名`);
+  if(dp.measurement)p.push('要計量');
+  return p.map(esc).join('／');
+}
+function sgRow(dp){
+  const n=dp.vehicle?vehName(dp.vehicle):'';const m=n.match(/^(.+?)\s*[（(](.+)[）)]\s*$/);
+  const vno=m?m[1]:n,vtype=m?m[2]:'';
+  const isShip=dp.dispatchType==='shipment';
+  const name=isShip?(dp.destName||'出荷'):custName(dp.customer);
+  const site=isShip?(dp.destAddr||''):(dp.siteName||'');
+  const note=[dp.notes?`<span class="sg-note">${esc(dp.notes)}</span>`:'',dp.caution?`<span class="sg-caution">⚠ ${esc(dp.caution)}</span>`:''].filter(Boolean).join(' ');
+  const hol=holNeedsStrip(dp)?`<span class="sg-tag red">🎌祝日要確認</span>`:'';
+  return `<div class="sg-row${dp.status==='pending'?' pend':''}">
+    <div class="sg-time">${sgTime(dp)}</div>
+    <div class="sg-main"><div class="sg-cust">${isShip?'📦 ':''}${esc(name)}${dp.isReg?'<span class="sg-tag">定期</span>':''}${dp.status==='pending'?'<span class="sg-tag red">保留</span>':''}${hol}</div>${site?`<div class="sg-site">📍${esc(site)}</div>`:''}</div>
+    <div class="sg-drv">${esc(drvName(dp.driver).split(/[\s　]+/)[0])}</div>
+    <div class="sg-veh">${esc(vno)}${vtype?`<small>${esc(vtype)}</small>`:''}</div>
+    <div class="sg-work">${sgWork(dp)}${note?`<div>${note}</div>`:''}</div>
+  </div>`;
+}
+function renderSignage(){
+  const root=document.getElementById('signageRoot');if(!root||!db)return;
+  const ds=sgTargetDate(),d=pd(ds),today=fmt(new Date());
+  const day=(db.dispatches||[]).filter(dp=>workDate(dp)===ds);
+  const isPm=amPmFlags(day);
+  const drvOrder=getOrderedResources((db.drivers||[]).slice(),'driver').map(x=>x.id);
+  const ordIdx=id=>{const i=drvOrder.indexOf(id);return i<0?9999:i;};
+  const sortRows=arr=>arr.slice().sort((a,b)=>ordIdx(a.driver)-ordIdx(b.driver)||dayKey(a)-dayKey(b));
+  const assigned=day.filter(dp=>!dp.isCarryIn&&dp.driver);
+  const carry=sortDay(day.filter(dp=>dp.isCarryIn));
+  const unassigned=day.filter(dp=>!dp.isCarryIn&&!dp.driver);
+  const cs=(db.contractSupports||[]).filter(c=>c.date===ds);
+  const abs=(db.absences||[]).filter(a=>a.from<=ds&&ds<=a.to);
+  const section=(title,cls,arr)=>arr.length?`<div class="sg-sec ${cls}">${title}<span>${arr.length}件</span></div>${sortRows(arr).map(sgRow).join('')}`:'';
+  const col=pm=>{
+    const list=assigned.filter(dp=>!!isPm[dp.id]===pm);
+    const crane=list.filter(dp=>isCraneDisp(dp)),reg=list.filter(dp=>dp.isReg&&!isCraneDisp(dp)),spot=list.filter(dp=>!dp.isReg&&!isCraneDisp(dp));
+    const body=section('臨時業務','spot',spot)+section('定期便','reg',reg)+section('ユニック（クレーン）','crane',crane);
+    return `<div class="sg-col"><div class="sg-half ${pm?'pm':'am'}">${pm?'午　後':'午　前'}<span>${list.length}件</span></div>
+      <div class="sg-head"><div>時間</div><div>物件名・収集先</div><div>氏名</div><div>車番</div><div>作業内容・注意</div></div>
+      <div class="sg-body">${body||'<div class="sg-empty">予定はありません</div>'}</div></div>`;
+  };
+  const chip=(t)=>`<span class="sg-chip">${t}</span>`;
+  const bottom=[
+    carry.length?`<div class="sg-foot"><b>🏭 持込</b>${carry.map(dp=>chip(`${(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||carryInTime(dp)||''} ${esc(custName(dp.customer))}`)).join('')}</div>`:'',
+    cs.length?`<div class="sg-foot"><b>🏛 委託応援</b>${cs.map(c=>chip(`${esc(drvName(c.driverId).split(/[\s　]+/)[0])} ${c.startHour}-${c.endHour}時`)).join('')}</div>`:'',
+    abs.length?`<div class="sg-foot"><b>🌴 休み・車両不在</b>${abs.map(a=>chip(`${esc(a.kind==='driver'?drvName(a.resId):vehName(a.resId))}（${esc(a.reason)}）`)).join('')}</div>`:'',
+    unassigned.length?`<div class="sg-foot warn"><b>🔴 未確定</b>${chip(unassigned.length+'件（ドライバー未定）')}</div>`:''
+  ].join('');
+  const hol=HOLIDAYS[ds];
+  const t=new Date();
+  // 描き直してもスクロール位置を引き継ぐ（件数が多い日も最後まで流れるように）
+  const prevScroll=[...root.querySelectorAll('.sg-body')].map(e=>e.scrollTop);
+  const upd=_sgLastLoad?`${String(_sgLastLoad.getHours()).padStart(2,'0')}:${String(_sgLastLoad.getMinutes()).padStart(2,'0')}`:'--:--';
+  root.innerHTML=`<div class="sg-top">
+      <div class="sg-date">${d.getMonth()+1}月${d.getDate()}日（${DOW_JP[d.getDay()]}）${ds!==today?'<span class="sg-next">翌営業日の予定</span>':''}${hol?`<span class="sg-hol">🎌 ${esc(hol)}</span>`:''}</div>
+      <div class="sg-title">配車予定</div>
+      <div class="sg-clock">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}<small>${_sgLoadErr?`<span class="sg-err">⚠ 接続エラー（${upd}時点の内容）</span>`:`最終更新 ${upd}`}</small></div>
+    </div>
+    <div class="sg-cols">${col(false)}${col(true)}</div>
+    ${bottom?`<div class="sg-bottom">${bottom}</div>`:''}`;
+  root.querySelectorAll('.sg-body').forEach((e,i)=>{if(prevScroll[i])e.scrollTop=prevScroll[i];});
+  sgStartScroll(prevScroll.some(Boolean));
+}
+// 画面に入りきらないときは、各列をゆっくり自動スクロール（下まで行ったら上に戻る）
+function sgStartScroll(resume){
+  _sgScrollTimers.forEach(clearInterval);_sgScrollTimers=[];
+  document.querySelectorAll('#signageRoot .sg-body').forEach(el=>{
+    if(el.scrollHeight<=el.clientHeight+4)return;
+    let wait=resume&&el.scrollTop>0?0:80; // 最初と端で少し止まる（×50ms）。描き直しのときは止まらずに続ける
+    _sgScrollTimers.push(setInterval(()=>{
+      if(wait>0){wait--;return;}
+      if(el.scrollTop+el.clientHeight>=el.scrollHeight-1){el.scrollTop=0;wait=100;return;}
+      el.scrollTop+=1;
+      if(el.scrollTop+el.clientHeight>=el.scrollHeight-1)wait=100;
+    },50));
+  });
+}
+async function sgReload(){
+  try{
+    await loadDB();
+    _sgLoadErr=_loadFailed||!GAS_URL;
+    if(!_sgLoadErr)_sgLastLoad=new Date();
+  }catch(e){_sgLoadErr=true;}
+  renderSignage();
+}
+async function initSignage(){
+  document.body.classList.add('signage');
+  document.getElementById('loadOvl').classList.add('hid');
+  const root=document.getElementById('signageRoot');
+  if(!GAS_URL){
+    root.innerHTML='<div class="sg-setup">📺 サイネージ画面<br><small>このパソコンではまだGoogle連携（接続URL）が設定されていません。<br>一度 ?signage=1 を外して通常の画面を開き、⚙ 設定 → Google連携 で接続URLを設定してから、もう一度開いてください。</small></div>';
+    return;
+  }
+  await loadHolidays();
+  await sgReload();
+  // 1分ごと：他のパソコンで更新があれば読み込み直し、時計と日付の切り替えを更新
+  setInterval(async()=>{
+    try{
+      const r=await readGasJson(await fetch(gasUrl({action:'rev'}),{redirect:'follow'}));
+      if(r&&r.ok&&(Number(r.rev)!==_serverRev||_sgLoadErr)){await sgReload();return;}
+      if(r&&r.ok){_sgLoadErr=false;_sgLastLoad=new Date();}
+    }catch(e){_sgLoadErr=true;}
+    renderSignage();
+  },60*1000);
+  // 画面が暗くならないようにする（対応しているブラウザのみ）
+  try{if(navigator.wakeLock){let lock=await navigator.wakeLock.request('screen');document.addEventListener('visibilitychange',async()=>{if(!document.hidden)try{lock=await navigator.wakeLock.request('screen');}catch(e){}});}}catch(e){}
+}
+// 通常画面から、サイネージ画面を別タブで開く
+function openSignage(){window.open(location.pathname+'?signage=1','_blank');}
+
+// ================================================================
 // INIT
 // ================================================================
 window.addEventListener('DOMContentLoaded',async()=>{
+  if(SIGNAGE){initSignage();return;} // サイネージ画面は表示専用（データの書き込みをしない）
   document.getElementById('loadOvl').classList.remove('hid');
   await Promise.all([loadDB(),loadHolidays()]);
   for(const rs of db.regulars)genRegDisps(rs);
