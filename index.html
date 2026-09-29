@@ -529,6 +529,14 @@ body.signage #signageRoot{display:flex;flex-direction:column;height:100vh;paddin
 .sg-foot{display:flex;align-items:center;gap:.4em;flex-wrap:wrap}
 .sg-foot.warn b{color:#fca5a5}
 .sg-chip{background:#1e293b;border-radius:.4em;padding:.1em .5em}
+/* 持込み：工場の作業者向けに大きく目立たせる帯 */
+.sg-carry{display:flex;align-items:stretch;gap:.6em;background:#111a2e;border:2px solid #0e7490;border-radius:.6em;overflow:hidden;font-size:1.3em}
+.sg-carry-lbl{background:#0e7490;color:#fff;font-weight:900;padding:.3em .8em;display:flex;align-items:center;white-space:nowrap;letter-spacing:.1em}
+.sg-carry-lbl span{font-size:.7em;margin-left:.5em;letter-spacing:0;opacity:.9}
+.sg-carry-list{display:flex;flex-wrap:wrap;gap:.4em .6em;padding:.35em 0;align-items:center}
+.sg-carry-item{background:#1e293b;border-radius:.4em;padding:.1em .6em;font-weight:800;color:#fff;white-space:nowrap}
+.sg-carry-item b{color:#fde68a;margin-right:.4em}
+.sg-carry-item.done{opacity:.4}
 .sg-ctrl{position:fixed;left:50%;bottom:2vh;transform:translateX(-50%);display:flex;gap:.6em;align-items:center;background:rgba(15,23,42,.95);border:1px solid #334155;border-radius:.8em;padding:.5em .8em;opacity:0;pointer-events:none;transition:opacity .3s;font-size:.9em}
 body.sg-active{cursor:default}
 body.sg-active .sg-ctrl{opacity:1;pointer-events:auto}
@@ -8309,8 +8317,16 @@ function renderSignage(){
       <div class="sg-body">${body||'<div class="sg-empty">予定はありません</div>'}</div></div>`;
   };
   const chip=(t)=>`<span class="sg-chip">${t}</span>`;
+  // 持込みは大きな帯で表示。今日の分で時間が過ぎたものは薄くする
+  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  const carryItem=dp=>{
+    const tm=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||carryInTime(dp)||'';
+    const hm=String(tm).match(/(\d{1,2}):(\d{2})(?!.*\d{1,2}:\d{2})/);
+    const done=ds===today&&hm&&(+hm[1]*60+ +hm[2])<nowMin;
+    return `<span class="sg-carry-item${done?' done':''}">${tm?`<b>${esc(tm)}</b>`:''}${esc(custName(dp.customer))}</span>`;
+  };
+  const carryBar=carry.length?`<div class="sg-carry"><div class="sg-carry-lbl">🏭 持込み<span>${carry.length}件</span></div><div class="sg-carry-list">${carry.map(carryItem).join('')}</div></div>`:'';
   const bottom=[
-    carry.length?`<div class="sg-foot"><b>🏭 持込</b>${carry.map(dp=>chip(`${(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||carryInTime(dp)||''} ${esc(custName(dp.customer))}`)).join('')}</div>`:'',
     cs.length?`<div class="sg-foot"><b>🏛 委託応援</b>${cs.map(c=>chip(`${esc(drvName(c.driverId).split(/[\s　]+/)[0])} ${c.startHour}-${c.endHour}時`)).join('')}</div>`:'',
     abs.length?`<div class="sg-foot"><b>🌴 休み・車両不在</b>${abs.map(a=>chip(`${esc(a.kind==='driver'?drvName(a.resId):vehName(a.resId))}（${esc(a.reason)}）`)).join('')}</div>`:'',
     unassigned.length?`<div class="sg-foot warn"><b>🔴 未確定</b>${chip(unassigned.length+'件（ドライバー未定）')}</div>`:''
@@ -8326,6 +8342,7 @@ function renderSignage(){
       <div class="sg-clock">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}<small>${_sgLoadErr?`<span class="sg-err">⚠ 接続エラー（${upd}時点の内容）</span>`:`最終更新 ${upd}`}</small></div>
     </div>
     <div class="sg-cols">${col(false)}${col(true)}</div>
+    ${carryBar}
     ${bottom?`<div class="sg-bottom">${bottom}</div>`:''}
     <div class="sg-ctrl" id="sgCtrl">
       <button onclick="sgMove(-1)">◀ 前の日</button>
