@@ -1374,15 +1374,45 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
   <div class="mbox lg">
     <div class="mhdr"><h2>⚙ 設定・マスター管理</h2><span class="mcls" onclick="closeM('mSettings')">×</span></div>
     <div class="stabs">
-      <div class="stab on" onclick="stab('google')">🌐 Google連携</div>
-      <div class="stab" onclick="stab('drivers')">👤 ドライバー</div>
-      <div class="stab" onclick="stab('vehicles')">🚛 車両</div>
-      <div class="stab" onclick="stab('customers')">🏢 お客様</div>
-      <div class="stab" onclick="stab('sites')">📍 収集先</div>
-      <div class="stab" onclick="stab('staff')">🧑‍💼 スタッフ</div>
-      <div class="stab" onclick="stab('data')">💾 データ</div>
+      <div class="stab on" data-st="google" onclick="stab('google')">🌐 Google連携</div>
+      <div class="stab" data-st="drivers" onclick="stab('drivers')">👤 ドライバー</div>
+      <div class="stab" data-st="vehicles" onclick="stab('vehicles')">🚛 車両</div>
+      <div class="stab" data-st="customers" onclick="stab('customers')">🏢 お客様</div>
+      <div class="stab" data-st="sites" onclick="stab('sites')">📍 収集先</div>
+      <div class="stab" data-st="staff" onclick="stab('staff')">🧑‍💼 スタッフ</div>
+      <div class="stab" data-st="data" onclick="stab('data')">💾 データ</div>
+      <div class="stab" data-st="supabase" onclick="stab('supabase')">🗄 新データベース</div>
     </div>
     <div class="mbdy">
+
+      <!-- 新データベース（Supabase）への移行 -->
+      <div class="spane" id="sp-supabase">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:13px;margin-bottom:16px;font-size:12px;color:#1e40af;line-height:1.7">
+          <strong>🗄 新データベース（Supabase）への移行</strong><br>
+          今はまだ、これまでどおり Google スプレッドシートで動いています。<br>
+          ここでは管理者がログインして、今のデータを新データベースへ<strong>写します</strong>。写しても今のデータは変わりません。何度でもやり直せます（新データベース側が今のデータと同じ内容に上書きされます）。
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:13px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:10px">🔑 ログイン</div>
+          <div id="sbLoginBox">
+            <div class="fr"><label>メールアドレス</label><input type="email" id="sbEmail" autocomplete="username"></div>
+            <div class="fr"><label>パスワード</label><input type="password" id="sbPass" autocomplete="current-password" onkeydown="if(event.key==='Enter')sbLogin()"></div>
+            <button class="btn btn-p" onclick="sbLogin()">ログイン</button>
+          </div>
+          <div id="sbUserBox" class="hid" style="font-size:13px;line-height:1.8">
+            <span id="sbUserTxt"></span>
+            <button class="btn btn-s" style="margin-left:10px" onclick="sbLogout()">ログアウト</button>
+          </div>
+          <div id="sbAuthMsg" style="font-size:12px;margin-top:8px"></div>
+        </div>
+        <div id="sbMigBox" class="hid" style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:13px">
+          <div style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:6px">📤 今のデータを新データベースへ写す（管理者のみ）</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.6">まず「違いを確認」で件数を確かめてから「写す」を押してください。写したあと、自動でもう一度確認して、一致したかをお知らせします。</div>
+          <button class="btn btn-s" onclick="sbMigrate(false)">🔍 違いを確認（まだ写さない）</button>
+          <button class="btn btn-p" onclick="sbMigrate(true)">📤 新データベースへ写す</button>
+          <div id="sbMigResult" style="margin-top:12px;font-size:12px"></div>
+        </div>
+      </div>
 
       <!-- GOOGLE SHEETS 連携 -->
       <div class="spane on" id="sp-google">
@@ -5383,10 +5413,171 @@ function chkLic(){
 // ================================================================
 function openSettings(){updateUrlStatus();renderSLists();updateSalesHistoryStatus();openM('mSettings');checkProtection();}
 function stab(name){
-  const ns=['google','drivers','vehicles','customers','sites','data'];
-  document.querySelectorAll('.stab').forEach((t,i)=>t.classList.toggle('on',ns[i]===name));
+  document.querySelectorAll('#mSettings .stab').forEach(t=>t.classList.toggle('on',t.dataset.st===name));
   document.querySelectorAll('.spane').forEach(p=>p.classList.remove('on'));
   document.getElementById(`sp-${name}`).classList.add('on');
+  if(name==='supabase')sbRefreshUser();
+}
+
+// ===== 新データベース（Supabase）：ログインと、今のデータの移し替え =====
+// 公開用の鍵（画面に入れて使う前提の鍵。データは役割ごとの権限でデータベース側が守る）
+const SB_URL='https://ideyhuryqtyeqjqeehss.supabase.co';
+const SB_KEY='sb_publishable_8jOoqp0jnPYeZD70Vhg6zw_njzpCarg';
+const SB_LIB='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
+let _sb=null,_sbProfile=null;
+async function sbClient(){
+  if(_sb)return _sb;
+  if(!window.supabase){
+    await new Promise((ok,ng)=>{const s=document.createElement('script');s.src=SB_LIB;s.onload=ok;s.onerror=()=>ng(new Error('新データベースの部品を読み込めません（インターネット接続を確認してください）'));document.head.appendChild(s);});
+  }
+  _sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,storageKey:'haishaSbAuth'}});
+  return _sb;
+}
+function sbMsg(html,color){const el=document.getElementById('sbAuthMsg');if(el){el.innerHTML=html;el.style.color=color||'#475569';}}
+function sbErrJa(e){
+  const m=(e&&e.message)||String(e);
+  if(/Invalid login credentials/i.test(m))return 'メールアドレスかパスワードが違います';
+  if(/Email not confirmed/i.test(m))return 'このメールアドレスはまだ確認されていません（管理者に連絡してください）';
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m))return '新データベースに接続できません（インターネット接続を確認してください）';
+  return m;
+}
+async function sbRefreshUser(){
+  const loginBox=document.getElementById('sbLoginBox'),userBox=document.getElementById('sbUserBox'),migBox=document.getElementById('sbMigBox');
+  try{
+    const sb=await sbClient();
+    const {data:{session}}=await sb.auth.getSession();
+    _sbProfile=null;
+    if(!session){loginBox.classList.remove('hid');userBox.classList.add('hid');migBox.classList.add('hid');return;}
+    const {data:p,error}=await sb.from('profiles').select('display_name,role,active,roles(label)').eq('user_id',session.user.id).maybeSingle();
+    if(error)throw error;
+    _sbProfile=p;
+    loginBox.classList.add('hid');userBox.classList.remove('hid');
+    document.getElementById('sbUserTxt').innerHTML=p
+      ?`✅ ログイン中：<b>${esc(p.display_name)}</b>（${esc(p.roles?p.roles.label:p.role)}）　<span style="color:#94a3b8">${esc(session.user.email||'')}</span>${p.active?'':'　<b style="color:#dc2626">※停止中のアカウントです</b>'}`
+      :`⚠ ログインしましたが、このアカウントには役割が設定されていません。管理者に連絡してください。　<span style="color:#94a3b8">${esc(session.user.email||'')}</span>`;
+    migBox.classList.toggle('hid',!(p&&p.active&&p.role==='admin'));
+  }catch(e){sbMsg('❌ '+esc(sbErrJa(e)),'#dc2626');}
+}
+async function sbLogin(){
+  const email=(document.getElementById('sbEmail').value||'').trim(),pass=document.getElementById('sbPass').value||'';
+  if(!email||!pass){sbMsg('メールアドレスとパスワードを入力してください','#dc2626');return;}
+  sbMsg('ログイン中…');
+  try{
+    const sb=await sbClient();
+    const {error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error)throw error;
+    document.getElementById('sbPass').value='';
+    sbMsg('');
+    await sbRefreshUser();
+  }catch(e){sbMsg('❌ '+esc(sbErrJa(e)),'#dc2626');}
+}
+async function sbLogout(){
+  try{const sb=await sbClient();await sb.auth.signOut();}catch(e){}
+  _sbProfile=null;sbMsg('ログアウトしました');
+  document.getElementById('sbMigResult').innerHTML='';
+  sbRefreshUser();
+}
+
+// 移し替えの対象（新データベースの表 ← 今のデータの項目）
+const SB_TABLES=[
+  ['customers','customers','お客様'],['sites','sites','収集先'],['drivers','drivers','ドライバー'],['vehicles','vehicles','車両'],
+  ['staffs','staffs','スタッフ'],['regulars','regulars','定期便の設定'],['absences','absences','休み・車両不在'],
+  ['contract_supports','contractSupports','委託応援'],['container_placements','containerPlacements','コンテナ（設置）'],
+  ['container_actions','containerActions','コンテナ（作業履歴）'],['sales_invoices','salesInvoices','売上伝票'],
+  ['waste_unit_prices','wasteUnitPrices','品目別単価'],['sales_history','salesHistory','売上履歴'],['print_logs','printLogs','印刷記録'],
+];
+// 項目の並び順に左右されない比較用の文字列（データベースは項目の順番を入れ替えて保存するため）
+function sbStable(v){
+  if(Array.isArray(v))return '['+v.map(x=>x===undefined?'null':sbStable(x)).join(',')+']';
+  if(v&&typeof v==='object')return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+sbStable(v[k])).join(',')+'}';
+  return JSON.stringify(v===undefined?null:v);
+}
+const sbTime=t=>t?new Date(t).getTime():null;
+async function sbFetchAll(sb,table,cols,key){
+  const out=[];
+  for(let from=0;;from+=1000){
+    const {data,error}=await sb.from(table).select(cols).order(key).range(from,from+999);
+    if(error)throw new Error(`${table}：${error.message}`);
+    out.push(...data);
+    if(data.length<1000)return out;
+  }
+}
+// 今のデータから、表ごとの「あるべき行」を作る
+function sbSourceRows(){
+  const plan=SB_TABLES.map(([table,key,label])=>({table,label,key:'id',
+    rows:(db[key]||[]).map((r,i)=>({id:String(r.id||`${key}-${i+1}`),data:r}))}));
+  const live=db.dispatches.map(dp=>({id:dp.id,data:dp,deleted_at:null}));
+  const ids=new Set(live.map(r=>r.id));
+  const trash=(db.trash||[]).filter(t=>t&&t.dp&&!ids.has(t.dp.id))
+    .map(t=>({id:t.dp.id,data:{...t.dp,trashReason:t.reason||''},deleted_at:t.deletedAt}));
+  plan.push({table:'dispatches',label:'配車カード（ごみ箱を含む）',key:'id',rows:[...live,...trash],hasDeleted:true});
+  const settings=[
+    ['driverOrder',db.driverOrder||[],'dispatch_assign'],['vehicleOrder',db.vehicleOrder||[],'dispatch_assign'],
+    ['regSkips',db.regSkips||[],'dispatch_delete'],['containerSettings',db.containerSettings||{},'container_manage'],
+    ['products',db.products||[],'sales'],
+  ];
+  plan.push({table:'app_settings',label:'設定（並び順など）',key:'key',isSettings:true,
+    rows:settings.map(([key,value,edit_perm])=>({key,value,edit_perm}))});
+  return plan;
+}
+async function sbMigrate(apply){
+  const out=document.getElementById('sbMigResult');
+  if(!_sbProfile||_sbProfile.role!=='admin'){alert('管理者でログインしてください');return;}
+  if(_dirty||_syncLock){alert('まだGoogleへ保存中の変更があります。画面上の同期表示が「同期済み」になってから、もう一度押してください。');return;}
+  if(apply&&!confirm('今のデータを新データベースへ写します。\n新データベース側は、今のデータと同じ内容に上書きされます（今のデータは変わりません）。\n\nよろしいですか？'))return;
+  out.innerHTML='⏳ '+(apply?'写しています…':'確認しています…');
+  try{
+    const sb=await sbClient();
+    const plan=sbSourceRows();
+    const res=[];
+    for(const t of plan){
+      out.innerHTML=`⏳ ${apply?'写しています':'確認しています'}…（${esc(t.label)}）`;
+      const valCol=t.isSettings?'value':'data';
+      const cur=await sbFetchAll(sb,t.table,t.isSettings?'key,value':(t.hasDeleted?'id,data,deleted_at':'id,data'),t.key);
+      const curMap=new Map(cur.map(r=>[r[t.key],r]));
+      const srcIds=new Set(t.rows.map(r=>r[t.key]));
+      const up=[];let add=0,chg=0;
+      for(const r of t.rows){
+        const c=curMap.get(r[t.key]);
+        if(!c){up.push(r);add++;continue;}
+        if(sbStable(c[valCol])!==sbStable(r[valCol])||(t.hasDeleted&&sbTime(c.deleted_at)!==sbTime(r.deleted_at))){up.push(r);chg++;}
+      }
+      const del=t.isSettings?[]:cur.filter(c=>!srcIds.has(c[t.key])).map(c=>c[t.key]);
+      if(apply){
+        for(let i=0;i<up.length;i+=300){
+          const {error}=await sb.from(t.table).upsert(up.slice(i,i+300),{onConflict:t.key});
+          if(error)throw new Error(`${t.label}：${error.message}`);
+        }
+        for(let i=0;i<del.length;i+=200){
+          const {error}=await sb.from(t.table).delete().in(t.key,del.slice(i,i+200));
+          if(error)throw new Error(`${t.label}：${error.message}`);
+        }
+      }
+      res.push({label:t.label,src:t.rows.length,cur:cur.length,add,chg,del:del.length});
+    }
+    const diff=res.reduce((s,r)=>s+r.add+r.chg+r.del,0);
+    const td='style="padding:3px 8px;border-bottom:1px solid #e2e8f0;text-align:right"';
+    const tbl=`<table style="border-collapse:collapse;margin-top:6px"><tr style="background:#f1f5f9"><th style="padding:3px 8px;text-align:left">データ</th><th ${td}>今のデータ</th><th ${td}>新DB（${apply?'写す前':'現在'}）</th><th ${td}>追加</th><th ${td}>変更</th><th ${td}>削除</th></tr>`
+      +res.map(r=>`<tr><td style="padding:3px 8px;border-bottom:1px solid #e2e8f0">${esc(r.label)}</td><td ${td}>${r.src}</td><td ${td}>${r.cur}</td><td ${td}>${r.add||''}</td><td ${td}>${r.chg||''}</td><td ${td}>${r.del||''}</td></tr>`).join('')+'</table>';
+    if(!apply){
+      out.innerHTML=(diff?`🔍 新データベースとの違いは <b>${diff}件</b> です。「写す」を押すと、この内容で上書きします。`:'✅ 新データベースは今のデータと<b>一致しています</b>。')+tbl;
+      return;
+    }
+    out.innerHTML=`✅ <b>${diff}件</b>を写しました。確認しています…`+tbl;
+    // 写したあと、もう一度比べて一致したか確かめる
+    let left=0;
+    for(const t of plan){
+      const valCol=t.isSettings?'value':'data';
+      const cur=await sbFetchAll(sb,t.table,t.isSettings?'key,value':(t.hasDeleted?'id,data,deleted_at':'id,data'),t.key);
+      const curMap=new Map(cur.map(r=>[r[t.key],r]));
+      for(const r of t.rows){const c=curMap.get(r[t.key]);if(!c||sbStable(c[valCol])!==sbStable(r[valCol])||(t.hasDeleted&&sbTime(c.deleted_at)!==sbTime(r.deleted_at)))left++;}
+      if(!t.isSettings)left+=cur.filter(c=>!t.rows.some(r=>r[t.key]===c[t.key])).length;
+    }
+    out.innerHTML=(left?`⚠ <b>${diff}件</b>を写しましたが、まだ <b>${left}件</b> の違いが残っています。もう一度「違いを確認」を押してください。`
+      :`✅ <b>${diff}件</b>を写しました。新データベースは今のデータと<b>一致しています</b>。`)+tbl;
+  }catch(e){
+    out.innerHTML='❌ 途中で止まりました：'+esc(sbErrJa(e))+'<br><span style="color:#64748b">もう一度押すと、止まったところから続きを写せます。</span>';
+  }
 }
 function renderSLists(){
   document.getElementById('driverList').innerHTML=!(db.drivers||[]).length?
