@@ -62,6 +62,13 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 /* ===== LOADING ===== */
 .loading-ovl{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-size:14px;color:#475569}
 .loading-ovl.hid{display:none}
+.sb-gate{position:fixed;inset:0;background:#e2e8f0;z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px}
+.sb-gate-box{background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(15,23,42,.15);padding:28px;width:100%;max-width:380px}
+.sb-gate-title{font-size:20px;font-weight:800;color:#1e293b;text-align:center}
+.sb-gate-sub{font-size:13px;color:#64748b;text-align:center;margin:6px 0 18px}
+.sb-gate-msg{font-size:12px;color:#dc2626;margin-top:10px;min-height:1.2em;text-align:center}
+.sb-gate-foot{font-size:11px;color:#94a3b8;text-align:center;margin-top:14px;line-height:1.6}
+.sb-gate-foot a{color:#2563eb}
 .spinner{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin 0.7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -744,6 +751,19 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
   <div id="loadMsg">Googleスプレッドシートからデータを読み込み中...</div>
 </div>
 
+<!-- 新データベースのログイン画面 -->
+<div class="sb-gate hid" id="sbGate">
+  <div class="sb-gate-box">
+    <div class="sb-gate-title">🚛 配車管理システム</div>
+    <div class="sb-gate-sub">ログインしてください</div>
+    <div class="fr"><label>メールアドレス</label><input type="email" id="sbGateEmail" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('sbGatePass').focus()"></div>
+    <div class="fr"><label>パスワード</label><input type="password" id="sbGatePass" autocomplete="current-password" onkeydown="if(event.key==='Enter')sbGateLogin()"></div>
+    <button class="btn btn-p" style="width:100%;justify-content:center;padding:10px" onclick="sbGateLogin()">ログイン</button>
+    <div id="sbGateMsg" class="sb-gate-msg"></div>
+    <div class="sb-gate-foot">新データベース（テスト）で開いています。<a href="?db=google">Googleのデータで開く</a></div>
+  </div>
+</div>
+
 <!-- HEADER -->
 <header class="app-header">
   <div class="app-title">🚛 廃棄物収集・運搬 配車管理システム</div>
@@ -752,6 +772,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
     <div class="sync-dot none" id="syncDot"></div>
     <span id="syncTxt">未設定</span>
   </div>
+  <button class="hbtn hid" id="sbUserBadge" onclick="sbHeaderLogout()"></button>
   <button class="hbtn" style="background:#2563eb;font-size:12px;padding:6px 12px;" onclick="manualSync()">☁️ 今すぐ同期</button>
   <button class="hbtn" onclick="exportCSV()">📊 CSV</button>
   <button class="hbtn" onclick="exportJSON()">💾 バックアップ</button>
@@ -1411,6 +1432,16 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
           <button class="btn btn-s" onclick="sbMigrate(false)">🔍 違いを確認（まだ写さない）</button>
           <button class="btn btn-p" onclick="sbMigrate(true)">📤 新データベースへ写す</button>
           <div id="sbMigResult" style="margin-top:12px;font-size:12px"></div>
+        </div>
+        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:13px;margin-top:16px">
+          <div style="font-size:13px;font-weight:700;color:#b45309;margin-bottom:6px">🧪 このパソコンで新データベースを試す</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.6">
+            新データベースのデータで配車表を開きます（ログインが必要です）。今はまだ<b>表示のテスト</b>だけで、変更しても保存されません。<br>
+            切り替えはこのパソコンだけに効きます。ほかのパソコンは、これまでどおりGoogleのデータで動きます。
+          </div>
+          <div id="sbModeNow" style="font-size:12px;margin-bottom:8px"></div>
+          <button class="btn btn-w" onclick="sbSwitchMode(true)">🧪 新データベースで開く</button>
+          <button class="btn btn-s" onclick="sbSwitchMode(false)">🌐 Googleのデータで開く</button>
         </div>
       </div>
 
@@ -2829,6 +2860,16 @@ const DEMO_DB={
 // ================================================================
 let GAS_URL=localStorage.getItem('gasUrl')||'';
 let db=null;
+// このパソコンで新データベース（Supabase）を使うか。URLの ?db=supabase / ?db=google で切り替え、パソコンごとに覚える
+const SB_MODE=(()=>{
+  const q=new URLSearchParams(location.search).get('db');
+  try{
+    if(q==='supabase')localStorage.setItem('dbMode','supabase');
+    if(q==='google')localStorage.removeItem('dbMode');
+    if(q){const u=new URL(location.href);u.searchParams.delete('db');history.replaceState(null,'',u.toString());}
+    return localStorage.getItem('dbMode')==='supabase';
+  }catch(e){return false;}
+})();
 // サーバー（GAS）の更新番号。保存時に送り、他のパソコンが先に保存していたら上書きを止める
 let _serverRev=Number(localStorage.getItem('haishaRev')||0);
 function setServerRev(n){_serverRev=Number(n)||0;localStorage.setItem('haishaRev',String(_serverRev));}
@@ -2945,6 +2986,7 @@ function clearGasUrl(){
 let _loadFailed=false;
 const LOAD_TIMEOUT_MS=30000,LOAD_TRIES=2;
 async function loadDB(){
+  if(SB_MODE){await sbLoadDB();return;}
   if(GAS_URL){
     // 30秒待っても応答がなければ、もう1回だけ読み込み直す（GASの起動待ち対策）
     for(let t=1;t<=LOAD_TRIES;t++){
@@ -3027,6 +3069,7 @@ let _autoSyncTimer=null;
 let _dirty=false; // まだサーバーに送っていない変更があるか
 async function save(){
   syncContainers(); // 配車カードのコンテナ作業をコンテナ管理へ反映
+  if(SB_MODE){sbTestSaveNotice();return;} // 新データベースのテスト中は保存しない（Googleのデータも触らない）
   localStorage.setItem('haishaDB2',JSON.stringify(db));
   if(GAS_URL){
     _dirty=true;
@@ -3041,6 +3084,7 @@ let _syncLock=false;
 let _syncNeeded=false;
 
 async function manualSync(){
+  if(SB_MODE){await refreshFromServer();if(!_loadFailed)setSyncStatus('ok',SB_TEST_TXT);return;}
   if(!GAS_URL){openSettings();stab('google');return;}
   // 同期中なら「完了後に再実行」フラグを立てて終了
   if(_syncLock){_syncNeeded=true;return;}
@@ -3092,6 +3136,7 @@ async function refreshFromServer(){
 
 // 他のパソコンで更新されていないか確認し、未保存の変更がなければ自動で最新にする
 async function checkServerUpdate(){
+  if(SB_MODE)return; // 新データベースの自動更新は、保存に対応するときに組み込む
   if(!GAS_URL||_dirty||_syncLock||document.hidden)return;
   if(document.querySelector('.ovl:not(.hid)'))return; // 入力画面を開いている間は触らない
   try{
@@ -3107,6 +3152,7 @@ async function checkServerUpdate(){
 }
 // 同期表示のクリック：読み込みに失敗しているときは読み込み直す
 async function onSyncBadgeClick(){
+  if(SB_MODE){if(_loadFailed)await refreshFromServer();return;}
   if(!GAS_URL||!_loadFailed)return;
   if(_dirty&&!confirm('このパソコンにまだ保存していない変更があります。\n読み込み直すと、その変更は反映されません。\n\n読み込み直しますか？'))return;
   await refreshFromServer();
@@ -5443,6 +5489,9 @@ function sbErrJa(e){
 }
 async function sbRefreshUser(){
   const loginBox=document.getElementById('sbLoginBox'),userBox=document.getElementById('sbUserBox'),migBox=document.getElementById('sbMigBox');
+  document.getElementById('sbModeNow').innerHTML=SB_MODE
+    ?'いまこのパソコンは <b style="color:#b45309">🧪 新データベース（表示のテスト）</b> で開いています'
+    :'いまこのパソコンは <b style="color:#15803d">🌐 Googleのデータ</b> で開いています';
   try{
     const sb=await sbClient();
     const {data:{session}}=await sb.auth.getSession();
@@ -5455,7 +5504,8 @@ async function sbRefreshUser(){
     document.getElementById('sbUserTxt').innerHTML=p
       ?`✅ ログイン中：<b>${esc(p.display_name)}</b>（${esc(p.roles?p.roles.label:p.role)}）　<span style="color:#94a3b8">${esc(session.user.email||'')}</span>${p.active?'':'　<b style="color:#dc2626">※停止中のアカウントです</b>'}`
       :`⚠ ログインしましたが、このアカウントには役割が設定されていません。管理者に連絡してください。　<span style="color:#94a3b8">${esc(session.user.email||'')}</span>`;
-    migBox.classList.toggle('hid',!(p&&p.active&&p.role==='admin'));
+    // 写すのは「Googleのデータで開いているとき」だけ（新データベースで開いているときは、写す元がないため）
+    migBox.classList.toggle('hid',SB_MODE||!(p&&p.active&&p.role==='admin'));
   }catch(e){sbMsg('❌ '+esc(sbErrJa(e)),'#dc2626');}
 }
 async function sbLogin(){
@@ -5493,10 +5543,13 @@ function sbStable(v){
   return JSON.stringify(v===undefined?null:v);
 }
 const sbTime=t=>t?new Date(t).getTime():null;
+// 1回に1000件までしか取れないので、分けて全部取る（pos＝今のデータでの並び順があれば、その順に）
 async function sbFetchAll(sb,table,cols,key){
   const out=[];
   for(let from=0;;from+=1000){
-    const {data,error}=await sb.from(table).select(cols).order(key).range(from,from+999);
+    let q=sb.from(table).select(cols);
+    if(/\bpos\b/.test(cols))q=q.order('pos',{nullsFirst:false});
+    const {data,error}=await q.order(key).range(from,from+999);
     if(error)throw new Error(`${table}：${error.message}`);
     out.push(...data);
     if(data.length<1000)return out;
@@ -5505,11 +5558,11 @@ async function sbFetchAll(sb,table,cols,key){
 // 今のデータから、表ごとの「あるべき行」を作る
 function sbSourceRows(){
   const plan=SB_TABLES.map(([table,key,label])=>({table,label,key:'id',
-    rows:(db[key]||[]).map((r,i)=>({id:String(r.id||`${key}-${i+1}`),data:r}))}));
-  const live=db.dispatches.map(dp=>({id:dp.id,data:dp,deleted_at:null}));
+    rows:(db[key]||[]).map((r,i)=>({id:String(r.id||`${key}-${i+1}`),data:r,pos:i}))}));
+  const live=db.dispatches.map((dp,i)=>({id:dp.id,data:dp,deleted_at:null,pos:i}));
   const ids=new Set(live.map(r=>r.id));
   const trash=(db.trash||[]).filter(t=>t&&t.dp&&!ids.has(t.dp.id))
-    .map(t=>({id:t.dp.id,data:{...t.dp,trashReason:t.reason||''},deleted_at:t.deletedAt}));
+    .map((t,j)=>({id:t.dp.id,data:{...t.dp,trashReason:t.reason||''},deleted_at:t.deletedAt,pos:live.length+j}));
   plan.push({table:'dispatches',label:'配車カード（ごみ箱を含む）',key:'id',rows:[...live,...trash],hasDeleted:true});
   const settings=[
     ['driverOrder',db.driverOrder||[],'dispatch_assign'],['vehicleOrder',db.vehicleOrder||[],'dispatch_assign'],
@@ -5519,6 +5572,24 @@ function sbSourceRows(){
   plan.push({table:'app_settings',label:'設定（並び順など）',key:'key',isSettings:true,
     rows:settings.map(([key,value,edit_perm])=>({key,value,edit_perm}))});
   return plan;
+}
+// 新データベースの今の中身と比べて、写す必要のある行・消す行を出す
+async function sbDiffTable(sb,t){
+  const valCol=t.isSettings?'value':'data';
+  const cols=t.isSettings?'key,value':(t.hasDeleted?'id,data,deleted_at,pos':'id,data,pos');
+  const cur=await sbFetchAll(sb,t.table,cols,t.key);
+  const curMap=new Map(cur.map(r=>[r[t.key],r]));
+  const srcIds=new Set(t.rows.map(r=>r[t.key]));
+  const up=[];let add=0,chg=0;
+  for(const r of t.rows){
+    const c=curMap.get(r[t.key]);
+    if(!c){up.push(r);add++;continue;}
+    if(sbStable(c[valCol])!==sbStable(r[valCol])
+       ||(t.hasDeleted&&sbTime(c.deleted_at)!==sbTime(r.deleted_at))
+       ||(!t.isSettings&&c.pos!==r.pos)){up.push(r);chg++;}
+  }
+  const del=t.isSettings?[]:cur.filter(c=>!srcIds.has(c[t.key])).map(c=>c[t.key]);
+  return {cur,up,del,add,chg};
 }
 async function sbMigrate(apply){
   const out=document.getElementById('sbMigResult');
@@ -5532,17 +5603,7 @@ async function sbMigrate(apply){
     const res=[];
     for(const t of plan){
       out.innerHTML=`⏳ ${apply?'写しています':'確認しています'}…（${esc(t.label)}）`;
-      const valCol=t.isSettings?'value':'data';
-      const cur=await sbFetchAll(sb,t.table,t.isSettings?'key,value':(t.hasDeleted?'id,data,deleted_at':'id,data'),t.key);
-      const curMap=new Map(cur.map(r=>[r[t.key],r]));
-      const srcIds=new Set(t.rows.map(r=>r[t.key]));
-      const up=[];let add=0,chg=0;
-      for(const r of t.rows){
-        const c=curMap.get(r[t.key]);
-        if(!c){up.push(r);add++;continue;}
-        if(sbStable(c[valCol])!==sbStable(r[valCol])||(t.hasDeleted&&sbTime(c.deleted_at)!==sbTime(r.deleted_at))){up.push(r);chg++;}
-      }
-      const del=t.isSettings?[]:cur.filter(c=>!srcIds.has(c[t.key])).map(c=>c[t.key]);
+      const {cur,up,del,add,chg}=await sbDiffTable(sb,t);
       if(apply){
         for(let i=0;i<up.length;i+=300){
           const {error}=await sb.from(t.table).upsert(up.slice(i,i+300),{onConflict:t.key});
@@ -5566,18 +5627,105 @@ async function sbMigrate(apply){
     out.innerHTML=`✅ <b>${diff}件</b>を写しました。確認しています…`+tbl;
     // 写したあと、もう一度比べて一致したか確かめる
     let left=0;
-    for(const t of plan){
-      const valCol=t.isSettings?'value':'data';
-      const cur=await sbFetchAll(sb,t.table,t.isSettings?'key,value':(t.hasDeleted?'id,data,deleted_at':'id,data'),t.key);
-      const curMap=new Map(cur.map(r=>[r[t.key],r]));
-      for(const r of t.rows){const c=curMap.get(r[t.key]);if(!c||sbStable(c[valCol])!==sbStable(r[valCol])||(t.hasDeleted&&sbTime(c.deleted_at)!==sbTime(r.deleted_at)))left++;}
-      if(!t.isSettings)left+=cur.filter(c=>!t.rows.some(r=>r[t.key]===c[t.key])).length;
-    }
+    for(const t of plan){const d=await sbDiffTable(sb,t);left+=d.up.length+d.del.length;}
     out.innerHTML=(left?`⚠ <b>${diff}件</b>を写しましたが、まだ <b>${left}件</b> の違いが残っています。もう一度「違いを確認」を押してください。`
       :`✅ <b>${diff}件</b>を写しました。新データベースは今のデータと<b>一致しています</b>。`)+tbl;
   }catch(e){
     out.innerHTML='❌ 途中で止まりました：'+esc(sbErrJa(e))+'<br><span style="color:#64748b">もう一度押すと、止まったところから続きを写せます。</span>';
   }
+}
+
+// ----- 新データベースで開く（このパソコンだけの切り替え。テスト中は表示だけで、保存はしない） -----
+// 新データベースから、今までと同じ形のデータ（db）を組み立てる
+async function sbLoadAll(){
+  const sb=await sbClient();
+  const [tabs,disp,settings]=await Promise.all([
+    Promise.all(SB_TABLES.map(([t])=>sbFetchAll(sb,t,'id,data,pos','id'))),
+    sbFetchAll(sb,'dispatches','id,data,deleted_at,pos','id'),
+    sbFetchAll(sb,'app_settings','key,value','key'),
+  ]);
+  const nd={};
+  SB_TABLES.forEach(([,key],i)=>{nd[key]=tabs[i].map(r=>r.data);});
+  nd.dispatches=disp.filter(r=>!r.deleted_at).map(r=>r.data);
+  nd.trash=disp.filter(r=>r.deleted_at).map(r=>{
+    const {trashReason,...dp}=r.data;
+    return {dp,deletedAt:new Date(r.deleted_at).toISOString(),reason:trashReason||''};
+  });
+  settings.forEach(s=>{nd[s.key]=s.value;});
+  return nd;
+}
+async function sbLoadDB(){
+  setSyncStatus('loading','新データベースから読込中...');
+  try{
+    db=await sbLoadAll();normalizeDB();
+    _loadFailed=false;
+    setSyncStatus('ok',SB_TEST_TXT);
+  }catch(e){
+    console.warn('sbLoadDB:',e);
+    _loadFailed=true;
+    setSyncStatus('error','新データベースを読み込めません（'+sbErrJa(e)+'）・ここをクリックで再読込');
+    db=JSON.parse(JSON.stringify(DEMO_DB));db.regulars=[];db.dispatches=[];db.customers=[];db.drivers=[];db.vehicles=[];normalizeDB();
+  }
+}
+const SB_TEST_TXT='🗄 新データベース（表示のテスト中・変更は保存されません）';
+let _sbSaveWarned=false;
+function sbTestSaveNotice(){
+  setSyncStatus('pending','🗄 テスト中：この変更は保存されていません');
+  if(_sbSaveWarned)return;_sbSaveWarned=true;
+  alert('このパソコンは、新データベースを「表示のテスト」で開いています。\n\n今はまだ、変更は保存されません（画面を読み込み直すと元に戻ります）。\n実際の入力は、Googleのデータで開いて行ってください。\n\n（⚙ 設定 →「🗄 新データベース」→「Googleのデータで開く」）');
+}
+// 起動時：ログインしていなければログイン画面を出し、役割のある有効なアカウントでログインするまで待つ
+async function sbEnsureLogin(){
+  const gate=document.getElementById('sbGate'),msg=document.getElementById('sbGateMsg');
+  const check=async()=>{
+    const sb=await sbClient();
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)return false;
+    const {data:p,error}=await sb.from('profiles').select('display_name,role,active,roles(label)').eq('user_id',session.user.id).maybeSingle();
+    if(error)throw error;
+    if(!p||!p.active){
+      await sb.auth.signOut();
+      throw new Error(p?'このアカウントは停止されています。管理者に連絡してください。':'このアカウントには役割が設定されていません。管理者に連絡してください。');
+    }
+    _sbProfile=p;_sbEmail=session.user.email||'';
+    return true;
+  };
+  try{if(await check())return true;}catch(e){msg.textContent='❌ '+sbErrJa(e);}
+  document.getElementById('loadOvl').classList.add('hid');
+  gate.classList.remove('hid');
+  setTimeout(()=>document.getElementById('sbGateEmail').focus(),50);
+  return new Promise(resolve=>{
+    window.sbGateLogin=async()=>{
+      const email=(document.getElementById('sbGateEmail').value||'').trim(),pass=document.getElementById('sbGatePass').value||'';
+      if(!email||!pass){msg.textContent='メールアドレスとパスワードを入力してください';return;}
+      msg.textContent='ログイン中…';
+      try{
+        const sb=await sbClient();
+        const {error}=await sb.auth.signInWithPassword({email,password:pass});
+        if(error)throw error;
+        document.getElementById('sbGatePass').value='';
+        if(await check()){msg.textContent='';gate.classList.add('hid');document.getElementById('loadOvl').classList.remove('hid');resolve(true);}
+      }catch(e){msg.textContent='❌ '+sbErrJa(e);}
+    };
+  });
+}
+let _sbEmail='';
+// 画面上部に、ログイン中の人と役割を出す
+function sbShowUserBadge(){
+  const el=document.getElementById('sbUserBadge');if(!el||!_sbProfile)return;
+  el.innerHTML=`👤 ${esc(_sbProfile.display_name)}（${esc(_sbProfile.roles?_sbProfile.roles.label:_sbProfile.role)}）`;
+  el.title=`${_sbEmail}\nクリックでログアウト`;
+  el.classList.remove('hid');
+}
+async function sbHeaderLogout(){
+  if(!confirm('ログアウトしますか？'))return;
+  try{const sb=await sbClient();await sb.auth.signOut();}catch(e){}
+  location.reload();
+}
+// このパソコンで開くデータを切り替える
+function sbSwitchMode(toSupabase){
+  if(toSupabase&&!confirm('このパソコンで、新データベースのデータを「表示のテスト」で開きます。\n\nテスト中は、変更しても保存されません。\n（元に戻すときは、⚙ 設定 →「🗄 新データベース」→「Googleのデータで開く」）\n\n切り替えますか？'))return;
+  location.href=location.pathname+(toSupabase?'?db=supabase':'?db=google');
 }
 function renderSLists(){
   document.getElementById('driverList').innerHTML=!(db.drivers||[]).length?
@@ -8616,9 +8764,14 @@ function openSignage(){window.open(location.pathname+'?signage=1','_blank');}
 window.addEventListener('DOMContentLoaded',async()=>{
   if(SIGNAGE){initSignage();return;} // サイネージ画面は表示専用（データの書き込みをしない）
   document.getElementById('loadOvl').classList.remove('hid');
+  if(SB_MODE){
+    document.getElementById('loadMsg').textContent='新データベースからデータを読み込み中...';
+    await sbEnsureLogin();
+    sbShowUserBadge();
+  }
   await Promise.all([loadDB(),loadHolidays()]);
   for(const rs of db.regulars)genRegDisps(rs);
-  if(syncContainers())save();
+  if(syncContainers()&&!SB_MODE)save();
   document.getElementById('dCust').addEventListener('change',refreshConTargets);
   document.getElementById('loadOvl').classList.add('hid');
   setView('week');
