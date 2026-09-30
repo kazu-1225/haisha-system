@@ -773,6 +773,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
     <span id="syncTxt">未設定</span>
   </div>
   <button class="hbtn hid" id="sbUserBadge" onclick="sbHeaderLogout()"></button>
+  <button class="hbtn hid" id="fbBtn" style="background:#0e7490" onclick="openFeedback()" title="使いにくいところ・直してほしいところを送る">💬 要望・不具合<span id="fbNew" style="display:none;background:#dc2626;border-radius:9px;padding:0 6px;margin-left:4px"></span></button>
   <button class="hbtn" style="background:#2563eb;font-size:12px;padding:6px 12px;" onclick="manualSync()">☁️ 今すぐ同期</button>
   <button class="hbtn" onclick="exportCSV()">📊 CSV</button>
   <button class="hbtn" onclick="exportJSON()">💾 バックアップ</button>
@@ -2310,6 +2311,27 @@ function checkContainerAlerts() {
 </div>
 
 <!-- ===== MODAL: 印刷確認（担当者選択） ===== -->
+<!-- 要望・不具合 -->
+<div class="ovl hid" id="mFeedback">
+  <div class="mbox lg">
+    <div class="mhdr"><h2>💬 要望・不具合を送る</h2><span class="mcls" onclick="closeM('mFeedback')">×</span></div>
+    <div class="mbdy">
+      <div style="font-size:12px;color:#475569;margin-bottom:10px;line-height:1.7">使いにくいところ、直してほしいところ、分からないところを、気軽に送ってください。<br>管理者が確認して、対応した内容をここに返事します。</div>
+      <div class="fr"><label>種類</label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-weight:400;margin:0;cursor:pointer"><input type="radio" name="fbKind" value="request" checked style="width:auto;margin:0"> 💡 要望（こうしてほしい）</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-weight:400;margin:0;cursor:pointer"><input type="radio" name="fbKind" value="bug" style="width:auto;margin:0"> 🐞 不具合（おかしい動き）</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-weight:400;margin:0;cursor:pointer"><input type="radio" name="fbKind" value="question" style="width:auto;margin:0"> ❓ 質問</label>
+        </div></div>
+      <div class="fr"><label>内容</label><textarea id="fbBody" rows="4" placeholder="例：週表示で、持込みの時間がもっと大きく見えるとよい"></textarea></div>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">送った画面：<span id="fbScreen"></span>（自動で記録します）</div>
+      <button class="btn btn-p" onclick="sendFeedback()">送る</button>
+      <div style="font-size:13px;font-weight:700;color:#334155;margin:18px 0 6px" id="fbListTitle">これまでに送ったもの</div>
+      <div id="fbList" style="font-size:12px"></div>
+    </div>
+  </div>
+</div>
+
 <div class="ovl hid" id="mPrintConfirm">
   <div class="mbox" style="max-width:420px">
     <div class="mhdr" style="background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%)">
@@ -5955,6 +5977,8 @@ function sbShowUserBadge(){
   el.innerHTML=`👤 ${esc(_sbProfile.display_name)}（${esc(_sbProfile.roles?_sbProfile.roles.label:_sbProfile.role)}）`;
   el.title=`${_sbEmail}\nクリックでログアウト`;
   el.classList.remove('hid');
+  document.getElementById('fbBtn').classList.remove('hid');
+  fbRefreshCount();setInterval(fbRefreshCount,5*60*1000);
 }
 async function sbHeaderLogout(){
   if(!confirm('ログアウトしますか？'))return;
@@ -6107,6 +6131,75 @@ function permCheckSaveDispatch(driver,vehicle,dispatchDate){
   const moved=(dp.driver||null)!==(driver||null)||(dp.vehicle||null)!==(vehicle||null)||(dp.driver&&(dp.dispatchDate||null)!==(dispatchDate||null));
   if(moved&&!canDo('dispatch_assign')){permAlert('dispatch_assign');return false;}
   return true;
+}
+
+// ----- 要望・不具合（ログイン中の人なら誰でも送れる。管理者は全部を見て、対応状況と返事を記入する） -----
+const FB_KIND={request:'💡 要望',bug:'🐞 不具合',question:'❓ 質問'};
+const FB_STATUS={new:'🆕 未確認',doing:'🔧 対応中',done:'✅ 対応済み',wontfix:'⏸ 見送り'};
+// 今どの画面を見ているか（送った内容と一緒に記録する）
+function fbScreenName(){
+  const main=(document.querySelector('.mnav-btn.on')||{}).textContent||'';
+  const view={day:'日',week:'週',month:'月'}[ST.view]||ST.view||'';
+  const res=ST.res==='vehicle'?'車両':'ドライバー';
+  const modal=[...document.querySelectorAll('.ovl:not(.hid) .mhdr h2')].map(h=>h.textContent.trim()).filter(t=>!t.includes('要望'));
+  return [main.trim(),main.includes('配車')?`${view}表示・${res}`:'',...modal].filter(Boolean).join(' ＞ ');
+}
+function openFeedback(){
+  document.getElementById('fbScreen').textContent=fbScreenName()||'—';
+  document.getElementById('fbBody').value='';
+  document.querySelector('input[name="fbKind"][value="request"]').checked=true;
+  openM('mFeedback');
+  fbRenderList();
+}
+async function sendFeedback(){
+  const body=document.getElementById('fbBody').value.trim();
+  if(!body){alert('内容を入力してください');return;}
+  const kind=(document.querySelector('input[name="fbKind"]:checked')||{}).value||'request';
+  try{
+    const sb=await sbClient();
+    const {error}=await sb.from('feedback').insert({user_id:_sbUid,user_name:_sbProfile?_sbProfile.display_name:'',kind,screen:document.getElementById('fbScreen').textContent,body});
+    if(error)throw error;
+    document.getElementById('fbBody').value='';
+    alert('✅ 送りました。ありがとうございます。\n管理者が確認して、この画面に返事をします。');
+    fbRenderList();
+  }catch(e){alert('❌ 送れませんでした：'+sbErrJa(e));}
+}
+async function fbRenderList(){
+  const el=document.getElementById('fbList'),isAdmin=_sbProfile&&_sbProfile.role==='admin';
+  document.getElementById('fbListTitle').textContent=isAdmin?'届いた要望・不具合（全員分）':'これまでに送ったもの';
+  el.textContent='読み込み中…';
+  try{
+    const sb=await sbClient();
+    const {data,error}=await sb.from('feedback').select('*').order('created_at',{ascending:false}).limit(200);
+    if(error)throw error;
+    if(!data.length){el.innerHTML='<div style="color:#94a3b8">まだありません</div>';fbUpdateBadge(0);return;}
+    const f=t=>{const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+    el.innerHTML=data.map(x=>`<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:8px;${x.status==='new'?'background:#fffbeb;border-color:#fcd34d':''}">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11px;color:#64748b">
+        <b style="color:#334155">${FB_KIND[x.kind]||x.kind}</b><span>${f(x.created_at)}</span>${isAdmin?`<span>👤 ${esc(x.user_name||'')}</span>`:''}<span>📍 ${esc(x.screen||'')}</span>
+        <span style="margin-left:auto">${isAdmin?`<select onchange="fbSetStatus(${x.id},this.value)">${Object.entries(FB_STATUS).map(([k,v])=>`<option value="${k}"${k===x.status?' selected':''}>${v}</option>`).join('')}</select>`:`<b>${FB_STATUS[x.status]||x.status}</b>`}</span>
+      </div>
+      <div style="white-space:pre-wrap;margin-top:4px;color:#1e293b">${esc(x.body)}</div>
+      ${isAdmin?`<div style="display:flex;gap:6px;margin-top:6px"><input type="text" id="fbReply_${x.id}" value="${esc(x.reply||'')}" placeholder="返事・対応内容（送った人に見えます）" style="flex:1"><button class="btn btn-s" style="padding:3px 10px;font-size:11px" onclick="fbSaveReply(${x.id})">返事を保存</button></div>`
+        :x.reply?`<div style="margin-top:6px;background:#eff6ff;border-radius:6px;padding:5px 8px;color:#1e40af">💬 ${esc(x.reply)}</div>`:''}
+    </div>`).join('');
+    if(isAdmin)fbUpdateBadge(data.filter(x=>x.status==='new').length);
+  }catch(e){el.innerHTML='❌ 読み込めませんでした：'+esc(sbErrJa(e));}
+}
+async function fbSetStatus(id,status){
+  try{const sb=await sbClient();const {error}=await sb.from('feedback').update({status}).eq('id',id);if(error)throw error;fbRenderList();}
+  catch(e){alert('❌ 変えられませんでした：'+sbErrJa(e));}
+}
+async function fbSaveReply(id){
+  const reply=(document.getElementById('fbReply_'+id).value||'').trim();
+  try{const sb=await sbClient();const {error}=await sb.from('feedback').update({reply}).eq('id',id);if(error)throw error;alert('✅ 返事を保存しました');}
+  catch(e){alert('❌ 保存できませんでした：'+sbErrJa(e));}
+}
+// 管理者には、まだ確認していない件数をボタンに出す
+function fbUpdateBadge(n){const b=document.getElementById('fbNew');if(!b)return;b.textContent=n;b.style.display=n?'inline':'none';}
+async function fbRefreshCount(){
+  if(!_sbProfile||_sbProfile.role!=='admin')return;
+  try{const sb=await sbClient();const {count,error}=await sb.from('feedback').select('id',{count:'exact',head:true}).eq('status','new');if(!error)fbUpdateBadge(count||0);}catch(e){}
 }
 
 // ----- 自分のパスワードを変える（ログイン中の人なら誰でも） -----
