@@ -4874,7 +4874,8 @@ function printWorkOrder(id,mode){
   <div class="sec-hdr">📝 作業内容・備考</div>
   <div class="sec-body"><div class="notes-box">${dp.notes||'（記載なし）'}</div></div>
 </div>`;
-    const cautionSec=(!isCustomer&&dp.caution)?`<div class="section" style="border:2px solid #f59e0b;border-radius:5px">
+    // お客様控えには注意事項を出さないが、複写用紙で1枚目と書き込む位置がそろうよう、同じ高さの空白を残す
+    const cautionSec=dp.caution?`<div class="section" style="border:2px solid #f59e0b;border-radius:5px${isCustomer?';visibility:hidden':''}">
   <div class="sec-hdr" style="background:#fef3c7;color:#78350f;font-weight:800;font-size:10px;border-bottom:2px solid #f59e0b;padding:4px 10px">⚠ 注意事項</div>
   <div class="sec-body"><div class="notes-box warn">${dp.caution}</div></div>
 </div>`:'';
@@ -4917,10 +4918,14 @@ function printWorkOrder(id,mode){
     <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:.04em;margin-bottom:4px">外部の搬入先名：</div>
   </div>
 </div>`;
-    const signSec=`<div class="sign-row">
-  <div class="sign-box"><div class="sign-label">${isCustomer?'受取確認':copyType==='office'?'確認（事務所）':'確認（管理者）'}</div></div>
+    // サイン欄：収集用は右に「お客様サイン」、お客様控えは左に「ドライバーサイン」
+    // （複写用紙で重ねたとき、片方のサインがもう片方の欄に写らないよう、左右に分ける）
+    const signSec=copyType==='office'?`<div class="sign-row">
+  <div class="sign-box"><div class="sign-label">確認（事務所）</div></div>
   <div class="sign-box"><div class="sign-label">ドライバー確認</div></div>
-  <div class="sign-box"><div class="sign-label">${isCustomer?'担当者サイン':'完了確認'}</div></div>
+  <div class="sign-box"><div class="sign-label">完了確認</div></div>
+</div>`:`<div class="sign-row two">
+  ${isCustomer?'<div class="sign-box"><div class="sign-label">ドライバーサイン</div></div><div></div>':'<div></div><div class="sign-box"><div class="sign-label">お客様サイン</div></div>'}
 </div>`;
     // 作業条件を個別カラムで表示（条件2・3はチェックあり時のみ）
     const cond1Col=dp.timeSpec&&dp.timeSpec.enabled
@@ -4943,7 +4948,7 @@ function printWorkOrder(id,mode){
     ?`<div class="meta-item"><span class="meta-val" style="font-size:13px;font-weight:800;color:#15803d">♻ 一般廃・資源物</span></div>`
     :`<div class="meta-item"><span class="meta-label">📋 マニフェスト:</span><span class="meta-val" style="font-size:13px;font-weight:800;color:#1e293b">${mfstLabel(dp.manifest)}</span></div>`}
   <div class="meta-item"><span class="meta-label">種別:</span><span class="meta-val">${typeStr}</span></div>
-  ${dp.receptionist&&!isCustomer?`<div class="meta-item"><span class="meta-label">受付担当:</span><span class="meta-val">${dp.receptionist}</span></div>`:''}
+  ${dp.receptionist?`<div class="meta-item"${isCustomer?' style="visibility:hidden"':''}><span class="meta-label">受付担当:</span><span class="meta-val">${dp.receptionist}</span></div>`:''}
 </div>`;
     const footerLabel=isCustomer?'【お客様控え】':copyType==='office'?'【事務所控え】':'【収集用】';
     const wrapId=copyType==='collect'?'wrap1':copyType==='customer'?'wrap2':'wrap3';
@@ -5016,6 +5021,7 @@ body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:11px;color:#1e293b}
 .notes-box{background:#fafaf8;border:1px solid #e2e8f0;border-radius:4px;padding:5px 8px;font-size:10px;line-height:1.6;min-height:32px;white-space:pre-wrap;color:#334155}
 .notes-box.warn{background:#fff8e1;border:1px solid #f59e0b;border-left:4px solid #d97706;color:#1c1917;font-weight:700;font-size:11px;line-height:1.7}
 .sign-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:7px}
+.sign-row.two{grid-template-columns:1fr 1fr;gap:24px}
 .sign-box{border:1px solid #e2e8f0;border-radius:4px;padding:4px 8px;text-align:center;min-height:72px}
 .sign-label{font-size:8px;color:#94a3b8;font-weight:700;margin-bottom:3px}
 .footer{margin-top:5px;border-top:1px solid #f1f5f9;padding-top:3px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between}
