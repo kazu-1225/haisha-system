@@ -1404,8 +1404,33 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
       <div class="stab" data-st="staff" onclick="stab('staff')">🧑‍💼 スタッフ</div>
       <div class="stab" data-st="data" data-perm="admin" onclick="stab('data')">💾 データ</div>
       <div class="stab" data-st="supabase" onclick="stab('supabase')">🗄 新データベース</div>
+      <div class="stab" data-st="users" data-perm="user_admin" onclick="stab('users')">👥 ユーザー管理</div>
     </div>
     <div class="mbdy">
+
+      <!-- ユーザー管理（管理者のみ） -->
+      <div class="spane" id="sp-users">
+        <div id="uaGate" style="font-size:13px;color:#475569;padding:10px 0"></div>
+        <div id="uaBody" class="hid">
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:13px;margin-bottom:16px">
+            <div style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:10px">➕ 社員のアカウントを作る</div>
+            <div class="r2">
+              <div class="fr"><label>表示名（画面に出る名前）</label><input type="text" id="uaName" placeholder="例：山田"></div>
+              <div class="fr"><label>役割</label><select id="uaRole"></select></div>
+              <div class="fr"><label>メールアドレス（ログインに使う）</label><input type="email" id="uaEmail" autocomplete="off"></div>
+              <div class="fr"><label>最初のパスワード（8文字以上）</label>
+                <div style="display:flex;gap:6px"><input type="text" id="uaPass" autocomplete="off" style="flex:1"><button class="btn btn-s" onclick="document.getElementById('uaPass').value=uaGenPass()">自動で作る</button></div></div>
+            </div>
+            <button class="btn btn-g" onclick="uaCreate()">アカウントを作る</button>
+            <span style="font-size:11px;color:#64748b;margin-left:8px">作ったあと、メールアドレスと最初のパスワードを本人に伝えてください（本人がログイン後に変更できます）</span>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px">👥 アカウントの一覧 <button class="btn btn-s" style="margin-left:8px;padding:3px 10px;font-size:11px" onclick="uaRender()">↻ 最新にする</button></div>
+          <div id="uaList" style="font-size:12px;margin-bottom:20px"></div>
+          <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:4px">🔐 権限表（役割ごとにできること）</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.6">○＝できる　△＝条件付きでできる　✕＝できない。選ぶとすぐに保存されます。<br>変更は、それぞれの人が画面を開き直したときから反映されます。</div>
+          <div id="uaPerm" style="font-size:12px;overflow-x:auto"></div>
+        </div>
+      </div>
 
       <!-- 新データベース（Supabase）への移行 -->
       <div class="spane" id="sp-supabase">
@@ -1426,6 +1451,14 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
             <button class="btn btn-s" style="margin-left:10px" onclick="sbLogout()">ログアウト</button>
           </div>
           <div id="sbAuthMsg" style="font-size:12px;margin-top:8px"></div>
+          <div id="sbPwBox" class="hid" style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:10px">
+            <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px">🔑 自分のパスワードを変える</div>
+            <div class="r2">
+              <div class="fr"><label>新しいパスワード（8文字以上）</label><input type="password" id="sbNewPw1" autocomplete="new-password"></div>
+              <div class="fr"><label>もう一度</label><input type="password" id="sbNewPw2" autocomplete="new-password"></div>
+            </div>
+            <button class="btn btn-s" onclick="sbChangePw()">パスワードを変える</button>
+          </div>
         </div>
         <div id="sbMigBox" class="hid" style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:13px">
           <div style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:6px">📤 今のデータを新データベースへ写す（管理者のみ）</div>
@@ -5483,6 +5516,7 @@ function stab(name){
   document.querySelectorAll('.spane').forEach(p=>p.classList.remove('on'));
   document.getElementById(`sp-${name}`).classList.add('on');
   if(name==='supabase')sbRefreshUser();
+  if(name==='users')uaRender();
 }
 
 // ===== 新データベース（Supabase）：ログインと、今のデータの移し替え =====
@@ -5516,6 +5550,7 @@ async function sbRefreshUser(){
     const sb=await sbClient();
     const {data:{session}}=await sb.auth.getSession();
     _sbProfile=null;
+    document.getElementById('sbPwBox').classList.toggle('hid',!session);
     if(!session){loginBox.classList.remove('hid');userBox.classList.add('hid');migBox.classList.add('hid');return;}
     const {data:p,error}=await sb.from('profiles').select('display_name,role,active,roles(label)').eq('user_id',session.user.id).maybeSingle();
     if(error)throw error;
@@ -6061,6 +6096,167 @@ function permCheckSaveDispatch(driver,vehicle,dispatchDate){
   const moved=(dp.driver||null)!==(driver||null)||(dp.vehicle||null)!==(vehicle||null)||(dp.driver&&(dp.dispatchDate||null)!==(dispatchDate||null));
   if(moved&&!canDo('dispatch_assign')){permAlert('dispatch_assign');return false;}
   return true;
+}
+
+// ----- 自分のパスワードを変える（ログイン中の人なら誰でも） -----
+async function sbChangePw(){
+  const a=document.getElementById('sbNewPw1').value,b=document.getElementById('sbNewPw2').value;
+  if(a.length<8){alert('パスワードは8文字以上にしてください');return;}
+  if(a!==b){alert('2つのパスワードが一致しません');return;}
+  try{
+    const sb=await sbClient();
+    const {error}=await sb.auth.updateUser({password:a});
+    if(error)throw error;
+    document.getElementById('sbNewPw1').value='';document.getElementById('sbNewPw2').value='';
+    alert('✅ パスワードを変えました。次のログインから新しいパスワードを使ってください。');
+  }catch(e){
+    const m=sbErrJa(e);
+    alert('❌ 変えられませんでした：'+(/different from the old/i.test(m)?'今と同じパスワードは使えません':/weak|short/i.test(m)?'もっと長く・複雑なパスワードにしてください':m));
+  }
+}
+
+// ----- ユーザー管理（管理者のみ）：アカウントの作成・役割・停止、権限表 -----
+// アカウントの作成・停止・パスワード再設定は Supabase 側のプログラム（admin-users）で行う（親鍵が必要なため）
+// 役割・表示名・権限表の変更は、データベースの決まり（管理者だけ変更できる）のもとで直接行う
+const UA_PARTIAL=new Set(['dispatch_assign','dispatch_edit','dispatch_delete','master_customer','master_site']); // △が意味を持つ操作
+let _uaRoles=[];
+async function uaCall(action,payload){
+  const sb=await sbClient();
+  const {data,error}=await sb.functions.invoke('admin-users',{body:{action,...(payload||{})}});
+  if(error){
+    let msg=error.message||String(error);
+    try{const j=await error.context.json();if(j&&j.error)msg=j.error;}catch(e){}
+    if(/Failed to send|not found|404|NetworkError|Failed to fetch/i.test(msg))msg='ユーザー管理のプログラム（admin-users）に接続できません。Supabaseに登録されているか確認してください。';
+    throw new Error(msg);
+  }
+  if(data&&data.error)throw new Error(data.error);
+  return data;
+}
+function uaGenPass(){
+  const cs='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const a=new Uint32Array(10);crypto.getRandomValues(a);
+  return Array.from(a,n=>cs[n%cs.length]).join('');
+}
+const uaFmt=t=>{if(!t)return '（まだ）';const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+async function uaRender(){
+  const gate=document.getElementById('uaGate'),body=document.getElementById('uaBody');
+  gate.textContent='読み込み中…';body.classList.add('hid');
+  try{
+    const sb=await sbClient();
+    const {data:{session}}=await sb.auth.getSession();
+    if(session&&!_sbProfile){const {data:p}=await sb.from('profiles').select('display_name,role,active,roles(label)').eq('user_id',session.user.id).maybeSingle();_sbProfile=p;}
+    if(!session||!_sbProfile||_sbProfile.role!=='admin'){
+      gate.innerHTML='この画面は<b>管理者</b>だけが使えます。<br>「🗄 新データベース」のタブで、管理者のアカウントでログインしてから開いてください。';
+      return;
+    }
+    const [roles,perms,rps,list]=await Promise.all([
+      sb.from('roles').select('code,label,sort').order('sort'),
+      sb.from('permissions').select('code,label,category,sort,note').order('sort'),
+      sb.from('role_permissions').select('role,perm,level'),
+      uaCall('list')]);
+    for(const r of [roles,perms,rps])if(r.error)throw r.error;
+    _uaRoles=roles.data;
+    const roleOpts=sel=>_uaRoles.map(r=>`<option value="${r.code}"${r.code===sel?' selected':''}>${esc(r.label)}</option>`).join('');
+    document.getElementById('uaRole').innerHTML='<option value="">-- 選択 --</option>'+roleOpts('');
+    // アカウントの一覧
+    const users=list.users.slice().sort((a,b)=>(b.has_profile-a.has_profile)||(a.active===b.active?0:a.active?-1:1)||String(a.display_name).localeCompare(String(b.display_name),'ja'));
+    const th='style="padding:5px 8px;text-align:left;background:#f1f5f9;border-bottom:1px solid #e2e8f0;white-space:nowrap"',td='style="padding:5px 8px;border-bottom:1px solid #e2e8f0;vertical-align:middle"';
+    document.getElementById('uaList').innerHTML=`<table style="border-collapse:collapse;width:100%"><tr><th ${th}>表示名</th><th ${th}>メールアドレス</th><th ${th}>役割</th><th ${th}>状態</th><th ${th}>最後のログイン</th><th ${th}></th></tr>`
+      +users.map(u=>{
+        const id=esc(u.id);
+        if(!u.has_profile)return `<tr style="background:#fffbeb"><td ${td}><input type="text" id="uaAttName_${id}" placeholder="表示名" style="width:110px"></td><td ${td}>${esc(u.email||'')}</td>
+          <td ${td}><select id="uaAttRole_${id}"><option value="">-- 役割 --</option>${roleOpts('')}</select></td><td ${td} colspan="2"><span style="color:#b45309">役割が付いていません（このままでは何も見られません）</span></td>
+          <td ${td}><button class="btn btn-g" style="padding:3px 10px;font-size:11px" onclick="uaAttach('${id}')">役割を付ける</button></td></tr>`;
+        return `<tr${u.active?'':' style="background:#f8fafc;color:#94a3b8"'}>
+          <td ${td}><b>${esc(u.display_name)}</b>${u.is_me?' <span style="font-size:10px;color:#2563eb">（自分）</span>':''} <span style="cursor:pointer" title="表示名を変える" onclick="uaRename('${id}')">✏️</span></td>
+          <td ${td}>${esc(u.email||'')}</td>
+          <td ${td}><select onchange="uaSetRole('${id}',this.value)"${u.active?'':' disabled'}>${roleOpts(u.role)}</select></td>
+          <td ${td}>${u.active?'<span style="color:#15803d">有効</span>':'<span style="color:#dc2626">停止中</span>'}</td>
+          <td ${td}>${uaFmt(u.last_sign_in_at)}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;vertical-align:middle;white-space:nowrap">
+            <button class="btn btn-s" style="padding:3px 8px;font-size:11px" onclick="uaResetPw('${id}')">🔑 パスワード再設定</button>
+            ${u.is_me?'':`<button class="btn ${u.active?'btn-d':'btn-g'}" style="padding:3px 8px;font-size:11px" onclick="uaSetActive('${id}',${!u.active})">${u.active?'停止':'再開'}</button>`}
+          </td></tr>`;
+      }).join('')+'</table>';
+    // 権限表
+    const lv={};rps.data.forEach(r=>{lv[r.role+'|'+r.perm]=r.level;});
+    const sym={yes:'○',partial:'△',no:'✕'},col={yes:'#15803d',partial:'#b45309',no:'#94a3b8'};
+    document.getElementById('uaPerm').innerHTML=`<table style="border-collapse:collapse"><tr><th ${th}>できること</th>${_uaRoles.map(r=>`<th ${th}>${esc(r.label)}</th>`).join('')}</tr>`
+      +perms.data.map(p=>`<tr><td ${td}>${esc(p.label)}${p.note?`<div style="font-size:10px;color:#94a3b8">${esc(p.note)}</div>`:''}</td>`
+        +_uaRoles.map(r=>{
+          const v=lv[r.code+'|'+p.code]||'no';
+          const lock=r.code==='admin'&&p.code==='user_admin';
+          const opts=['yes',...(UA_PARTIAL.has(p.code)||v==='partial'?['partial']:[]),'no'];
+          return `<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;text-align:center"><select style="color:${col[v]};font-weight:700" ${lock?'disabled title="管理者の「ユーザー管理」は外せません"':''} onchange="uaSetPerm('${r.code}','${p.code}',this)">${opts.map(o=>`<option value="${o}"${o===v?' selected':''}>${sym[o]}</option>`).join('')}</select></td>`;
+        }).join('')+'</tr>').join('')+'</table>';
+    gate.textContent='';body.classList.remove('hid');
+  }catch(e){
+    gate.innerHTML='❌ 読み込めませんでした：'+esc(sbErrJa(e));
+  }
+}
+async function uaCreate(){
+  const name=document.getElementById('uaName').value.trim(),role=document.getElementById('uaRole').value;
+  const email=document.getElementById('uaEmail').value.trim(),pass=document.getElementById('uaPass').value;
+  if(!name||!role||!email||!pass){alert('表示名・役割・メールアドレス・最初のパスワードをすべて入力してください');return;}
+  const rl=(_uaRoles.find(r=>r.code===role)||{}).label||role;
+  if(!confirm(`次のアカウントを作ります。\n\n表示名：${name}\n役割　：${rl}\nメール：${email}\n\nよろしいですか？`))return;
+  try{
+    await uaCall('create',{display_name:name,role,email,password:pass});
+    alert(`✅ アカウントを作りました。\n\n本人に次の2つを伝えてください。\n・メールアドレス：${email}\n・最初のパスワード：${pass}\n\n（ログインしたあと「🗄 新データベース」のタブで、自分のパスワードに変えられます）`);
+    ['uaName','uaEmail','uaPass'].forEach(id=>document.getElementById(id).value='');document.getElementById('uaRole').value='';
+    uaRender();
+  }catch(e){alert('❌ 作れませんでした：'+e.message);}
+}
+async function uaAttach(id){
+  const name=(document.getElementById('uaAttName_'+id).value||'').trim(),role=document.getElementById('uaAttRole_'+id).value;
+  if(!name||!role){alert('表示名と役割を入力してください');return;}
+  try{await uaCall('attach',{user_id:id,display_name:name,role});uaRender();}
+  catch(e){alert('❌ '+e.message);}
+}
+async function uaSetRole(id,role){
+  const rl=(_uaRoles.find(r=>r.code===role)||{}).label||role;
+  if(!confirm(`役割を「${rl}」に変えますか？\n（本人が画面を開き直したときから反映されます）`)){uaRender();return;}
+  try{
+    const sb=await sbClient();
+    const {error}=await sb.from('profiles').update({role}).eq('user_id',id);
+    if(error)throw error;
+  }catch(e){alert('❌ 変えられませんでした：'+sbErrJa(e));}
+  uaRender();
+}
+async function uaRename(id){
+  const name=prompt('新しい表示名を入力してください');
+  if(name===null||!name.trim())return;
+  try{
+    const sb=await sbClient();
+    const {error}=await sb.from('profiles').update({display_name:name.trim()}).eq('user_id',id);
+    if(error)throw error;
+  }catch(e){alert('❌ 変えられませんでした：'+sbErrJa(e));}
+  uaRender();
+}
+async function uaResetPw(id){
+  const pass=prompt('新しいパスワードを入力してください（8文字以上）\n空のままOKを押すと、自動で作ります。','');
+  if(pass===null)return;
+  const pw=pass.trim()||uaGenPass();
+  if(pw.length<8){alert('パスワードは8文字以上にしてください');return;}
+  try{
+    await uaCall('reset_password',{user_id:id,password:pw});
+    alert(`✅ パスワードを再設定しました。\n\n新しいパスワード：${pw}\n\n本人に伝えてください（ログインしたあと、自分のパスワードに変えられます）。`);
+  }catch(e){alert('❌ 再設定できませんでした：'+e.message);}
+}
+async function uaSetActive(id,active){
+  if(!confirm(active?'このアカウントを再開しますか？（またログインできるようになります）':'このアカウントを停止しますか？\n\n停止すると、ログインできなくなります（退職・休職のとき）。\nあとで「再開」で元に戻せます。'))return;
+  try{await uaCall('set_active',{user_id:id,active});}
+  catch(e){alert('❌ '+e.message);}
+  uaRender();
+}
+async function uaSetPerm(role,perm,sel){
+  const level=sel.value;
+  try{
+    const sb=await sbClient();
+    const {error}=await sb.from('role_permissions').update({level}).eq('role',role).eq('perm',perm);
+    if(error)throw error;
+    sel.style.color={yes:'#15803d',partial:'#b45309',no:'#94a3b8'}[level];
+  }catch(e){alert('❌ 変えられませんでした：'+sbErrJa(e));uaRender();}
 }
 
 // このパソコンで開くデータを切り替える
