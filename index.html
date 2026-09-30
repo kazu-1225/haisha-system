@@ -1544,7 +1544,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
 // =====================================================
 
 const SHEET_NAME = 'DB_JSON';
-const CODE_VERSION = 2;
+const CODE_VERSION = 3;
 // 合言葉（配車システムの「📋 コードをコピー」で自動的に書き換わります。手で変更しないでください）
 const API_KEY = '__API_KEY__';
 const BACKUP_FOLDER = '配車管理バックアップ';
@@ -1585,7 +1585,8 @@ function doGet(e) {
     if (action === 'rev') return respond({ ok: true, rev: _getRev() });
     // データ保護の状態（設定画面の表示用）
     if (action === 'status') return respond(_status());
-    const data = readData();
+    // 配車画面への読み込みは、いつもスプレッドシートから（新データベースへの切り替え後は「見るだけ」の古いデータ）
+    const data = readSheetData();
     data._rev = _getRev();
     return respond(data);
   } catch(err) {
@@ -1671,6 +1672,9 @@ function _status() {
     rev: _getRev(),
     lastBackup: p.getProperty('LAST_BACKUP') || '',
     lastArchive: p.getProperty('LAST_ARCHIVE') || '',
+    source: p.getProperty('SB_EXPORT_URL') ? 'supabase' : 'sheet',
+    sbLastOk: p.getProperty('SB_LAST_OK') || '',
+    sbLastError: p.getProperty('SB_LAST_ERROR') || '',
     triggers: {
       backup: fns.indexOf('dailyBackup') !== -1,
       archive: fns.indexOf('archiveConfirmedDispatches') !== -1,
@@ -1685,7 +1689,33 @@ function respond(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// =====================================================
+// 🗄 新データベース（Supabase）からの読み込み
+// スクリプト プロパティに SB_EXPORT_URL と SB_EXPORT_TOKEN を設定すると、
+// 毎日のバックアップ・実績ログ・コンテナの期限メールが、新データベースの内容を使うようになる
+// （設定しなければ、これまでどおりスプレッドシートの内容を使う）
+// =====================================================
+function _sbExport() {
+  const p = PropertiesService.getScriptProperties();
+  const url = p.getProperty('SB_EXPORT_URL'), token = p.getProperty('SB_EXPORT_TOKEN');
+  if (!url || !token) return null;
+  const res = UrlFetchApp.fetch(url, { method: 'post', headers: { 'x-backup-token': token }, muteHttpExceptions: true });
+  const code = res.getResponseCode();
+  if (code !== 200) {
+    p.setProperty('SB_LAST_ERROR', new Date().toISOString() + ' ' + code + ' ' + res.getContentText().slice(0, 200));
+    throw new Error('新データベースから読み込めませんでした（' + code + '）');
+  }
+  p.setProperty('SB_LAST_OK', new Date().toISOString());
+  return JSON.parse(res.getContentText());
+}
+
 function readData() {
+  const fromSb = _sbExport();
+  if (fromSb) return fromSb;
+  return readSheetData();
+}
+
+function readSheetData() {
   const sheet = getSheet(SHEET_NAME);
   const lastRow = sheet.getLastRow();
   if (lastRow === 0) return { drivers: [], vehicles: [], customers: [], regulars: [], dispatches: [] };
@@ -3253,7 +3283,11 @@ async function checkProtection(){
       row(s.keyEnabled&&!!urlKey(GAS_URL),'合言葉によるアクセス制限',s.keyEnabled?(urlKey(GAS_URL)?'有効':'このパソコンのURLに合言葉がありません'):'未設定（手順3でコードをコピーし直してください）')
       +row(t.backup&&!!s.lastBackup,'毎日の自動バックアップ',t.backup?(s.lastBackup?'最終: '+fmtT(s.lastBackup):'まだ実行されていません'):'タイマー未設定（手順6）')
       +row(t.archive,'実績ログの自動記録',t.archive?(s.lastArchive?'最終: '+fmtT(s.lastArchive):'まだ実行されていません'):'タイマー未設定（手順6）')
-      +row(true,'同時編集の上書き防止','有効（更新番号 '+s.rev+'）');
+      +row(true,'同時編集の上書き防止','有効（更新番号 '+s.rev+'）')
+      +(s.codeVersion>=3
+        ?row(s.source!=='supabase'||(!!s.sbLastOk&&!(s.sbLastError&&s.sbLastError>s.sbLastOk)),'バックアップ・実績ログの読み込み元',
+          s.source==='supabase'?('🗄 新データベース'+(s.sbLastOk?'（最終: '+fmtT(s.sbLastOk)+'）':'（まだ読み込んでいません）')+(s.sbLastError&&s.sbLastError>s.sbLastOk?'　⚠ 前回失敗: '+esc(s.sbLastError.slice(25,80)):'')):'スプレッドシート（新データベースへの切り替え前）')
+        :row(false,'新データベースからのバックアップ','Apps Scriptのコードを更新してください（手順3・4）'));
   }catch(e){
     el.innerHTML=row(false,'状態を取得できませんでした',esc(gasErrMsg(e)));
   }
