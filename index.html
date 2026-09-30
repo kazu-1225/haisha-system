@@ -1471,7 +1471,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
           <button class="btn btn-p" onclick="sbMigrate(true)">📤 新データベースへ写す</button>
           <div id="sbMigResult" style="margin-top:12px;font-size:12px"></div>
         </div>
-        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:13px;margin-top:16px">
+        <div id="sbTryBox" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:13px;margin-top:16px">
           <div style="font-size:13px;font-weight:700;color:#b45309;margin-bottom:6px">🧪 このパソコンで新データベースを試す</div>
           <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.6">
             新データベースのデータで配車表を開きます（ログインが必要です）。<b>入力・保存のテスト</b>ができますが、Googleのデータ（本番）には反映されません。上の「写す」をもう一度行うと、テストの入力は消えて本番と同じ内容に戻ります。<br>
@@ -2949,16 +2949,30 @@ const DEMO_DB={
 // ================================================================
 let GAS_URL=localStorage.getItem('gasUrl')||'';
 let db=null;
+// ★ 切り替え済みか（切り替えの日に true にする）
+//   false：Googleのデータが本番。新データベースは、パソコンごとに「試す」ときだけ使う
+//   true ：新データベースが本番。全部のパソコンが新データベースで開く。Googleのデータは「見るだけ」の古いデータ
+const SB_CUTOVER=false;
+const SB_CUTOVER_DATE='2026年10月9日';
 // このパソコンで新データベース（Supabase）を使うか。URLの ?db=supabase / ?db=google で切り替え、パソコンごとに覚える
+// （切り替え前に「試す」を選んだ印は 'supabase'、切り替え後に「古いデータを見る」を選んだ印は 'google-ro'）
 const SB_MODE=(()=>{
   const q=new URLSearchParams(location.search).get('db');
   try{
-    if(q==='supabase')localStorage.setItem('dbMode','supabase');
-    if(q==='google')localStorage.removeItem('dbMode');
+    if(SB_CUTOVER){
+      if(q==='google')localStorage.setItem('dbMode','google-ro');
+      if(q==='supabase')localStorage.removeItem('dbMode');
+    }else{
+      if(q==='supabase')localStorage.setItem('dbMode','supabase');
+      if(q==='google')localStorage.removeItem('dbMode');
+    }
     if(q){const u=new URL(location.href);u.searchParams.delete('db');history.replaceState(null,'',u.toString());}
-    return localStorage.getItem('dbMode')==='supabase';
-  }catch(e){return false;}
+    const m=localStorage.getItem('dbMode');
+    return SB_CUTOVER?m!=='google-ro':m==='supabase';
+  }catch(e){return SB_CUTOVER;}
 })();
+// 切り替え後に、Googleの古いデータを開いているか（見るだけ）
+const G_READONLY=SB_CUTOVER&&!SB_MODE;
 // サーバー（GAS）の更新番号。保存時に送り、他のパソコンが先に保存していたら上書きを止める
 let _serverRev=Number(localStorage.getItem('haishaRev')||0);
 function setServerRev(n){_serverRev=Number(n)||0;localStorage.setItem('haishaRev',String(_serverRev));}
@@ -3091,7 +3105,7 @@ async function loadDB(){
           db=data;normalizeDB();setServerRev(data._rev);
           localStorage.setItem('haishaDB2',JSON.stringify(db));
           _loadFailed=false;
-          setSyncStatus('ok');return;
+          setSyncStatus('ok',G_READONLY?`📦 Googleの古いデータ（${SB_CUTOVER_DATE}まで・見るだけ）`:undefined);return;
         }
         throw new Error('GASから正しい応答がありません');
       }catch(e){
@@ -3158,6 +3172,7 @@ let _autoSyncTimer=null;
 let _dirty=false; // まだサーバーに送っていない変更があるか
 async function save(){
   if(SIGNAGE)return; // サイネージ画面は表示専用（データを書き込まない）
+  if(G_READONLY){gReadOnlyNotice();return;} // 切り替え後のGoogleのデータは見るだけ
   syncContainers(); // 配車カードのコンテナ作業をコンテナ管理へ反映
   if(SB_MODE){sbScheduleFlush();return;} // 新データベース：変わった行だけを送る（Googleのデータは触らない）
   localStorage.setItem('haishaDB2',JSON.stringify(db));
@@ -3174,6 +3189,7 @@ let _syncLock=false;
 let _syncNeeded=false;
 
 async function manualSync(){
+  if(G_READONLY){await refreshFromServer();return;} // 古いGoogleのデータは送らない（読み直すだけ）
   if(SB_MODE){
     if(_dirty||_sbFlushing){clearTimeout(_sbFlushTimer);await sbFlush();}
     else await refreshFromServer();
@@ -5611,7 +5627,13 @@ function sbErrJa(e){
 }
 async function sbRefreshUser(){
   const loginBox=document.getElementById('sbLoginBox'),userBox=document.getElementById('sbUserBox'),migBox=document.getElementById('sbMigBox');
-  document.getElementById('sbModeNow').innerHTML=SB_MODE
+  if(SB_CUTOVER){
+    // 切り替え後：古いGoogleのデータを「見るだけ」で開く／新データベースに戻る
+    document.getElementById('sbTryBox').innerHTML=`<div style="font-size:13px;font-weight:700;color:#475569;margin-bottom:6px">📦 Googleの古いデータを見る</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.6">新データベースに切り替える前（${SB_CUTOVER_DATE}まで）のGoogleのデータを、<b>見るだけ</b>で開きます。変更はできません。</div>
+      <div style="font-size:12px;margin-bottom:8px">いまこのパソコンは ${SB_MODE?'<b style="color:#15803d">🗄 新データベース</b>':'<b style="color:#475569">📦 Googleの古いデータ（見るだけ）</b>'} で開いています</div>
+      ${SB_MODE?'<button class="btn btn-s" onclick="sbSwitchMode(false)">📦 Googleの古いデータを見る（見るだけ）</button>':'<button class="btn btn-p" onclick="sbSwitchMode(true)">🗄 新データベースに戻る</button>'}`;
+  }else document.getElementById('sbModeNow').innerHTML=SB_MODE
     ?'いまこのパソコンは <b style="color:#b45309">🧪 新データベース（テスト）</b> で開いています'
     :'いまこのパソコンは <b style="color:#15803d">🌐 Googleのデータ</b> で開いています';
   try{
@@ -5628,7 +5650,7 @@ async function sbRefreshUser(){
       ?`✅ ログイン中：<b>${esc(p.display_name)}</b>（${esc(p.roles?p.roles.label:p.role)}）　<span style="color:#94a3b8">${esc(session.user.email||'')}</span>${p.active?'':'　<b style="color:#dc2626">※停止中のアカウントです</b>'}`
       :`⚠ ログインしましたが、このアカウントには役割が設定されていません。管理者に連絡してください。　<span style="color:#94a3b8">${esc(session.user.email||'')}</span>`;
     // 写すのは「Googleのデータで開いているとき」だけ（新データベースで開いているときは、写す元がないため）
-    migBox.classList.toggle('hid',SB_MODE||!(p&&p.active&&p.role==='admin'));
+    migBox.classList.toggle('hid',SB_MODE||SB_CUTOVER||!(p&&p.active&&p.role==='admin'));
   }catch(e){sbMsg('❌ '+esc(sbErrJa(e)),'#dc2626');}
 }
 async function sbLogin(){
@@ -5715,6 +5737,8 @@ async function sbDiffTable(sb,t){
   return {cur,up,del,add,chg};
 }
 async function sbMigrate(apply){
+  // 切り替えのあとは、新データベースが本番なので、古いGoogleのデータで上書きしない
+  if(SB_CUTOVER){alert('新データベースへの切り替えが終わっているため、「写す」は使えません。\n（Googleの古いデータで、今のデータを上書きしてしまうのを防ぐため）');return;}
   const out=document.getElementById('sbMigResult');
   if(!_sbProfile||_sbProfile.role!=='admin'){alert('管理者でログインしてください');return;}
   if(_dirty||_syncLock){alert('まだGoogleへ保存中の変更があります。画面上の同期表示が「同期済み」になってから、もう一度押してください。');return;}
@@ -5796,7 +5820,7 @@ async function sbLoadDB(){
     db=JSON.parse(JSON.stringify(DEMO_DB));db.regulars=[];db.dispatches=[];db.customers=[];db.drivers=[];db.vehicles=[];normalizeDB();
   }
 }
-const SB_TEST_TXT='🧪 新データベース（テスト中・本番には反映されません）';
+const SB_TEST_TXT=SB_CUTOVER?'同期済み':'🧪 新データベース（テスト中・本番には反映されません）';
 
 // ----- 保存：変わったカード・マスタだけを送る -----
 // _sbBase … 新データベースに今入っている内容の控え（表→ id →{sig:比較用の文字列, pos:並び順}）
@@ -5989,6 +6013,7 @@ async function sbEnsureLogin(){
   };
   try{if(await check())return true;}catch(e){msg.textContent='❌ '+sbErrJa(e);}
   document.getElementById('loadOvl').classList.add('hid');
+  if(SB_CUTOVER)document.querySelector('#sbGate .sb-gate-foot').innerHTML=`ログインできないときは、管理者に連絡してください。<br><a href="?db=google">Googleの古いデータを見る（${SB_CUTOVER_DATE}まで・見るだけ）</a>`;
   gate.classList.remove('hid');
   setTimeout(()=>document.getElementById('sbGateEmail').focus(),50);
   return new Promise(resolve=>{
@@ -6399,8 +6424,21 @@ async function uaSetPerm(role,perm,sel){
   }catch(e){alert('❌ 変えられませんでした：'+sbErrJa(e));uaRender();}
 }
 
+// 切り替え後に、Googleの古いデータを開いているときの「保存」：保存せずにお知らせし、読み込み直して元に戻す
+let _gRoWarned=false;
+function gReadOnlyNotice(){
+  if(!_gRoWarned){
+    _gRoWarned=true;
+    alert(`📦 これは、新データベースに切り替える前（${SB_CUTOVER_DATE}まで）のGoogleのデータです。見るだけで、変更は保存されません。\n\n入力するときは、⚙ 設定 →「🗄 新データベース」→「🗄 新データベースに戻る」を押してください。`);
+  }
+  refreshFromServer();
+}
 // このパソコンで開くデータを切り替える
 function sbSwitchMode(toSupabase){
+  if(SB_CUTOVER){
+    if(!toSupabase&&!confirm(`切り替える前（${SB_CUTOVER_DATE}まで）のGoogleのデータを、見るだけで開きます。\n\n変更はできません。戻るときは、⚙ 設定 →「🗄 新データベース」→「🗄 新データベースに戻る」を押してください。\n\n開きますか？`))return;
+    location.href=location.pathname+(toSupabase?'?db=supabase':'?db=google');return;
+  }
   if(toSupabase&&!confirm('このパソコンで、新データベースのデータを「テスト」で開きます。\n\n入力・保存はできますが、Googleのデータ（本番）には反映されません。\nGoogleのデータから「写す」をもう一度行うと、テストで入力した内容は消えて、本番と同じ内容に戻ります。\n（元に戻すときは、⚙ 設定 →「🗄 新データベース」→「Googleのデータで開く」）\n\n切り替えますか？'))return;
   location.href=location.pathname+(toSupabase?'?db=supabase':'?db=google');
 }
@@ -9486,7 +9524,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   await Promise.all([loadDB(),loadHolidays()]);
   for(const rs of db.regulars)genRegDisps(rs);
   if(SB_MODE){if(!_loadFailed)save();} // 変わった行だけ送る（定期便の予定・コンテナ反映など）
-  else if(syncContainers())save();
+  else if(!G_READONLY&&syncContainers())save();
   document.getElementById('dCust').addEventListener('change',refreshConTargets);
   document.getElementById('loadOvl').classList.add('hid');
   setView('week');
