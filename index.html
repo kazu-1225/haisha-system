@@ -3127,6 +3127,7 @@ function normalizeDB(){
 let _autoSyncTimer=null;
 let _dirty=false; // まだサーバーに送っていない変更があるか
 async function save(){
+  if(SIGNAGE)return; // サイネージ画面は表示専用（データを書き込まない）
   syncContainers(); // 配車カードのコンテナ作業をコンテナ管理へ反映
   if(SB_MODE){sbScheduleFlush();return;} // 新データベース：変わった行だけを送る（Googleのデータは触らない）
   localStorage.setItem('haishaDB2',JSON.stringify(db));
@@ -5915,7 +5916,7 @@ async function sbStartRealtime(){
         const changed=p.eventType==='DELETE'?sbApplyRemote(t,p.old,true,false):sbApplyRemote(t,p.new,false,false);
         if(changed)sbScheduleRender();
         // 定期便の設定が変わったら、予定を作る役割の画面で作り直す
-        if(changed&&p.table==='regulars'&&canGenReg()){clearTimeout(_sbRegTimer);_sbRegTimer=setTimeout(()=>{for(const rs of db.regulars)genRegDisps(rs);save();},1500);}
+        if(changed&&p.table==='regulars'&&!SIGNAGE&&canGenReg()){clearTimeout(_sbRegTimer);_sbRegTimer=setTimeout(()=>{for(const rs of db.regulars)genRegDisps(rs);save();},1500);}
       })
       .subscribe(st=>{
         const was=_sbLive;_sbLive=st==='SUBSCRIBED';
@@ -5929,6 +5930,7 @@ let _sbEverLive=false,_sbRegTimer=null;
 function sbScheduleRender(){
   clearTimeout(_sbRenderTimer);
   _sbRenderTimer=setTimeout(()=>{
+    if(SIGNAGE){_sgLastLoad=new Date();_sgLoadErr=false;renderSignage();return;} // サイネージは、変更が届いたらすぐ描き直す
     // 入力画面を開いている間は描き直さない（閉じるまで待つ）
     if(document.querySelector('.ovl:not(.hid)')){sbScheduleRender();return;}
     render();
@@ -9372,7 +9374,7 @@ function sgStartScroll(resume){
 async function sgReload(){
   try{
     await loadDB();
-    _sgLoadErr=_loadFailed||!GAS_URL;
+    _sgLoadErr=_loadFailed||(!SB_MODE&&!GAS_URL);
     if(!_sgLoadErr)_sgLastLoad=new Date();
   }catch(e){_sgLoadErr=true;}
   renderSignage();
@@ -9381,20 +9383,31 @@ async function initSignage(){
   document.body.classList.add('signage');
   document.getElementById('loadOvl').classList.add('hid');
   const root=document.getElementById('signageRoot');
+  if(SB_MODE){
+    // 新データベース：サイネージ用のアカウント（閲覧のみ）でログインして表示する。変更は数秒で画面に届く
+    await sbEnsureLogin();
+    document.getElementById('loadOvl').classList.add('hid');
+    await loadHolidays();
+    await sgReload();
+    sgBindControls();
+    let tick=0;
+    setInterval(async()=>{
+      tick++;
+      // 変更の知らせが途切れているとき、または30分ごとに、念のため全部を読み直す
+      if(!_sbLive||tick%30===0){await sgReload();return;}
+      _sgLoadErr=false;_sgLastLoad=new Date();
+      renderSignage();
+    },60*1000);
+    sgKeepAwake();
+    return;
+  }
   if(!GAS_URL){
     root.innerHTML='<div class="sg-setup">📺 サイネージ画面<br><small>このパソコンではまだGoogle連携（接続URL）が設定されていません。<br>一度 ?signage=1 を外して通常の画面を開き、⚙ 設定 → Google連携 で接続URLを設定してから、もう一度開いてください。</small></div>';
     return;
   }
   await loadHolidays();
   await sgReload();
-  // マウスを動かしたらボタンとカーソルを出す。キーボード：← → 日を移動、T 今日、A 自動
-  document.addEventListener('mousemove',sgShowCtrl);
-  document.addEventListener('keydown',e=>{
-    if(e.key==='ArrowLeft')sgMove(-1);
-    else if(e.key==='ArrowRight')sgMove(1);
-    else if(e.key==='t'||e.key==='T')sgGo('today');
-    else if(e.key==='a'||e.key==='A')sgGo('auto');
-  });
+  sgBindControls();
   // 1分ごと：他のパソコンで更新があれば読み込み直し、時計と日付の切り替えを更新
   setInterval(async()=>{
     try{
@@ -9404,7 +9417,20 @@ async function initSignage(){
     }catch(e){_sgLoadErr=true;}
     renderSignage();
   },60*1000);
-  // 画面が暗くならないようにする（対応しているブラウザのみ）
+  sgKeepAwake();
+}
+// マウスを動かしたらボタンとカーソルを出す。キーボード：← → 日を移動、T 今日、A 自動
+function sgBindControls(){
+  document.addEventListener('mousemove',sgShowCtrl);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowLeft')sgMove(-1);
+    else if(e.key==='ArrowRight')sgMove(1);
+    else if(e.key==='t'||e.key==='T')sgGo('today');
+    else if(e.key==='a'||e.key==='A')sgGo('auto');
+  });
+}
+// 画面が暗くならないようにする（対応しているブラウザのみ）
+async function sgKeepAwake(){
   try{if(navigator.wakeLock){let lock=await navigator.wakeLock.request('screen');document.addEventListener('visibilitychange',async()=>{if(!document.hidden)try{lock=await navigator.wakeLock.request('screen');}catch(e){}});}}catch(e){}
 }
 // 通常画面から、サイネージ画面を別タブで開く
