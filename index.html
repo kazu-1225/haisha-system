@@ -776,7 +776,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
   <button class="hbtn" style="background:#2563eb;font-size:12px;padding:6px 12px;" onclick="manualSync()">☁️ 今すぐ同期</button>
   <button class="hbtn" onclick="exportCSV()">📊 CSV</button>
   <button class="hbtn" onclick="exportJSON()">💾 バックアップ</button>
-  <button class="hbtn" onclick="document.getElementById('fi-json').click()">📂 復元</button>
+  <button class="hbtn" data-perm="admin" onclick="document.getElementById('fi-json').click()">📂 復元</button>
   <button class="hbtn" onclick="openTrash()" title="削除したカードを30日間保管しています">🗑 ごみ箱<span id="trashCnt"></span></button>
   <input id="fi-json" type="file" accept=".json" class="hid" onchange="importJSON(event)">
 </header>
@@ -1307,10 +1307,11 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
       <div class="fr"><label>⚠ 注意事項（収集先固有の注意・入構ルール等）</label><textarea id="dCaution" rows="2" placeholder="危険物の有無、駐車場、入構証など"></textarea></div>
     </div>
     <div class="mftr" style="flex-wrap:wrap;gap:6px">
+      <div id="dPermNote" class="hid" style="flex-basis:100%;font-size:12px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px"></div>
       <button class="btn btn-s" onclick="closeM('mDispatch')">キャンセル</button>
       <button class="btn btn-d hid" id="dDelBtn" onclick="delDispatch()">🗑 削除</button>
       <button class="btn hid" id="dPrintBtn" style="background:#7c3aed;color:#fff" onclick="openPrintConfirm(ST.editId,'all3')" title="作業指示書を3部まとめて印刷（印刷担当者を記録）">🖨 指示書印刷（3部）</button>
-      <button class="btn btn-p" onclick="saveDispatch()">💾 保存</button>
+      <button class="btn btn-p" id="dSaveBtn" onclick="saveDispatch()">💾 保存</button>
     </div>
   </div>
 </div>
@@ -1395,13 +1396,13 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
   <div class="mbox lg">
     <div class="mhdr"><h2>⚙ 設定・マスター管理</h2><span class="mcls" onclick="closeM('mSettings')">×</span></div>
     <div class="stabs">
-      <div class="stab on" data-st="google" onclick="stab('google')">🌐 Google連携</div>
+      <div class="stab on" data-st="google" data-perm="admin" onclick="stab('google')">🌐 Google連携</div>
       <div class="stab" data-st="drivers" onclick="stab('drivers')">👤 ドライバー</div>
       <div class="stab" data-st="vehicles" onclick="stab('vehicles')">🚛 車両</div>
       <div class="stab" data-st="customers" onclick="stab('customers')">🏢 お客様</div>
       <div class="stab" data-st="sites" onclick="stab('sites')">📍 収集先</div>
       <div class="stab" data-st="staff" onclick="stab('staff')">🧑‍💼 スタッフ</div>
-      <div class="stab" data-st="data" onclick="stab('data')">💾 データ</div>
+      <div class="stab" data-st="data" data-perm="admin" onclick="stab('data')">💾 データ</div>
       <div class="stab" data-st="supabase" onclick="stab('supabase')">🗄 新データベース</div>
     </div>
     <div class="mbdy">
@@ -2263,7 +2264,7 @@ function checkContainerAlerts() {
         </div>
         <div style="background:#f8fafc;border-radius:8px;padding:12px">
           <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">📂 復元・リセット</div>
-          <button class="btn btn-g" onclick="document.getElementById('fi-json').click()" style="margin:3px">JSONから復元</button>
+          <button class="btn btn-g" data-perm="admin" onclick="document.getElementById('fi-json').click()" style="margin:3px">JSONから復元</button>
           <button class="btn btn-d" onclick="resetAll()" style="margin:3px">⚠ 全データリセット</button>
         </div>
       </div>
@@ -4359,7 +4360,8 @@ async function confirmDrop(){
       dp.driver=newDriver;
       dp.vehicle=newVehicle;
     }
-    dp.status=(dp.driver&&dp.vehicle&&dp.dispatchDate)?'confirmed':'pending';
+    // 確定できない役割（事務など）が動かした場合は「保留」（確定は配車係・管理者）
+    dp.status=(dp.driver&&dp.vehicle&&dp.dispatchDate&&canFull('dispatch_confirm'))?'confirmed':'pending';
     await save();
   }
   ST.drag=null;ST.drop=null;closeM('mConfirm');render();
@@ -5315,8 +5317,9 @@ function openAddDispatch(date,rid,pending){
   document.getElementById('dPrintBtn').classList.add('hid');
   document.getElementById('licWarn').classList.remove('show');
   document.getElementById('deadlineWarn').textContent='';
-  if(rid){if(ST.res==='driver')document.getElementById('dDriver').value=rid;else document.getElementById('dVehicle').value=rid;}
+  if(rid&&canDo('dispatch_assign')){if(ST.res==='driver')document.getElementById('dDriver').value=rid;else document.getElementById('dVehicle').value=rid;}
   syncAllMPTriggers();
+  permAdjustDispatchModal();
   openM('mDispatch');
 }
 function editDisp(id){
@@ -5380,6 +5383,7 @@ function editDisp(id){
   } else {
     flowWrap.classList.add('hid');
   }
+  permAdjustDispatchModal();
   openM('mDispatch');
 }
 async function saveDispatch(){
@@ -5393,6 +5397,7 @@ async function saveDispatch(){
   const status=document.getElementById('dStatus').value;
   const driver=isCarryIn?null:document.getElementById('dDriver').value||null;
   const vehicle=isCarryIn?null:document.getElementById('dVehicle').value||null;
+  if(!permCheckSaveDispatch(driver,vehicle,dispatchDate))return;
   if(!licenseOk(driver,vehicle))return;
   {
     const absMsg=absenceWarn(driver,vehicle,dispatchDate);
@@ -5429,7 +5434,14 @@ async function saveDispatch(){
     if(workType.containerOp==='set')workType.conNo=parseInt(document.getElementById('dConNo').value)||0;
     else workType.conPlacementId=document.getElementById('dConTarget').value||'';
   }
-  const finalStatus=status;
+  // 確定できない役割（事務など）が割り当てたカードは「保留」のまま保存する（確定は配車係・管理者）
+  // すでに確定しているカードでも、割り当てを変えたら保留に戻る（データベース側と同じ決まり）
+  let finalStatus=status;
+  if(finalStatus==='confirmed'&&!isCarryIn&&driver&&!canFull('dispatch_confirm')){
+    const prev=ST.editId?(db.dispatches||[]).find(x=>x.id===ST.editId):null;
+    const same=prev&&prev.status==='confirmed'&&prev.driver===driver&&(prev.vehicle||null)===vehicle&&(prev.dispatchDate||null)===dispatchDate;
+    if(!same)finalStatus='pending';
+  }
   if(ST.editId){
     const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
     // 時間指定を変えたら、手で並べ替えた位置は解除して新しい時刻の順に並べる
@@ -5462,7 +5474,10 @@ function chkLic(){
 // ================================================================
 // SETTINGS
 // ================================================================
-function openSettings(){updateUrlStatus();renderSLists();updateSalesHistoryStatus();openM('mSettings');checkProtection();}
+function openSettings(){
+  updateUrlStatus();renderSLists();updateSalesHistoryStatus();openM('mSettings');checkProtection();
+  if(_perm&&!permOk('admin'))stab('drivers'); // Google連携のタブは管理者だけ
+}
 function stab(name){
   document.querySelectorAll('#mSettings .stab').forEach(t=>t.classList.toggle('on',t.dataset.st===name));
   document.querySelectorAll('.spane').forEach(p=>p.classList.remove('on'));
@@ -5646,7 +5661,7 @@ async function sbLoadAll(){
   const sb=await sbClient();
   const [tabs,disp,settings]=await Promise.all([
     Promise.all(SB_TABLES.map(([t])=>sbFetchAll(sb,t,'id,data,pos','id'))),
-    sbFetchAll(sb,'dispatches','id,data,deleted_at,pos','id'),
+    sbFetchAll(sb,'dispatches','id,data,deleted_at,pos,created_by','id'),
     sbFetchAll(sb,'app_settings','key,value','key'),
   ]);
   const nd={},pos=new Map();
@@ -5654,6 +5669,7 @@ async function sbLoadAll(){
   nd.dispatches=disp.filter(r=>!r.deleted_at).map(r=>r.data);
   nd.trash=disp.filter(r=>r.deleted_at).map(sbTrashItem);
   pos.set('dispatches',new Map(disp.map(r=>[r.id,r.pos])));
+  _sbCreatedBy.clear();disp.forEach(r=>{if(r.created_by)_sbCreatedBy.set(r.id,r.created_by);});
   settings.forEach(s=>{nd[s.key]=s.value;});
   return {nd,pos};
 }
@@ -5733,7 +5749,12 @@ async function sbFlush(){
         const {data,error}=await sb.from(t.table).upsert(part.map(x=>x.row),{onConflict:t.key,ignoreDuplicates:true}).select(cols);
         if(error)throw new Error(`${t.label}：${error.message}`);
         const done=new Set((data||[]).map(r=>r[t.key]));
-        for(const x of part)if(done.has(x.row[t.key]))base.set(x.row[t.key],{sig:x.sig,pos:x.row.pos});
+        for(const r of data||[]){
+          const x=part.find(p=>p.row[t.key]===r[t.key]);
+          if(t.table==='dispatches'&&_sbUid)_sbCreatedBy.set(r.id,_sbUid);
+          // データベース側で内容が変わった場合（権限による「保留」など）は、画面にも反映する
+          if(x&&sbSig(t,r)===x.sig)base.set(r[t.key],{sig:x.sig,pos:x.row.pos});else sbApplyRemote(t,r,false,true);
+        }
         const skipped=part.filter(x=>!done.has(x.row[t.key])).map(x=>x.row[t.key]);
         if(skipped.length){
           const {data:srv,error:e2}=await sb.from(t.table).select(cols).in(t.key,skipped);
@@ -5797,6 +5818,7 @@ function sbApplyRemote(t,r,remove,force){
     if(loc)loc.arr.splice(loc.i,1);
     base.delete(id);return !!loc;
   }
+  if(t.table==='dispatches'&&r.created_by)_sbCreatedBy.set(id,r.created_by);
   const sig=sbSig(t,r);
   if(!force&&b&&b.sig===sig)return false; // 自分が送った内容の知らせ
   if(loc)loc.arr.splice(loc.i,1);
@@ -5824,6 +5846,8 @@ async function sbStartRealtime(){
         const t=plans().get(p.table);if(!t)return;
         const changed=p.eventType==='DELETE'?sbApplyRemote(t,p.old,true,false):sbApplyRemote(t,p.new,false,false);
         if(changed)sbScheduleRender();
+        // 定期便の設定が変わったら、予定を作る役割の画面で作り直す
+        if(changed&&p.table==='regulars'&&canGenReg()){clearTimeout(_sbRegTimer);_sbRegTimer=setTimeout(()=>{for(const rs of db.regulars)genRegDisps(rs);save();},1500);}
       })
       .subscribe(st=>{
         const was=_sbLive;_sbLive=st==='SUBSCRIBED';
@@ -5833,7 +5857,7 @@ async function sbStartRealtime(){
       });
   }catch(e){console.warn('sbStartRealtime:',e);}
 }
-let _sbEverLive=false;
+let _sbEverLive=false,_sbRegTimer=null;
 function sbScheduleRender(){
   clearTimeout(_sbRenderTimer);
   _sbRenderTimer=setTimeout(()=>{
@@ -5856,7 +5880,7 @@ async function sbEnsureLogin(){
       await sb.auth.signOut();
       throw new Error(p?'このアカウントは停止されています。管理者に連絡してください。':'このアカウントには役割が設定されていません。管理者に連絡してください。');
     }
-    _sbProfile=p;_sbEmail=session.user.email||'';
+    _sbProfile=p;_sbEmail=session.user.email||'';_sbUid=session.user.id;
     return true;
   };
   try{if(await check())return true;}catch(e){msg.textContent='❌ '+sbErrJa(e);}
@@ -5891,6 +5915,154 @@ async function sbHeaderLogout(){
   try{const sb=await sbClient();await sb.auth.signOut();}catch(e){}
   location.reload();
 }
+// ----- 役割ごとの権限（管理者が権限表で決めた ○=yes／△=partial／✕=no）-----
+// _perm が null のとき（Googleのデータで開いているとき）は、今までどおり制限なし
+let _perm=null,_permLabel={},_sbUid='';
+const _sbCreatedBy=new Map(); // 配車カード → 登録した人（「自分が登録した未割当のカードだけ削除できる」の判定用）
+function permLv(p){
+  if(!_perm)return 'yes';
+  if(p==='admin')return _sbProfile&&_sbProfile.role==='admin'?'yes':'no';
+  return _perm[p]||'no';
+}
+function canDo(p){return permLv(p)!=='no';}     // ○か△
+function canFull(p){return permLv(p)==='yes';}  // ○だけ
+// 'xxx' は ○か△ でよい、'xxx!' は ○ が必要
+function permOk(req){return req.endsWith('!')?canFull(req.slice(0,-1)):canDo(req);}
+function permName(req){const p=req.replace(/!$/,'');return p==='admin'?'管理者のみ':(_permLabel[p]||p);}
+function permAlert(req,extra){
+  alert(`⛔ この操作はできません。\n（必要な権限：${permName(req)}${req.endsWith('!')?'（○）':''}）${extra?'\n\n'+extra:''}\n\n必要な場合は、管理者に相談してください。`);
+}
+// 定期便の予定を自動で作るのは、定期便の設定と配車の確定ができる人の画面だけ（ほかの人が作ると「保留」になるため）
+function canGenReg(){return canDo('regular_manage')&&canFull('dispatch_confirm');}
+function isMyCard(id){return !!_sbUid&&_sbCreatedBy.get(id)===_sbUid;}
+// このカードをごみ箱へ移せるか（△は自分が登録した未割当のカードだけ）
+function canTrashCard(dp){
+  const lv=permLv('dispatch_delete');
+  return lv==='yes'||(lv==='partial'&&!!dp&&!dp.driver&&isMyCard(dp.id));
+}
+// 操作 → 必要な権限
+const PERM_FN={
+  openAddDispatch:'dispatch_create',openAddShipment:'dispatch_create',saveShipment:'dispatch_create',cellClick:'dispatch_create',
+  onDragStart:'dispatch_assign',onDrop:'dispatch_assign',onDropToPending:'dispatch_assign',confirmDrop:'dispatch_assign',
+  openPlanner:'dispatch_assign',generatePlan:'dispatch_assign',applyPlan:'dispatch_assign',applyAI:'dispatch_assign',
+  moveDayOrder:'dispatch_assign',onRowDragStart:'dispatch_assign',onRowDrop:'dispatch_assign',toggleUsageGroup:'dispatch_assign',
+  advanceJobStatus:'dispatch_assign',
+  openAddCS:'dispatch_assign',openEditCS:'dispatch_assign',saveCS:'dispatch_assign',deleteCS:'dispatch_assign',
+  qDel:'dispatch_delete',delDispatch:'dispatch_delete',restoreTrash:'dispatch_delete',purgeTrash:'trash_purge!',
+  openRegular:'regular_manage',saveRegular:'regular_manage',editRegular:'regular_manage',delRegular:'regular_manage',
+  openAddAbsence:'absence_manage',openEditAbsence:'absence_manage',saveAbsence:'absence_manage',deleteAbsence:'absence_manage',
+  markContacted:'contact_update',
+  openDayPrint:'print',printDaySchedule:'print',openPrintConfirm:'print',executePrint:'print',printWorkOrder:'print',
+  openConAction:'container_manage',saveCON:'container_manage',deleteCON:'container_manage',openConImport:'container_manage',
+  executeConImport:'container_manage',saveConSettings:'container_manage',addConEmail:'container_manage',removeConEmail:'container_manage',
+  addCustomer:'master_customer',startEditCustomer:'master_customer!',delCustomer:'admin',clearAllCustomers:'admin',
+  importMasterCSV:'admin',fetchCustomerMaster:'master_customer!',importCustomerMasterFromFile:'master_customer!',configMasterUrl:'admin',
+  addSite:'master_site',startEditSite:'master_site!',delSite:'admin',addSiteContact:'master_site!',delSiteContact:'master_site!',saveSiteTemplate:'master_site',
+  addDriver:'master_other',startEditDriver:'master_other',delDriver:'admin',addVehicle:'master_other',startEditVehicle:'master_other',delVehicle:'admin',
+  addStaff:'master_other',editStaff:'master_other',deleteStaff:'admin',
+  openTenkai:'sales',saveTenkai:'sales',addTenkaiItem:'sales',exportTPlannerSalesCSV:'sales',importSalesHistoryCSV:'sales',
+  importJSON:'admin',resetAll:'admin',saveGasUrl:'admin',clearGasUrl:'admin',copyGasCode:'admin',
+};
+// 押すと中身が見られる場所（マスや帯）は、権限がなくても隠さない（押したときに止める／何もしない）
+const PERM_NOHIDE=new Set(['cellClick','onDragStart','onDrop','onDropToPending','confirmDrop','onRowDragStart','onRowDrop','openAddCS','openEditCS','openEditAbsence','editRegular']);
+const PERM_SILENT=new Set(['cellClick','onDragStart','onRowDragStart']);
+async function sbLoadPerms(){
+  const sb=await sbClient();
+  const [{data:rp,error:e1},{data:ps,error:e2}]=await Promise.all([
+    sb.from('role_permissions').select('perm,level').eq('role',_sbProfile.role),
+    sb.from('permissions').select('code,label')]);
+  if(e1||e2)throw (e1||e2);
+  _perm={};rp.forEach(r=>{_perm[r.perm]=r.level;});
+  _permLabel={};ps.forEach(p=>{_permLabel[p.code]=p.label;});
+  installPermGuards();applyPermUI();
+}
+// 権限のない操作を、呼ばれたところで止める（ボタンを隠すのとは別の、二重の守り）
+function installPermGuards(){
+  for(const [fn,req] of Object.entries(PERM_FN)){
+    const orig=window[fn];if(typeof orig!=='function'||orig._permWrapped)continue;
+    const w=function(...a){
+      if(!permOk(req)){
+        if(PERM_SILENT.has(fn)){if(a[0]&&a[0].preventDefault)a[0].preventDefault();return;}
+        permAlert(req);return;
+      }
+      return orig.apply(this,a);
+    };
+    w._permWrapped=true;window[fn]=w;
+  }
+  // 削除・ごみ箱から戻す：△の人は「自分が登録した未割当のカード」だけ
+  const wrapTrash=(fn,getIds)=>{
+    const orig=window[fn];
+    window[fn]=async function(...a){
+      const ids=getIds(a),list=ids.map(id=>(db.dispatches||[]).find(x=>x.id===id)||((db.trash||[]).find(t=>t.dp&&t.dp.id===id)||{}).dp);
+      if(list.some(dp=>dp&&!canTrashCard(dp))){permAlert('dispatch_delete','自分が登録した、まだドライバーが決まっていないカードだけ削除・復元できます。');return;}
+      return orig.apply(this,a);
+    };
+    window[fn]._permWrapped=true;
+  };
+  wrapTrash('qDel',a=>[a[0]]);
+  wrapTrash('delDispatch',()=>[ST.editId]);
+  wrapTrash('restoreTrash',a=>a[0]||[]);
+}
+// 権限のないボタンを隠す
+function applyPermUI(){
+  if(!_perm)return;
+  let css='.perm-hid{display:none!important}';
+  for(const [fn,req] of Object.entries(PERM_FN)){
+    if(PERM_NOHIDE.has(fn)||permOk(req))continue;
+    css+=`[onclick*="${fn}("]{display:none!important}`;
+  }
+  let st=document.getElementById('permStyle');
+  if(!st){st=document.createElement('style');st.id='permStyle';document.head.appendChild(st);}
+  st.textContent=css;
+  document.querySelectorAll('[data-perm]').forEach(el=>el.classList.toggle('perm-hid',!permOk(el.dataset.perm)));
+}
+// 配車カードの入力画面を、役割に合わせて整える（開いた直後に呼ぶ）
+function permAdjustDispatchModal(){
+  const note=document.getElementById('dPermNote');
+  if(!_perm){note.classList.add('hid');return;}
+  const dp=ST.editId?(db.dispatches||[]).find(x=>x.id===ST.editId):null;
+  const msgs=[];
+  // ドライバー・車両の割り当て
+  const assign=canDo('dispatch_assign');
+  ['dDriver','dVehicle'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!assign;});
+  ['dDriverTxt','dVehicleTxt'].forEach(id=>{const el=document.getElementById(id);const b=el&&el.closest('button,.mp-trigger');if(b){b.style.pointerEvents=assign?'':'none';b.style.opacity=assign?'':'.5';}});
+  if(!assign)msgs.push('ドライバー・車両の割り当ては、配車係が行います');
+  // 確定
+  const st=document.getElementById('dStatus');
+  if(!canFull('dispatch_confirm')){
+    if(st){if(!dp||dp.status!=='confirmed')st.value='pending';st.disabled=true;}
+    if(assign)msgs.push('割り当てても「保留」のまま保存されます（確定は配車係・管理者が行います）');
+  }else if(st)st.disabled=false;
+  // 内容の修正
+  const edit=permLv('dispatch_edit');
+  let readOnly=false;
+  if(dp&&edit==='no')readOnly=true;
+  if(dp&&edit==='partial'&&dp.driver){readOnly=true;msgs.push('ドライバーが決まったカードは変更できません（見るだけです）');}
+  if(!dp&&!canDo('dispatch_create'))readOnly=true;
+  document.getElementById('dSaveBtn').classList.toggle('hid',readOnly);
+  // 削除
+  document.getElementById('dDelBtn').classList.toggle('hid',!dp||!canTrashCard(dp));
+  if(readOnly&&(edit==='no'||!msgs.length)){msgs.length=0;msgs.push('このカードは見るだけです（変更の権限がありません）');}
+  note.textContent=msgs.map(m=>'ℹ '+m).join('　');
+  note.classList.toggle('hid',!msgs.length);
+}
+// 保存前の確認（権限のない変更は止める）。OKなら true
+function permCheckSaveDispatch(driver,vehicle,dispatchDate){
+  if(!_perm)return true;
+  const dp=ST.editId?(db.dispatches||[]).find(x=>x.id===ST.editId):null;
+  if(!dp){
+    if(!canDo('dispatch_create')){permAlert('dispatch_create');return false;}
+    if((driver||vehicle)&&!canDo('dispatch_assign')){permAlert('dispatch_assign');return false;}
+    return true;
+  }
+  const edit=permLv('dispatch_edit');
+  if(edit==='no'){permAlert('dispatch_edit');return false;}
+  if(edit==='partial'&&dp.driver){permAlert('dispatch_edit','ドライバーが決まったカードは変更できません。');return false;}
+  const moved=(dp.driver||null)!==(driver||null)||(dp.vehicle||null)!==(vehicle||null)||(dp.driver&&(dp.dispatchDate||null)!==(dispatchDate||null));
+  if(moved&&!canDo('dispatch_assign')){permAlert('dispatch_assign');return false;}
+  return true;
+}
+
 // このパソコンで開くデータを切り替える
 function sbSwitchMode(toSupabase){
   if(toSupabase&&!confirm('このパソコンで、新データベースのデータを「テスト」で開きます。\n\n入力・保存はできますが、Googleのデータ（本番）には反映されません。\nGoogleのデータから「写す」をもう一度行うと、テストで入力した内容は消えて、本番と同じ内容に戻ります。\n（元に戻すときは、⚙ 設定 →「🗄 新データベース」→「Googleのデータで開く」）\n\n切り替えますか？'))return;
@@ -6722,6 +6894,7 @@ function regDates(rs){
   return out;
 }
 function genRegDisps(rs){
+  if(!canGenReg())return; // 予定を作るのは、定期便の設定と確定ができる人の画面だけ
   for(const ds of regDates(rs)){
     // 「祝日は作らない」設定の定期便は祝日をとばす
     if(rs.holidayMode==='skip'&&HOLIDAYS[ds])continue;
@@ -7223,6 +7396,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
 const MP={type:null,targetSel:null,triggerBtn:null};
 
 function openMP(type,triggerBtn,selId){
+  if((type==='driver'||type==='vehicle')&&!canDo('dispatch_assign')){permAlert('dispatch_assign');return;}
   closeMP();
   MP.type=type;
   MP.targetSel=document.getElementById(selId);
@@ -8214,6 +8388,7 @@ function conRevert(dp){
 // 全カードを見て、作業日を迎えたものを反映・変更があったものを作り直す（変更があれば true）
 function syncContainers(){
   if(!db||!db.dispatches)return false;
+  if(!canDo('container_manage'))return false; // コンテナ管理への反映は、コンテナ管理の権限がある人の画面だけ
   const today=fmt(new Date());let changed=false;
   for(const dp of db.dispatches){
     const it=conIntent(dp);
@@ -8942,6 +9117,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
     document.getElementById('loadMsg').textContent='新データベースからデータを読み込み中...';
     await sbEnsureLogin();
     sbShowUserBadge();
+    try{await sbLoadPerms();}
+    catch(e){alert('権限を読み込めませんでした（'+sbErrJa(e)+'）。\n画面を読み込み直してください。');_perm={};applyPermUI();}
   }
   await Promise.all([loadDB(),loadHolidays()]);
   for(const rs of db.regulars)genRegDisps(rs);
