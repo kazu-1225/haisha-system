@@ -1310,7 +1310,10 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
       <div id="dPermNote" class="hid" style="flex-basis:100%;font-size:12px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px"></div>
       <button class="btn btn-s" onclick="closeM('mDispatch')">キャンセル</button>
       <button class="btn btn-d hid" id="dDelBtn" onclick="delDispatch()">🗑 削除</button>
-      <button class="btn hid" id="dPrintBtn" style="background:#7c3aed;color:#fff" onclick="openPrintConfirm(ST.editId,'all3')" title="作業指示書を3部まとめて印刷（印刷担当者を記録）">🖨 指示書印刷（3部）</button>
+      <span id="dPrintBtn" class="hid" style="display:inline-flex;gap:6px">
+        <button class="btn" style="background:#7c3aed;color:#fff" onclick="openPrintConfirm(ST.editId,'both')" title="1枚目（収集用）と2枚目（お客様控え）を複写用紙に印刷（印刷担当者を記録）">🖨 複写用（収集用＋お客様控え）</button>
+        <button class="btn" style="background:#475569;color:#fff" onclick="openPrintConfirm(ST.editId,'office')" title="3枚目（事務所控え）を普通紙に印刷（印刷担当者を記録）">🖨 事務所控え</button>
+      </span>
       <button class="btn btn-p" id="dSaveBtn" onclick="saveDispatch()">💾 保存</button>
     </div>
   </div>
@@ -5025,12 +5028,14 @@ body{font-family:'Meiryo','Yu Gothic',sans-serif;font-size:11px;color:#1e293b}
 .sign-box{border:1px solid #e2e8f0;border-radius:4px;padding:4px 8px;text-align:center;min-height:72px}
 .sign-label{font-size:8px;color:#94a3b8;font-weight:700;margin-bottom:3px}
 .footer{margin-top:5px;border-top:1px solid #f1f5f9;padding-top:3px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between}
+.scr-note{max-width:680px;margin:8px auto;padding:8px 12px;border-radius:6px;font-size:13px;font-weight:700;text-align:center}
 @media print{
   @page{size:A4 portrait;margin:0}
   html,body{background:#fff}
+  .scr-note{display:none}
   .page-wrap{width:100%;padding:7mm 10mm 4mm}
 }
-</style></head><body>${bodyContent}
+</style></head><body>${printMode==='both'?'<div class="scr-note" style="background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd">📄 複写用紙：印刷の画面で、複写用紙をセットしたトレイを選んでください（この表示は印刷されません）</div>':printMode==='office'?'<div class="scr-note" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">📄 事務所控え：普通紙で印刷してください（この表示は印刷されません）</div>':''}${bodyContent}
 <script>
 window.onload=function(){
   var pages=document.querySelectorAll('.page-wrap');
@@ -6520,6 +6525,8 @@ async function deleteStaff(id){
 // PRINT CONFIRM DIALOG & LOG
 // ================================================================
 let _printPending={id:null,mode:null};
+// 印刷の種類（印刷記録にも残す名前）
+const PRINT_MODE_LABEL={both:'複写用（収集用・お客様控え）',office:'事務所控え',all3:'3部（収集用・お客様控え・事務所控え）',collect:'収集用',customer:'お客様控え'};
 
 function openPrintConfirm(id,mode){
   if(!id){alert('保存後に印刷できます');return;}
@@ -6530,7 +6537,8 @@ function openPrintConfirm(id,mode){
   // 案件情報表示
   document.getElementById('printConfirmInfo').innerHTML=`
     <div style="font-weight:700;font-size:13px;color:#1e293b;margin-bottom:4px">🏢 ${cu?cu.name:'（お客様未設定）'}</div>
-    <div style="color:#64748b;font-size:11px">🚛 配車確定日：${dispDate}　｜　🖨 3部印刷（収集用・お客様控え・事務所控え）</div>`;
+    <div style="color:#64748b;font-size:11px">🚛 配車確定日：${dispDate}　｜　🖨 ${esc(PRINT_MODE_LABEL[mode||'all3']||mode)}</div>
+    <div style="margin-top:6px;font-size:12px;font-weight:700;color:${mode==='both'?'#7c3aed':'#475569'}">📄 ${mode==='both'?'複写用紙をセットしたトレイを選んで印刷してください':mode==='office'?'普通紙で印刷してください':'普通紙で印刷してください'}</div>`;
   // スタッフリスト更新
   const sel=document.getElementById('printStaffSel');
   const staffs=db.staffs||[];
@@ -6563,7 +6571,7 @@ async function executePrint(){
     dispatchId:id,
     customerName:cu?cu.name:'—',
     dispatchDate:dp?(dp.dispatchDate||dp.date||'—'):'—',
-    printType:mode==='all3'?'3部（収集用・お客様控え・事務所控え）':mode
+    printType:PRINT_MODE_LABEL[mode]||mode
   });
   if(db.printLogs.length>500)db.printLogs=db.printLogs.slice(0,500);
   await save();
