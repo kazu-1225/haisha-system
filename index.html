@@ -62,6 +62,8 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 /* ===== LOADING ===== */
 .loading-ovl{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-size:14px;color:#475569}
 .loading-ovl.hid{display:none}
+.need-input{outline:3px solid #f59e0b!important;outline-offset:2px;border-radius:6px;animation:needFlash 1s ease-in-out 3}
+@keyframes needFlash{50%{outline-color:#fde68a}}
 .sb-gate{position:fixed;inset:0;background:#e2e8f0;z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px}
 .sb-gate-box{background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(15,23,42,.15);padding:28px;width:100%;max-width:380px}
 .sb-gate-title{font-size:20px;font-weight:800;color:#1e293b;text-align:center}
@@ -1154,6 +1156,15 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
           <div id="dTpcdDisp" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;background:#f8fafc;font-size:13px;color:#64748b;min-height:36px">
             <span id="dTpcdVal" style="font-family:monospace;font-weight:700;color:#1e293b"></span>
           </div>
+        </div>
+      </div>
+
+      <!-- お客様ごとの「いつものパターン」：押すと作業内容・収集先などがまとめて入る -->
+      <div id="dPatternRow" class="hid" style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:7px 10px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#a16207;white-space:nowrap">⭐ いつものパターン：</span>
+          <span id="dPatternBtns" style="display:contents"></span>
+          <button type="button" class="btn btn-s" style="padding:3px 10px;font-size:11px;margin-left:auto" onclick="savePatternFromForm()" title="今の入力内容（作業・コンテナ・区分・マニフェスト・収集先・備考など）を、このお客様のパターンとして保存">＋ この内容をパターンに保存</button>
         </div>
       </div>
 
@@ -2359,6 +2370,21 @@ function checkContainerAlerts() {
 </div>
 
 <!-- ===== MODAL: 印刷確認（担当者選択） ===== -->
+<!-- 配車カードの抜け漏れチェック -->
+<div class="ovl hid" id="mCheck">
+  <div class="mbox" style="max-width:460px">
+    <div class="mhdr"><h2>⚠ 入力されていない項目があります</h2><span class="mcls" onclick="dispCheckAnswer(false)">×</span></div>
+    <div class="mbdy">
+      <ul id="mCheckList" style="margin:0 0 12px 18px;font-size:13px;line-height:1.9;color:#1e293b"></ul>
+      <div style="font-size:11px;color:#64748b">「戻って入力する」を押すと、足りない項目に色が付きます。分からない項目は、空のまま保存して、あとで入れても大丈夫です。</div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-s" onclick="dispCheckAnswer(true)">このまま保存</button>
+      <button class="btn btn-p" id="mCheckBack" onclick="dispCheckAnswer(false)">戻って入力する</button>
+    </div>
+  </div>
+</div>
+
 <!-- 要望・不具合 -->
 <div class="ovl hid" id="mFeedback">
   <div class="mbox lg">
@@ -3184,6 +3210,7 @@ function normalizeDB(){
   if(!db.trash)db.trash=[];
   if(!db.regSkips)db.regSkips=[];
   if(!db.absences)db.absences=[];
+  if(!db.dispatchPatterns||Array.isArray(db.dispatchPatterns))db.dispatchPatterns={};
   // 旧コンテナサイズ → コンテナ管理の種類名に読み替え
   const LEG={'1.5box':'1.5㎥BOX','2t':'4㎥（2DR）コンテナ','4t':'8㎥（4DR）コンテナ','large':'大型コンテナ'};
   [...db.dispatches,...db.trash.map(t=>t.dp)].forEach(dp=>{const w=dp&&dp.workType;if(w&&LEG[w.containerSize])w.containerSize=LEG[w.containerSize];});
@@ -4633,6 +4660,7 @@ function onCustChange(){
     tpcdEl.textContent=c?.tpcd||'';
     tpcdEl.closest('#dTpcdDisp').style.color=c?.tpcd?'#1e293b':'#94a3b8';
   }
+  renderPatternBtns();
 }
 function onSiteSelect(){
   const id=document.getElementById('dSiteSelect').value;
@@ -5460,6 +5488,7 @@ function openAddDispatch(date,rid,pending){
   document.getElementById('deadlineWarn').textContent='';
   if(rid&&canDo('dispatch_assign')){if(ST.res==='driver')document.getElementById('dDriver').value=rid;else document.getElementById('dVehicle').value=rid;}
   syncAllMPTriggers();
+  renderPatternBtns();
   permAdjustDispatchModal();
   openM('mDispatch');
 }
@@ -5545,15 +5574,10 @@ async function saveDispatch(){
     const absMsg=absenceWarn(driver,vehicle,dispatchDate);
     if(absMsg&&!confirm('⚠ '+absMsg+'\n\nこのまま保存しますか？'))return;
   }
-  // コンテナの交換・撤去で、対象のコンテナが決められない場合は知らせる
+  // 入力の抜け漏れチェック（足りない項目を一覧で知らせる。「このまま保存」も選べる）
   {
-    const wk=(document.querySelector('input[name="wkType"]:checked')||{}).value||'';
-    const op=(document.querySelector('input[name="wkContainerOp"]:checked')||{}).value||'set';
-    if(!isCarryIn&&wk==='container'&&op!=='set'&&!document.getElementById('dConTarget').value){
-      const sz=(document.querySelector('input[name="wkContainerSize"]:checked')||{}).value||'';
-      const r=conResolveTarget({customer:cust},{target:'',type:sz,purpose:getWkPurpose()});
-      if(r.err&&!(op==='swap'&&r.none)&&!confirm('⚠ '+r.err+'。\nこのままだとコンテナ管理に反映されません（コンテナ管理画面の予定欄に⚠で表示されます）。\n\nこのまま保存しますか？'))return;
-    }
+    const miss=dispatchCheckItems(cust,isCarryIn);
+    if(miss.length&&!(await dispCheckDialog(miss)))return;
   }
   const notes=document.getElementById('dNotes').value.trim();
   const caution=document.getElementById('dCaution').value.trim();
@@ -5599,6 +5623,185 @@ async function saveDispatch(){
   }
   await save();closeM('mDispatch');render();
 }
+// ----- お客様ごとの「いつものパターン」 -----
+// 保存したパターン：db.dispatchPatterns[お客様の番号] = [{id,label,data,at,by}]
+// よく使う組み合わせ：過去の配車カードから自動で見つける（保存したものと同じものは除く）
+const PATTERN_MAX=6;
+function patternFromForm(){
+  const q=s=>document.querySelector(s),v=id=>(document.getElementById(id).value||'').trim();
+  const wk=(q('input[name="wkType"]:checked')||{}).value||'';
+  const wt={type:wk,waste:getWasteCat()};
+  if(wk==='container'){
+    wt.containerOp=(q('input[name="wkContainerOp"]:checked')||{}).value||'set';
+    wt.containerSize=(q('input[name="wkContainerSize"]:checked')||{}).value||'';
+    wt.containerPurpose=getWkPurpose();
+  }
+  return {isCarryIn:document.getElementById('dCarryIn').checked,workType:wt,manifest:getMfstForSave(),
+    siteName:v('dSiteName'),siteContact:v('dSiteContact'),sitePhone:v('dSitePhone'),siteAddr:v('dSiteAddr'),
+    custContact:v('dCustContact'),custPhone:v('dCustPhone'),notes:v('dNotes'),caution:v('dCaution'),
+    timeSpec:{enabled:document.getElementById('dTimeEnabled').checked,time:v('dTimeVal')},
+    assistant:{enabled:document.getElementById('dAssistEnabled').checked,count:parseInt(document.getElementById('dAssistCount').value)||1},
+    measurement:document.getElementById('dMeasure').checked};
+}
+function patternFromDp(dp){
+  const w=dp.workType||{};
+  const wt={type:w.type||'',waste:w.waste||''};
+  if(w.type==='container'){wt.containerOp=w.containerOp||'set';wt.containerSize=w.containerSize||'';wt.containerPurpose=w.containerPurpose||'';}
+  return {isCarryIn:!!dp.isCarryIn,workType:wt,manifest:dp.manifest||{needed:'no',type:'paper',sys:'jwnet'},
+    siteName:dp.siteName||'',siteContact:dp.siteContact||'',sitePhone:dp.sitePhone||'',siteAddr:dp.siteAddr||'',
+    custContact:dp.custContact||'',custPhone:dp.custPhone||'',notes:dp.notes||'',caution:dp.caution||'',
+    timeSpec:dp.timeSpec||{enabled:false,time:''},assistant:dp.assistant||{enabled:false,count:1},measurement:!!dp.measurement};
+}
+// 同じ組み合わせかどうかを見分ける印（作業・コンテナ・区分・マニフェスト・収集先）
+function patternKey(p){
+  const w=p.workType||{},m=p.manifest||{};
+  return sbStable({c:!!p.isCarryIn,t:w.type||'',o:w.containerOp||'',s:w.containerSize||'',u:w.containerPurpose||'',w:w.waste||'',m:m.needed||'no',mt:m.type||'',site:p.siteName||''});
+}
+function patternLabel(p){
+  const w=p.workType||{},parts=[];
+  if(p.isCarryIn)parts.push('持込み');
+  if(w.type==='manual')parts.push('手積み');
+  if(w.type==='container')parts.push(`${conShort(w.containerSize)}${({set:'設置',swap:'交換',remove:'撤去'})[w.containerOp]||''}${w.containerPurpose?'・'+w.containerPurpose:''}`);
+  if(w.waste)parts.push(w.waste==='general'?'一廃':'産廃');
+  if(p.siteName)parts.push(p.siteName.length>12?p.siteName.slice(0,12)+'…':p.siteName);
+  return parts.join(' ／ ')||'（内容なし）';
+}
+function customerPatterns(custId){
+  const saved=((db.dispatchPatterns||{})[custId]||[]).slice();
+  const savedKeys=new Set(saved.map(x=>patternKey(x.data)));
+  const groups=new Map();
+  for(const dp of db.dispatches||[]){
+    if(dp.customer!==custId||dp.dispatchType||dp.id===ST.editId)continue;
+    const p=patternFromDp(dp);
+    if(!p.workType.type&&!p.workType.waste&&!p.siteName)continue; // 内容がほとんどないカードは使わない
+    const k=patternKey(p);if(savedKeys.has(k))continue;
+    const g=groups.get(k)||{n:0,last:'',data:null};
+    g.n++;const d=dp.updated||dp.created||dp.date||'';
+    if(!g.data||d>g.last){g.last=d;g.data=p;}
+    groups.set(k,g);
+  }
+  const auto=[...groups.values()].sort((a,b)=>b.n-a.n||b.last.localeCompare(a.last)).slice(0,3);
+  return {saved,auto};
+}
+function renderPatternBtns(){
+  const row=document.getElementById('dPatternRow'),box=document.getElementById('dPatternBtns');if(!row)return;
+  const custId=document.getElementById('dCust').value;
+  if(!custId||!canDo('dispatch_create')){row.classList.add('hid');return;}
+  const {saved,auto}=customerPatterns(custId);
+  const b=(kind,i,label,title,extra)=>`<button type="button" class="btn" style="padding:3px 10px;font-size:11px;background:${kind==='s'?'#fde68a':'#fff'};border:1px solid #facc15;color:#713f12" onclick="applyPattern('${kind}',${i})" title="${esc(title)}">${esc(label)}${extra||''}</button>`;
+  box.innerHTML=(saved.length||auto.length)
+    ?saved.map((x,i)=>b('s',i,'📌 '+(x.label||patternLabel(x.data)),'保存したパターン：'+patternLabel(x.data),`<span onclick="event.stopPropagation();deletePattern('${esc(custId)}','${esc(x.id)}')" title="このパターンを消す" style="margin-left:6px;color:#a16207">×</span>`)).join('')
+      +auto.map((g,i)=>b('a',i,'🕘 '+patternLabel(g.data),`過去の配車カードで ${g.n}回 使った組み合わせ`,`<span style="margin-left:4px;color:#a16207;font-size:10px">${g.n}回</span>`)).join('')
+    :'<span style="font-size:11px;color:#a16207">まだありません。入力したら「＋ この内容をパターンに保存」で登録できます</span>';
+  row.classList.remove('hid');
+}
+function applyPattern(kind,i){
+  const custId=document.getElementById('dCust').value;
+  const {saved,auto}=customerPatterns(custId);
+  const p=kind==='s'?(saved[i]||{}).data:(auto[i]||{}).data;if(!p)return;
+  const set=(id,v)=>{document.getElementById(id).value=v||'';};
+  const fillIfEmpty=(id,v)=>{const el=document.getElementById(id);if(!el.value.trim()&&v)el.value=v;};
+  document.getElementById('dCarryIn').checked=!!p.isCarryIn;onCarryInChange();
+  const w=p.workType||{};
+  document.querySelectorAll('input[name="wkType"]').forEach(r=>{r.checked=r.value===(w.type||'');});
+  if(w.type==='container'){
+    const op=document.querySelector(`input[name="wkContainerOp"][value="${w.containerOp||'set'}"]`);if(op)op.checked=true;
+    const sz=document.querySelector(`input[name="wkContainerSize"][value="${w.containerSize||'1.5㎥BOX'}"]`);if(sz)sz.checked=true;
+  }
+  renderWkPurposeBtns(w.containerPurpose||'');
+  setWasteCat(w.waste||'');
+  onWkTypeChange();
+  setMfst(p.manifest||{needed:'no',type:'paper',sys:'jwnet'});applyMfstRules();
+  set('dSiteName',p.siteName);set('dSiteContact',p.siteContact);set('dSitePhone',p.sitePhone);set('dSiteAddr',p.siteAddr);
+  fillIfEmpty('dCustContact',p.custContact);fillIfEmpty('dCustPhone',p.custPhone);
+  fillIfEmpty('dNotes',p.notes);fillIfEmpty('dCaution',p.caution);
+  const ts=p.timeSpec||{};document.getElementById('dTimeEnabled').checked=!!ts.enabled;set('dTimeVal',ts.time);document.getElementById('dTimeInput').style.display=ts.enabled?'flex':'none';
+  const as=p.assistant||{};document.getElementById('dAssistEnabled').checked=!!as.enabled;document.getElementById('dAssistCount').value=as.count||1;document.getElementById('dAssistInput').style.display=as.enabled?'flex':'none';
+  document.getElementById('dMeasure').checked=!!p.measurement;
+  refreshConTargets();
+  const row=document.getElementById('dPatternRow');row.classList.add('need-input');setTimeout(()=>row.classList.remove('need-input'),1200);
+}
+async function savePatternFromForm(){
+  const custId=document.getElementById('dCust').value;
+  if(!custId){alert('先にお客様を選んでください');return;}
+  const data=patternFromForm();
+  if(!data.workType.type&&!data.workType.waste&&!data.siteName){alert('作業タイプ・区分・収集先などを入力してから保存してください');return;}
+  if(!db.dispatchPatterns)db.dispatchPatterns={};
+  const list=db.dispatchPatterns[custId]||(db.dispatchPatterns[custId]=[]);
+  const k=patternKey(data);
+  if(list.some(x=>patternKey(x.data)===k)&&!confirm('同じ組み合わせのパターンがすでにあります。内容を今の入力で上書きしますか？'))return;
+  const name=prompt('パターンの名前（空のままでOKなら、自動で付けます）',patternLabel(data));
+  if(name===null)return;
+  const rec={id:uid(),label:(name.trim()||patternLabel(data)),data,at:new Date().toISOString(),by:_sbProfile?_sbProfile.display_name:''};
+  const ix=list.findIndex(x=>patternKey(x.data)===k);
+  if(ix>=0)list[ix]=rec;else{if(list.length>=PATTERN_MAX){alert(`パターンは1つのお客様に${PATTERN_MAX}個までです。使わないものを×で消してから保存してください`);return;}list.push(rec);}
+  await save();renderPatternBtns();
+}
+async function deletePattern(custId,id){
+  if(!confirm('このパターンを消しますか？'))return;
+  const list=(db.dispatchPatterns||{})[custId]||[];
+  db.dispatchPatterns[custId]=list.filter(x=>x.id!==id);
+  if(!db.dispatchPatterns[custId].length)delete db.dispatchPatterns[custId];
+  await save();renderPatternBtns();
+}
+
+// ----- 配車カードの抜け漏れチェック -----
+// 返すもの：[{msg:'知らせる文', el:色を付ける場所}]
+function dispatchCheckItems(cust,isCarryIn){
+  const q=s=>document.querySelector(s),val=id=>(document.getElementById(id).value||'').trim();
+  const rowOf=name=>{const r=q(`input[name="${name}"]`);return r?r.closest('div'):null;};
+  const items=[];
+  const wk=(q('input[name="wkType"]:checked')||{}).value||'';
+  if(!isCarryIn){
+    // 作業タイプ
+    if(!wk)items.push({msg:'作業タイプ（手積み／コンテナ）が選ばれていません',el:rowOf('wkType')});
+    if(wk==='container'){
+      // コンテナの用途
+      if(!getWkPurpose())items.push({msg:'コンテナの用途（混載・廃プラなど）が選ばれていません',el:document.getElementById('wkPurposeBtns').parentElement});
+      // 交換・撤去の対象
+      const op=(q('input[name="wkContainerOp"]:checked')||{}).value||'set';
+      if(op!=='set'&&!val('dConTarget')){
+        const sz=(q('input[name="wkContainerSize"]:checked')||{}).value||'';
+        const r=conResolveTarget({customer:cust},{target:'',type:sz,purpose:getWkPurpose()});
+        if(r.err&&!(op==='swap'&&r.none))items.push({msg:`交換・撤去の対象コンテナが決まりません（${r.err.replace(/。.*$/,'')}）`,el:document.getElementById('dConTarget')});
+      }
+    }
+    // 収集先
+    if(!val('dSiteName')&&!val('dSiteAddr'))items.push({msg:'収集先（名称か住所）が入っていません',el:document.getElementById('dSiteName')});
+  }
+  // 区分
+  const waste=getWasteCat();
+  if(!waste)items.push({msg:'区分（一般廃・資源物／産業廃棄物）が選ばれていません',el:rowOf('wkWaste')});
+  // マニフェスト
+  if(waste==='industrial'&&mfstRule().mode!=='hide'&&getMfst().needed==='no')items.push({msg:'産業廃棄物なのに、マニフェストが「不要」になっています',el:document.getElementById('mfstSection')});
+  // 受付担当者
+  if(!val('dReceptionist'))items.push({msg:'受付担当者が入っていません',el:document.getElementById('dReceptionist')});
+  // 時間指定
+  if(document.getElementById('dTimeEnabled').checked&&!val('dTimeVal'))items.push({msg:'「時間指定あり」なのに、時刻が入っていません',el:document.getElementById('dTimeVal')});
+  return items;
+}
+let _dispCheckResolve=null,_dispCheckItems=[];
+function dispCheckDialog(items){
+  _dispCheckItems=items;
+  document.getElementById('mCheckList').innerHTML=items.map(x=>`<li>${esc(x.msg)}</li>`).join('');
+  openM('mCheck');
+  setTimeout(()=>document.getElementById('mCheckBack').focus(),50);
+  return new Promise(ok=>{_dispCheckResolve=ok;});
+}
+function dispCheckAnswer(save){
+  closeM('mCheck');
+  const r=_dispCheckResolve;_dispCheckResolve=null;
+  if(!save){
+    // 足りない項目に色を付けて、最初の項目までスクロールする
+    document.querySelectorAll('.need-input').forEach(e=>e.classList.remove('need-input'));
+    const els=_dispCheckItems.map(x=>x.el).filter(Boolean);
+    els.forEach(e=>e.classList.add('need-input'));
+    if(els[0])els[0].scrollIntoView({behavior:'smooth',block:'center'});
+    setTimeout(()=>els.forEach(e=>e.classList.remove('need-input')),6000);
+  }
+  if(r)r(!!save);
+}
+
 const TRASH_MSG='この配車予定を削除しますか？\n（ごみ箱に移動します。'+'30日間は元に戻せます）';
 async function delDispatch(){
   if(!ST.editId)return;if(!confirm(TRASH_MSG))return;
@@ -5739,6 +5942,7 @@ function sbSourceRows(){
     ['driverOrder',db.driverOrder||[],'dispatch_assign'],['vehicleOrder',db.vehicleOrder||[],'dispatch_assign'],
     ['regSkips',db.regSkips||[],'dispatch_delete'],['containerSettings',db.containerSettings||{},'container_manage'],
     ['products',db.products||[],'sales'],
+    ['dispatchPatterns',db.dispatchPatterns||{},'dispatch_create'], // お客様ごとの「いつものパターン」
   ];
   plan.push({table:'app_settings',label:'設定（並び順など）',key:'key',isSettings:true,
     rows:settings.map(([key,value,edit_perm])=>({key,value,edit_perm}))});
@@ -6109,6 +6313,7 @@ const PERM_FN={
   openRegular:'regular_manage',saveRegular:'regular_manage',editRegular:'regular_manage',delRegular:'regular_manage',
   openAddAbsence:'absence_manage',openEditAbsence:'absence_manage',saveAbsence:'absence_manage',deleteAbsence:'absence_manage',
   markContacted:'contact_update',
+  savePatternFromForm:'dispatch_create',deletePattern:'dispatch_create',
   openDayPrint:'print',printDaySchedule:'print',openPrintConfirm:'print',executePrint:'print',printWorkOrder:'print',
   openConAction:'container_manage',saveCON:'container_manage',deleteCON:'container_manage',openConImport:'container_manage',
   executeConImport:'container_manage',saveConSettings:'container_manage',addConEmail:'container_manage',removeConEmail:'container_manage',
