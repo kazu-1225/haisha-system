@@ -1152,9 +1152,10 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
       </div>
       <div class="r2">
         <div class="fr"><label>① お客様担当者 電話番号</label><input type="tel" id="dCustPhone" placeholder="例: 090-0000-0000"></div>
-        <div class="fr"><label>T-PlannerCD</label>
+        <div class="fr"><label>T-PLANNERCD（DB-CD）</label>
           <div id="dTpcdDisp" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;background:#f8fafc;font-size:13px;color:#64748b;min-height:36px">
             <span id="dTpcdVal" style="font-family:monospace;font-weight:700;color:#1e293b"></span>
+            <div id="dBillVal" style="font-size:11px;color:#b45309;margin-top:2px"></div>
           </div>
         </div>
       </div>
@@ -2216,16 +2217,37 @@ function checkContainerAlerts() {
           <div class="fr" style="margin:0"><label>フリガナ <span style="font-size:9px;color:#94a3b8;font-weight:400">（半角カタカナ）</span></label><input type="text" id="sCKana" placeholder="例: ｶﾌﾞｼｷｶﾞｲｼｬ〇〇" inputmode="katakana"></div>
         </div>
         <div class="r2" style="margin-bottom:6px">
-          <div class="fr" style="margin:0"><label>T-PlannerCD <span style="font-size:9px;color:#94a3b8;font-weight:400">（販売管理ソフトの得意先CD）</span></label><input type="text" id="sCTpcd" placeholder="例: T001234"></div>
+          <div class="fr" style="margin:0"><label>T-PLANNERの得意先 <span style="font-size:9px;color:#94a3b8;font-weight:400">（DBとCD。T-PLANNERにないお客様は空のまま）</span></label>
+            <div style="display:flex;gap:6px"><select id="sCTpDb" style="width:90px"><option value="daiei">大栄</option><option value="ichigen">一元</option></select><input type="text" id="sCTpcd" placeholder="例: 3443" style="flex:1"></div></div>
           <div class="fr" style="margin:0"><label>住所</label><input type="text" id="sCAddr" placeholder="例: 広島市〇〇区..."></div>
         </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#334155;cursor:pointer"><input type="checkbox" id="sCBillOther" style="width:auto" onchange="document.getElementById('sCBillBox').classList.toggle('hid',!this.checked)"> 請求先が別（請求は別の得意先にまとめる）</label>
+          <div id="sCBillBox" class="hid" style="margin-top:6px">
+            <div style="position:relative;margin-bottom:6px">
+              <input type="text" id="sCBillSearch" placeholder="🔍 請求先をお客様マスタから探す（名前かCD）" autocomplete="off" oninput="billSuggest(this.value)" style="width:100%">
+              <div id="sCBillSug" style="display:none;position:absolute;top:100%;left:0;right:0;border:1px solid #cbd5e1;border-radius:6px;background:#fff;max-height:160px;overflow-y:auto;z-index:300;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px">
+              <span>請求先：</span><select id="sCBillDb" style="width:80px"><option value="daiei">大栄</option><option value="ichigen">一元</option></select>
+              <input type="text" id="sCBillCd" placeholder="CD" style="width:90px">
+              <input type="text" id="sCBillName" placeholder="請求先の名前" style="flex:1;min-width:180px">
+            </div>
+          </div>
+        </div>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#475569;margin-bottom:8px;cursor:pointer"><input type="checkbox" id="sCInactive" style="width:auto"> 使わない（お客様を選ぶ一覧に出さない。取引が終わったお客様など）</label>
         <div class="r2" style="margin-bottom:10px">
           <div class="fr" style="margin:0"><label>担当者名</label><input type="text" id="sCContact" placeholder="例: 山田様"></div>
           <div class="fr" style="margin:0"><label>担当者 電話番号</label><input type="tel" id="sCPhone" placeholder="例: 082-000-0000"></div>
         </div>
         <button class="btn btn-p" id="customerAddBtn" onclick="addCustomer()" style="margin-bottom:10px">追加</button>
         <button class="btn btn-s" id="customerCancelBtn" onclick="resetCustomerForm()" style="margin-bottom:10px;display:none">キャンセル</button>
-        <button class="btn btn-d" onclick="clearAllCustomers()" style="margin-bottom:10px;margin-left:8px;background:#dc2626;color:#fff">🗑 全件クリア</button>
+        <button class="btn btn-g" data-perm="admin" onclick="openTpImport()" style="margin-bottom:10px;margin-left:8px" title="T-PLANNERの得意先マスタCSV（大栄クリーナー_新／一元管理_新）から、お客様の追加・請求先・使わない印をまとめて更新">📥 T-PLANNERの得意先CSVを読み込む</button>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+          <input type="text" id="sCListFilter" placeholder="🔍 一覧を名前・CDで絞り込む" oninput="renderSLists()" style="flex:1;min-width:200px">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#475569;cursor:pointer"><input type="checkbox" id="sCShowInactive" style="width:auto" onchange="renderSLists()"> 「使わない」も表示</label>
+          <span id="sCListCount" style="font-size:11px;color:#94a3b8"></span>
+        </div>
         <div class="dlist" id="customerList"></div>
       </div>
 
@@ -2370,6 +2392,24 @@ function checkContainerAlerts() {
 </div>
 
 <!-- ===== MODAL: 印刷確認（担当者選択） ===== -->
+<!-- T-PLANNERの得意先CSVの読み込み（管理者） -->
+<div class="ovl hid" id="mTpImport">
+  <div class="mbox lg">
+    <div class="mhdr"><h2>📥 T-PLANNERの得意先CSVを読み込む</h2><span class="mcls" onclick="closeM('mTpImport')">×</span></div>
+    <div class="mbdy">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e40af;line-height:1.7;margin-bottom:12px">
+        T-PLANNERから出力した「M得意先」のCSV（大栄クリーナー_新／一元管理_新）を読み込みます。<br>
+        お客様は「<b>DB＋CD</b>」で照らし合わせます。<b>お客様を消すことはありません</b>（配車カードや定期便が壊れないように）。読み込む前に、何がどう変わるかを確認できます。
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <span style="font-size:12px;font-weight:700">DB：</span><select id="tpImpDb" style="width:150px" onchange="tpImportPlan()"><option value="daiei">大栄クリーナー_新</option><option value="ichigen">一元管理_新</option></select>
+        <input type="file" id="tpImpFile" accept=".csv" onchange="tpImportRead(event)">
+      </div>
+      <div id="tpImpResult" style="font-size:12px"></div>
+    </div>
+  </div>
+</div>
+
 <!-- 配車カードの抜け漏れチェック -->
 <div class="ovl hid" id="mCheck">
   <div class="mbox" style="max-width:460px">
@@ -3188,6 +3228,8 @@ function normalizeDB(){
   if(!db.containerActions)db.containerActions=[];
   if(!db.containerSettings)db.containerSettings={defaultTargetDays:90,defaultWarnDays:7};
   (db.drivers||[]).forEach(d=>{if(!d.usageGroup)d.usageGroup='frequent';if(!d.group2)d.group2='';});
+  // T-PLANNERのCDがあってDBが決まっていないお客様は「大栄クリーナー_新」（今までの取り込みはすべて大栄）
+  (db.customers||[]).forEach(c=>{if(c.tpcd&&!c.tpDb)c.tpDb='daiei';});
   // 収集先：旧データ（contact/phone単一フィールド）→contacts[]へ移行
   (db.sites||[]).forEach(s=>{
     if(!s.contacts){
@@ -3375,6 +3417,19 @@ function canDrive(dr,ve){
   return(dr.license||[]).some(l=>LIC_ORDER.indexOf(l)>=ri);
 }
 function custName(id){const c=(db.customers||[]).find(x=>x.id===id);return c?c.name:'（不明）';}
+// ----- T-PLANNERの得意先：「DB＋CD」で区別する（大栄クリーナー_新と一元管理_新で同じCDが別の会社のことがあるため）-----
+const TP_DB={daiei:'大栄',ichigen:'一元'};
+const tpShort=cd=>String(cd||'').trim().replace(/^0+(?=\d)/,'');
+function tpLabel(c){return c&&c.tpcd?`${TP_DB[c.tpDb||'daiei']||c.tpDb}-${c.tpcd}`:'';}
+// 請求先（請求先が別ならその得意先、なければ自分）
+function billingOf(c){
+  if(!c)return null;
+  if(c.billTo&&c.billTo.cd)return {db:c.billTo.db||'daiei',cd:c.billTo.cd,name:c.billTo.name||'',other:true};
+  return c.tpcd?{db:c.tpDb||'daiei',cd:c.tpcd,name:c.name,other:false}:null;
+}
+const billLabel=b=>b?`${b.name}（${TP_DB[b.db]||b.db}-${b.cd}）`:'';
+// 「使わない」印のないお客様（いま選んでいるお客様は、印があっても残す）
+function activeCustomers(keepId){return (db.customers||[]).filter(c=>!c.inactive||c.id===keepId);}
 function drvName(id){if(!id)return'未定';const d=(db.drivers||[]).find(x=>x.id===id);return d?d.name:'未定';}
 function vehName(id){if(!id)return'未定';const v=(db.vehicles||[]).find(x=>x.id===id);return v?v.name:'未定';}
 function getWOM(d){const f=new Date(d.getFullYear(),d.getMonth(),1);return Math.ceil((d.getDate()+f.getDay())/7);}
@@ -4657,8 +4712,10 @@ function onCustChange(){
   const c=(db.customers||[]).find(x=>x.id===custId);
   const tpcdEl=document.getElementById('dTpcdVal');
   if(tpcdEl){
-    tpcdEl.textContent=c?.tpcd||'';
+    tpcdEl.textContent=tpLabel(c)||(c?'（T-PLANNERに得意先なし）':'');
     tpcdEl.closest('#dTpcdDisp').style.color=c?.tpcd?'#1e293b':'#94a3b8';
+    const b=billingOf(c);
+    document.getElementById('dBillVal').textContent=b&&b.other?'請求先：'+billLabel(b):'';
   }
   renderPatternBtns();
 }
@@ -6314,6 +6371,7 @@ const PERM_FN={
   openAddAbsence:'absence_manage',openEditAbsence:'absence_manage',saveAbsence:'absence_manage',deleteAbsence:'absence_manage',
   markContacted:'contact_update',
   savePatternFromForm:'dispatch_create',deletePattern:'dispatch_create',
+  openTpImport:'admin',tpImportApply:'admin',
   openDayPrint:'print',printDaySchedule:'print',openPrintConfirm:'print',executePrint:'print',printWorkOrder:'print',
   openConAction:'container_manage',saveCON:'container_manage',deleteCON:'container_manage',openConImport:'container_manage',
   executeConImport:'container_manage',saveConSettings:'container_manage',addConEmail:'container_manage',removeConEmail:'container_manage',
@@ -6696,13 +6754,21 @@ function renderSLists(){
       <span class="bdg ${bc}">${r}以上</span>
       <span class="di-del" onclick="startEditVehicle('${v.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
       <span class="di-del" onclick="delVehicle('${v.id}')">🗑</span></div>`;}).join('');
-  document.getElementById('customerList').innerHTML=!(db.customers||[]).length?
-    '<div class="empty">お客様がいません</div>':
-    db.customers.map(c=>`<div class="ditem"><div class="di-main">
-      <div class="di-name">${c.name}${c.kana?`<span style="font-size:10px;color:#94a3b8;margin-left:6px;font-weight:400">${c.kana}</span>`:''}${c.tpcd?`<span style="font-size:10px;color:#6366f1;margin-left:6px;font-family:monospace;font-weight:700">CD:${c.tpcd}</span>`:''}</div>
-      <div class="di-meta">${[c.addr,c.contact,c.phone].filter(x=>x).join(' | ')}</div></div>
+  {
+    // お客様の一覧（名前・カナ・CDで絞り込み。「使わない」は、選んだときだけ表示。多いときは先頭300件）
+    const fq=toSearchable((document.getElementById('sCListFilter')||{}).value||''),showIn=(document.getElementById('sCShowInactive')||{}).checked;
+    const all=db.customers||[];
+    const list=all.filter(c=>(showIn||!c.inactive)&&(!fq||toSearchable(c.name).includes(fq)||toSearchable(c.kana||'').includes(fq)||String(c.tpcd||'').startsWith(fq)||toSearchable(tpLabel(c)).includes(fq)));
+    const cntEl=document.getElementById('sCListCount');
+    if(cntEl)cntEl.textContent=`${list.length}件表示（全${all.length}件・使わない${all.filter(c=>c.inactive).length}件）`;
+    document.getElementById('customerList').innerHTML=!all.length?
+      '<div class="empty">お客様がいません</div>':
+      list.slice(0,300).map(c=>{const b=billingOf(c);return `<div class="ditem"${c.inactive?' style="opacity:.55"':''}><div class="di-main">
+      <div class="di-name">${esc(c.name)}${c.kana?`<span style="font-size:10px;color:#94a3b8;margin-left:6px;font-weight:400">${esc(c.kana)}</span>`:''}${c.tpcd?`<span style="font-size:10px;color:#6366f1;margin-left:6px;font-family:monospace;font-weight:700">${esc(tpLabel(c))}</span>`:''}${c.inactive?'<span class="bdg" style="font-size:9px;background:#e2e8f0;color:#475569;margin-left:6px">使わない</span>':''}</div>
+      <div class="di-meta">${[c.addr,c.contact,c.phone].filter(x=>x).map(esc).join(' | ')}${b&&b.other?`<div style="color:#b45309">請求先：${esc(billLabel(b))}</div>`:''}</div></div>
     <span class="di-del" onclick="startEditCustomer('${c.id}')" style="color:#6366f1;font-size:15px;margin-right:4px" title="編集">✏️</span>
-    <span class="di-del" onclick="delCustomer('${c.id}')">🗑</span></div>`).join('');
+    <span class="di-del" onclick="delCustomer('${c.id}')">🗑</span></div>`;}).join('')+(list.length>300?`<div class="empty">ほか${list.length-300}件（上の欄で絞り込んでください）</div>`:'');
+  }
   // 収集先リスト（お客様名も表示）
   const siteListEl=document.getElementById('siteList');
   if(siteListEl){
@@ -6824,9 +6890,27 @@ async function delVehicle(id){
 }
 function resetCustomerForm(){
   editCustomerId=null;
-  ['sCName','sCKana','sCTpcd','sCAddr','sCContact','sCPhone'].forEach(i=>document.getElementById(i).value='');
+  ['sCName','sCKana','sCTpcd','sCAddr','sCContact','sCPhone','sCBillSearch','sCBillCd','sCBillName'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('sCTpDb').value='daiei';document.getElementById('sCBillDb').value='daiei';
+  document.getElementById('sCBillOther').checked=false;document.getElementById('sCBillBox').classList.add('hid');
+  document.getElementById('sCInactive').checked=false;
   document.getElementById('customerAddBtn').textContent='追加';
   document.getElementById('customerCancelBtn').style.display='none';
+}
+// 請求先をお客様マスタから探す
+function billSuggest(val){
+  const sug=document.getElementById('sCBillSug');
+  const q=(val||'').trim();if(!q){sug.style.display='none';return;}
+  const qs=toSearchable(q);
+  const hits=(db.customers||[]).filter(c=>c.tpcd&&(toSearchable(c.name).includes(qs)||String(c.tpcd).startsWith(tpShort(q)))).slice(0,10);
+  if(!hits.length){sug.style.display='none';return;}
+  sug.innerHTML=hits.map(c=>`<div style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #f1f5f9" onmousedown="pickBillTo('${c.id}')"><span style="color:#6366f1;font-family:monospace;margin-right:6px">${esc(tpLabel(c))}</span>${esc(c.name)}</div>`).join('');
+  sug.style.display='';
+}
+function pickBillTo(id){
+  const c=(db.customers||[]).find(x=>x.id===id);if(!c)return;
+  document.getElementById('sCBillDb').value=c.tpDb||'daiei';document.getElementById('sCBillCd').value=c.tpcd;document.getElementById('sCBillName').value=c.name;
+  document.getElementById('sCBillSearch').value='';document.getElementById('sCBillSug').style.display='none';
 }
 function startEditCustomer(id){
   const c=db.customers.find(x=>x.id===id);if(!c)return;
@@ -6834,9 +6918,14 @@ function startEditCustomer(id){
   document.getElementById('sCName').value=c.name;
   document.getElementById('sCKana').value=c.kana||'';
   document.getElementById('sCTpcd').value=c.tpcd||'';
+  document.getElementById('sCTpDb').value=c.tpDb||'daiei';
   document.getElementById('sCAddr').value=c.addr||'';
   document.getElementById('sCContact').value=c.contact||'';
   document.getElementById('sCPhone').value=c.phone||'';
+  const bt=c.billTo&&c.billTo.cd?c.billTo:null;
+  document.getElementById('sCBillOther').checked=!!bt;document.getElementById('sCBillBox').classList.toggle('hid',!bt);
+  document.getElementById('sCBillDb').value=bt?bt.db||'daiei':'daiei';document.getElementById('sCBillCd').value=bt?bt.cd:'';document.getElementById('sCBillName').value=bt?bt.name||'':'';
+  document.getElementById('sCInactive').checked=!!c.inactive;
   document.getElementById('customerAddBtn').textContent='更新';
   document.getElementById('customerCancelBtn').style.display='inline-flex';
   document.getElementById('sCName').focus();
@@ -6844,7 +6933,20 @@ function startEditCustomer(id){
 async function addCustomer(){
   const name=document.getElementById('sCName').value.trim();
   if(!name){alert('お客様名を入力してください');return;}
-  const cdata={name,kana:document.getElementById('sCKana').value.trim(),tpcd:document.getElementById('sCTpcd').value.trim(),addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim(),phone:document.getElementById('sCPhone').value.trim()};
+  const tpcd=tpShort(document.getElementById('sCTpcd').value);
+  const tpDb=document.getElementById('sCTpDb').value;
+  const cdata={name,kana:document.getElementById('sCKana').value.trim(),tpcd,tpDb:tpcd?tpDb:'',addr:document.getElementById('sCAddr').value.trim(),contact:document.getElementById('sCContact').value.trim(),phone:document.getElementById('sCPhone').value.trim(),inactive:document.getElementById('sCInactive').checked};
+  // 同じ「DB＋CD」のお客様がほかにいれば知らせる
+  if(tpcd){
+    const dup=(db.customers||[]).find(c=>c.id!==editCustomerId&&c.tpcd===tpcd&&(c.tpDb||'daiei')===tpDb);
+    if(dup&&!confirm(`⚠ 同じT-PLANNERの得意先（${TP_DB[tpDb]}-${tpcd}）のお客様が、すでにあります：\n${dup.name}\n\n請求先が同じだけの場合は、「請求先が別」に入れてください。\nこのまま保存しますか？`))return;
+  }
+  // 請求先
+  if(document.getElementById('sCBillOther').checked){
+    const bcd=tpShort(document.getElementById('sCBillCd').value),bname=document.getElementById('sCBillName').value.trim();
+    if(!bcd||!bname){alert('請求先のCDと名前を入れてください（「🔍 請求先をお客様マスタから探す」で選ぶと、自動で入ります）');return;}
+    cdata.billTo={db:document.getElementById('sCBillDb').value,cd:bcd,name:bname};
+  }else cdata.billTo=null;
   if(editCustomerId){
     const c=db.customers.find(x=>x.id===editCustomerId);
     if(c)Object.assign(c,cdata);
@@ -6854,6 +6956,9 @@ async function addCustomer(){
   await save();resetCustomerForm();renderSLists();
 }
 async function delCustomer(id){
+  // 配車カード・定期便・ごみ箱で使っているお客様は消さない（消すとカードが「（不明）」になる）
+  const used=(db.dispatches||[]).some(d=>d.customer===id)||(db.regulars||[]).some(r=>r.cust===id)||(db.trash||[]).some(t=>t.dp&&t.dp.customer===id);
+  if(used){alert('このお客様は、配車カードや定期便で使われているため削除できません。\n取引が終わったお客様は、編集（✏️）で「使わない」に印を付けてください。');return;}
   if(!confirm('このお客様を削除しますか？'))return;
   db.customers=db.customers.filter(x=>x.id!==id);await save();renderSLists();
 }
@@ -7328,7 +7433,7 @@ let _regEditId=null;
 function openRegular(){fillRegForm();resetRegForm();renderRegList();openM('mRegular');}
 function fillRegForm(){
   document.getElementById('rCustSearch').value='';
-  document.getElementById('rCust').innerHTML='<option value="">-- お客様を選択 --</option>'+(db.customers||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  filterRCust('');
   document.getElementById('rDriver').innerHTML='<option value="">都度配車</option>'+(db.drivers||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
   document.getElementById('rVehicle').innerHTML='<option value="">都度配車</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
 }
@@ -7385,9 +7490,12 @@ function editRegular(id){
 }
 function filterRCust(q){
   const cur=document.getElementById('rCust').value;
-  const custs=db.customers||[];
-  const filtered=q?custs.filter(c=>c.name.includes(q)):custs;
-  document.getElementById('rCust').innerHTML='<option value="">-- お客様を選択 --</option>'+filtered.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${c.name}</option>`).join('');
+  // 「使わない」お客様は出さない（定期便で使っているお客様と、いま選んでいるお客様は残す）
+  const regIds=new Set((db.regulars||[]).map(r=>r.cust));
+  const custs=(db.customers||[]).filter(c=>!c.inactive||regIds.has(c.id)||c.id===cur);
+  const qs=toSearchable(q||''),qc=String(q||'').trim().replace(/^0+(?=\d)/,'');
+  const filtered=q?custs.filter(c=>toSearchable(c.name).includes(qs)||toSearchable(c.kana||'').includes(qs)||(qc&&String(c.tpcd||'')===qc)):custs;
+  document.getElementById('rCust').innerHTML='<option value="">-- お客様を選択 --</option>'+filtered.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${esc(c.name)}${c.tpcd?'（'+esc(tpLabel(c))+'）':''}</option>`).join('');
 }
 function onFreqChg(){
   document.getElementById('rWomRow').classList.toggle('hid',document.getElementById('rFreq').value!=='monthly');
@@ -8057,10 +8165,11 @@ function toSearchable(s){
 }
 
 function getMPItems(){
-  if(MP.type==='customer')return(db.customers||[]).map(c=>({
-    id:c.id, name:c.name, kana:c.kana||'',
-    sub:[c.addr,c.contact].filter(x=>x).join(' | ')
-  }));
+  if(MP.type==='customer')return activeCustomers(MP.targetSel?MP.targetSel.value:'').map(c=>{
+    const b=billingOf(c);
+    return {id:c.id, name:c.name, kana:c.kana||'', code:tpLabel(c),
+      sub:[c.addr,c.contact,b&&b.other?'請求先：'+billLabel(b):''].filter(x=>x).join(' | ')};
+  });
   if(MP.type==='driver')return(db.drivers||[]).map(d=>({id:d.id,name:d.name,kana:'',sub:[[d.group,d.group2].filter(x=>x).join('/'),d.type].filter(x=>x).join(' · ')}));
   if(MP.type==='vehicle')return(db.vehicles||[]).map(v=>({id:v.id,name:v.name,kana:'',sub:(v.type||'')+(v.req?' | '+v.req+'以上':'')}));
   return[];
@@ -8080,6 +8189,8 @@ function filterMP(){
     if(i.kana&&toSearchable(i.kana).includes(qNorm))return true;
     // sub（住所・担当者名）
     if(toSearchable(i.sub||'').includes(qNorm))return true;
+    // T-PLANNERのCD（「3443」でも「大栄-3443」でも）
+    if(i.code&&(toSearchable(i.code).includes(qNorm)||i.code.split('-')[1]===raw.trim().replace(/^0+(?=\d)/,'')))return true;
     return false;
   });
   const list=document.getElementById('mpList');
@@ -8094,7 +8205,7 @@ function filterMP(){
     return;
   }
   list.innerHTML=clearRow+items.map(i=>`<div class="mp-item${i.id===curVal?' active':''}" onclick="selectMP('${i.id}')">
-    <div class="mp-item-name">${i.name}</div>
+    <div class="mp-item-name">${i.code?`<span style="font-size:10px;color:#6366f1;font-family:monospace;margin-right:6px">${esc(i.code)}</span>`:''}${i.name}</div>
     ${i.kana?`<div class="mp-item-kana">📝 ${i.kana}</div>`:''}
     ${i.sub?`<div class="mp-item-sub">${i.sub}</div>`:''}
   </div>`).join('');
@@ -8133,6 +8244,123 @@ document.addEventListener('mousedown',function(e){
     if(!e.target.closest('.mp-trigger'))closeMP();
   }
 });
+
+// ================================================================
+// T-PLANNERの得意先CSV（M得意先：大栄クリーナー_新／一元管理_新）の読み込み
+//  ・お客様は「DB＋CD」で照らし合わせる（2つのDBで同じCDが別の会社のことがあるため）
+//  ・お客様は消さない。名前は勝手に変えない（名前が大きく違うものは一覧で知らせる）
+// ================================================================
+let _tpImp=null; // 読み込んだCSV {db, rows}
+function openTpImport(){
+  _tpImp=null;
+  document.getElementById('tpImpFile').value='';
+  document.getElementById('tpImpResult').innerHTML='<div style="color:#94a3b8">CSVファイルを選んでください。</div>';
+  openM('mTpImport');
+}
+// 引用符の中の改行・カンマにも対応したCSVの読み取り
+function tpParseCsv(t){
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+    else if(c==='"')q=true;else if(c===','){row.push(f);f='';}
+    else if(c==='\n'){row.push(f.replace(/\r$/,''));rows.push(row);row=[];f='';}else f+=c;}
+  if(f||row.length){row.push(f);rows.push(row);}
+  return rows.filter(r=>r.length>1);
+}
+async function tpImportRead(e){
+  const file=e.target.files[0];if(!file)return;
+  const buf=await file.arrayBuffer();
+  const b=new Uint8Array(buf);
+  let text=(b[0]===0xEF&&b[1]===0xBB&&b[2]===0xBF)?new TextDecoder('utf-8').decode(buf).slice(1):new TextDecoder('utf-8',{fatal:false}).decode(buf);
+  if(text.includes('�'))text=new TextDecoder('shift-jis').decode(buf);
+  const rows=tpParseCsv(text);const h=rows[0]||[];
+  if(!h.includes('得意先CD')||!h.includes('得意先名')){alert('T-PLANNERの「M得意先」のCSVではないようです（「得意先CD」「得意先名」の列がありません）');return;}
+  // ファイル名からDBを決める（一元管理なら一元、それ以外は大栄）。違っていれば選び直せる
+  document.getElementById('tpImpDb').value=/一元/.test(file.name)?'ichigen':'daiei';
+  _tpImp={name:file.name,rows:rows.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??''])))};
+  tpImportPlan();
+}
+// 何がどう変わるかを数える（まだ変えない）
+function tpImportCompute(){
+  const dbKey=document.getElementById('tpImpDb').value;
+  const today=new Date(),since=fmt(new Date(today.getFullYear()-1,today.getMonth(),today.getDate())).replace(/-/g,'/');
+  const lastOf=r=>(r['前回請求締年月日']||'').slice(0,10);
+  const isRecent=r=>lastOf(r)>=since;
+  const byKey=new Map();
+  for(const c of db.customers||[])if(c.tpcd&&(c.tpDb||'daiei')===dbKey)byKey.set(c.tpcd,c);
+  // 配車カード（この1年と、これから）・定期便で使っているお客様には「使わない」を付けない
+  const yAgo=fmt(new Date(today.getFullYear()-1,today.getMonth(),today.getDate()));
+  const used=new Set([...(db.regulars||[]).map(r=>r.cust),...(db.dispatches||[]).filter(d=>(workDate(d)||'')>=yAgo).map(d=>d.customer)]);
+  const plan={dbKey,since,fill:[],bill:[],off:[],on:[],add:[],nameDiff:[],seen:0,last:new Map()};
+  for(const r of _tpImp.rows){
+    const cd=tpShort(r['得意先CD']);if(!cd)continue;
+    const c=byKey.get(cd);
+    const addr=[r['郵便番号']?'〒'+r['郵便番号']:'',(r['住所1']||'')+(r['住所2']||'')].filter(Boolean).join(' ').trim();
+    const billCd=tpShort(r['請求先CD']);
+    const billTo=billCd&&billCd!==cd?{db:dbKey,cd:billCd,name:(r['請求先名']||'').trim()}:null;
+    const info={cd,name:(r['得意先名']||'').trim(),kana:(r['得意先名カナ']||'').trim(),addr,phone:(r['TEL1']||'').trim(),billTo,last:lastOf(r),recent:isRecent(r),shokuchi:r['諸口区分名']==='諸口'};
+    if(c){
+      plan.seen++;
+      // 名前が大きく違う（別の会社のCDの可能性）ものは、何も書き換えずに知らせるだけ
+      // 半角カナ・全角英数・空白の違いは同じとみなす
+      const nn=s=>_normName(toSearchable(s||'')).replace(/[\s　]/g,'');
+      const n1=nn(c.name),n2=nn(info.name);
+      if(n1&&n2&&n1!==n2&&!n1.includes(n2)&&!n2.includes(n1)){plan.nameDiff.push({c,info});continue;}
+      // 空の項目だけ埋める（カナ・住所・電話）
+      const f={};
+      if(!c.kana&&info.kana)f.kana=info.kana;
+      if(!c.addr&&info.addr)f.addr=info.addr;
+      if(!c.phone&&info.phone)f.phone=info.phone;
+      if(Object.keys(f).length)plan.fill.push({c,f});
+      // 請求先（まだ入っていなければ）
+      if(billTo&&!(c.billTo&&c.billTo.cd))plan.bill.push({c,billTo});
+      // 使わない印
+      if(!info.recent&&!c.inactive&&!used.has(c.id))plan.off.push({c,info});
+      if(info.recent&&c.inactive&&c.inactiveBy==='tpImport')plan.on.push({c});
+      if(info.last)plan.last.set(c.id,info.last);
+    }else if(info.recent&&!info.shokuchi){
+      plan.add.push(info);
+    }
+  }
+  return plan;
+}
+function tpImportPlan(){
+  const out=document.getElementById('tpImpResult');
+  if(!_tpImp){out.innerHTML='<div style="color:#94a3b8">CSVファイルを選んでください。</div>';return;}
+  const p=tpImportCompute(),dbName=TP_DB[p.dbKey];
+  const cb=(id,checked,label,n,note)=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f1f5f9;cursor:pointer"><input type="checkbox" id="${id}" ${checked?'checked':''} ${n?'':'disabled'} style="width:auto;margin-top:2px"><span><b>${label}</b>：<b style="color:#2563eb">${n}件</b>${note?`<br><span style="color:#64748b;font-size:11px">${note}</span>`:''}</span></label>`;
+  out.innerHTML=`<div style="margin-bottom:8px">📄 ${esc(_tpImp.name)}（${_tpImp.rows.length}件）／照らし合わせるDB：<b>${dbName}</b>　配車システムで一致したお客様：<b>${p.seen}件</b></div>
+    ${cb('tpOptFill',true,'空の項目（カナ・住所・電話）を埋める',p.fill.length,'すでに入っている内容は変えません')}
+    ${cb('tpOptBill',true,'請求先を入れる',p.bill.length,'T-PLANNERで請求先が別の得意先になっているもの（まだ請求先が入っていないお客様だけ）')}
+    ${cb('tpOptOff',true,'「使わない」印を付ける',p.off.length,`前回請求締が ${p.since} より前のお客様（配車カード・定期便で使っているお客様は除く）`)}
+    ${cb('tpOptOn',true,'「使わない」印を外す',p.on.length,'前回この読み込みで印を付けたお客様のうち、また請求があったもの')}
+    ${cb('tpOptAdd',p.dbKey==='ichigen',`新しいお客様として追加（${dbName}）`,p.add.length,`1年以内に請求があり、配車システムにまだないお客様（諸口は除く）${p.dbKey==='daiei'?'。大栄は件数が多いので、必要なときだけ選んでください':''}`)}
+    ${p.nameDiff.length?`<div style="margin-top:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px">
+      <div style="font-weight:700;color:#b91c1c;margin-bottom:4px">⚠ 名前が大きく違うお客様：${p.nameDiff.length}件（別の会社のCDの可能性があるため、このお客様には何も書き込みません。お客様マスタで確認してください）</div>
+      ${p.nameDiff.map(x=>`<div style="font-size:11px">${esc(dbName)}-${esc(x.info.cd)}：配車システム「${esc(x.c.name)}」／T-PLANNER「${esc(x.info.name)}」</div>`).join('')}</div>`:''}
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-s" onclick="closeM('mTpImport')">キャンセル</button>
+      <button class="btn btn-p" onclick="tpImportApply()">選んだ内容で更新する</button>
+    </div>`;
+}
+async function tpImportApply(){
+  if(!_tpImp)return;
+  const p=tpImportCompute(),on=id=>document.getElementById(id).checked,n={};
+  if(on('tpOptFill')){p.fill.forEach(x=>Object.assign(x.c,x.f));n.fill=p.fill.length;}
+  if(on('tpOptBill')){p.bill.forEach(x=>{x.c.billTo=x.billTo;});n.bill=p.bill.length;}
+  if(on('tpOptOff')){p.off.forEach(x=>{x.c.inactive=true;x.c.inactiveBy='tpImport';});n.off=p.off.length;}
+  if(on('tpOptOn')){p.on.forEach(x=>{x.c.inactive=false;delete x.c.inactiveBy;});n.on=p.on.length;}
+  if(on('tpOptAdd')){
+    p.add.forEach(i=>db.customers.push({id:uid(),name:i.name,kana:i.kana,tpcd:i.cd,tpDb:p.dbKey,addr:i.addr,contact:'',phone:i.phone,billTo:i.billTo,tpLast:i.last}));
+    n.add=p.add.length;
+  }
+  if(!Object.keys(n).length){alert('何も選ばれていません');return;}
+  // 前回請求締の日付を控えておく（古さが分かるように）
+  (db.customers||[]).forEach(c=>{const l=p.last.get(c.id);if(l&&c.tpLast!==l)c.tpLast=l;});
+  await save();
+  closeM('mTpImport');renderSLists();fillDSel();
+  alert(`✅ 更新しました（${TP_DB[p.dbKey]}）\n\n・空の項目を埋めた：${n.fill??0}件\n・請求先を入れた：${n.bill??0}件\n・「使わない」を付けた：${n.off??0}件\n・「使わない」を外した：${n.on??0}件\n・新しく追加した：${n.add??0}件`);
+}
 
 // ================================================================
 // MASTER CSV IMPORT / EXPORT
@@ -8964,7 +9192,7 @@ function conCustOf(p){
   const hit=cs.filter(c=>_normName(c.name)===n);
   return hit.length===1?hit[0]:null;
 }
-function conTpcd(p){const c=conCustOf(p);return c&&c.tpcd?c.tpcd:'';}
+function conTpcd(p){return tpLabel(conCustOf(p));}
 // 種類の下に、管理番号があれば小さく出す
 const conTypeCell=(type,no)=>`${esc(type||'')}${no?`<div style="font-size:10px;color:#94a3b8">No.${esc(no)}</div>`:''}`;
 const conPurposeCell=p=>p?`<span style="background:#ede9fe;color:#5b21b6;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700">${esc(p)}</span>`:'<span style="color:#cbd5e1">—</span>';
@@ -9347,9 +9575,9 @@ function conCustomerSuggest(val) {
   if (!val || val.length < 1) { sug.style.display = 'none'; return; }
   const q = val.toLowerCase();
   // T-PLANNERCDでも探せる
-  const matches = (db.customers||[]).filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.tpcd && String(c.tpcd).startsWith(val.trim()))).slice(0,8);
+  const matches = activeCustomers().filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.tpcd && String(c.tpcd).startsWith(tpShort(val)))).slice(0,8);
   if (matches.length === 0) { sug.style.display = 'none'; return; }
-  sug.innerHTML = matches.map(c => `<div style="padding:7px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #f1f5f9" onmousedown="selectConCustomer('${c.id}')">${c.tpcd?`<span style="color:#94a3b8;margin-right:6px">${esc(c.tpcd)}</span>`:''}${esc(c.name)}</div>`).join('');
+  sug.innerHTML = matches.map(c => `<div style="padding:7px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #f1f5f9" onmousedown="selectConCustomer('${c.id}')">${c.tpcd?`<span style="color:#94a3b8;margin-right:6px">${esc(tpLabel(c))}</span>`:''}${esc(c.name)}</div>`).join('');
   sug.style.display = '';
 }
 let _conCustId = ''; // 手動で登録するときに選んだお客様（お客様マスタの番号。T-PLANNERCDの表示に使う）
