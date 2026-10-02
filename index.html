@@ -2732,6 +2732,61 @@ function checkContainerAlerts() {
           <option value="normal">通常どおり予定を作る（祝日も実施）</option>
         </select>
       </div>
+      <!-- 作業種別・マニフェスト：ここで決めておくと、作られる全部のカードに入る -->
+      <div style="font-size:11px;font-weight:700;color:#6d28d9;margin-bottom:6px;background:#ede9fe;padding:4px 8px;border-radius:4px">🔧 作業種別 <span style="font-weight:400;color:#7c3aed">（作られるカードに入ります）</span></div>
+      <div style="border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;margin-bottom:10px;background:#faf5ff">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">廃棄物区分：</span>
+          <label class="mfst-btn"><input type="radio" name="rWkWaste" value="" checked onchange="rApplyMfstRules()">未選択</label>
+          <label class="mfst-btn type-yes"><input type="radio" name="rWkWaste" value="general" onchange="rApplyMfstRules()">♻ 一般廃・資源物</label>
+          <label class="mfst-btn type-sys"><input type="radio" name="rWkWaste" value="industrial" onchange="rApplyMfstRules()">🏭 産業廃棄物</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">作業タイプ：</span>
+          <label class="mfst-btn"><input type="radio" name="rWkType" value="" checked onchange="rOnWkTypeChange()">未選択</label>
+          <label class="mfst-btn type-yes"><input type="radio" name="rWkType" value="manual" onchange="rOnWkTypeChange()">🖐 手積み</label>
+          <label class="mfst-btn type-sys"><input type="radio" name="rWkType" value="container" onchange="rOnWkTypeChange()">🗃 コンテナ</label>
+        </div>
+        <div id="rContainerOpts" style="display:none;padding-top:8px;border-top:1px dashed #ddd6fe;margin-top:4px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">コンテナ作業：</span>
+            <label class="mfst-btn type-yes"><input type="radio" name="rWkContainerOp" value="set" onchange="rApplyMfstRules()">📥 設置</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="rWkContainerOp" value="swap" checked onchange="rApplyMfstRules()">🔄 交換</label>
+            <label class="mfst-btn type-no"><input type="radio" name="rWkContainerOp" value="remove" onchange="rApplyMfstRules()">📤 撤去</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">サイズ：</span>
+            <span id="rWkSizeBtns" style="display:contents"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px">
+            <span style="font-size:11px;font-weight:700;color:#5b21b6;min-width:64px;flex-shrink:0">用途：</span>
+            <span id="rWkPurposeBtns" style="display:contents"></span>
+          </div>
+        </div>
+      </div>
+      <div id="rMfstSection" style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;background:#f1f5f9;padding:4px 8px;border-radius:4px">📋 マニフェスト <span style="font-weight:400;color:#64748b">（作られるカードに入ります）</span></div>
+        <div class="mfst-wrap">
+          <div class="mfst-row">
+            <span class="mfst-row-label">必要性：</span>
+            <label class="mfst-btn type-yes"><input type="radio" name="rMfstNeeded" value="yes" onchange="rOnMfstChange()">要</label>
+            <label class="mfst-btn type-no" id="rMfstNoBtn"><input type="radio" name="rMfstNeeded" value="no" onchange="rOnMfstChange()" checked>不要</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="rMfstNeeded" value="bring" onchange="rOnMfstChange()">持参</label>
+            <label class="mfst-btn type-yes"><input type="radio" name="rMfstNeeded" value="receive" onchange="rOnMfstChange()">受領</label>
+          </div>
+          <div class="mfst-row hid" id="rMfstTypeRow">
+            <span class="mfst-row-label">種類：</span>
+            <label class="mfst-btn type-paper"><input type="radio" name="rMfstType" value="paper" onchange="rOnMfstChange()" checked>📄 紙</label>
+            <label class="mfst-btn type-paper"><input type="radio" name="rMfstType" value="electronic" onchange="rOnMfstChange()">💻 電子</label>
+          </div>
+          <div class="mfst-row hid" id="rMfstSysRow">
+            <span class="mfst-row-label">システム：</span>
+            <label class="mfst-btn type-sys"><input type="radio" name="rMfstSys" value="jwnet" checked>JWNET</label>
+            <label class="mfst-btn type-sys"><input type="radio" name="rMfstSys" value="ereverse">イーリバース</label>
+          </div>
+        </div>
+      </div>
+      <div id="rMfstHiddenNote" class="hid" style="font-size:11px;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;padding:5px 10px;margin-bottom:10px"></div>
       <div class="fr"><label>備考</label><textarea id="rNotes" rows="2" placeholder="収集品目、注意事項など"></textarea></div>
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <button class="btn btn-w" id="rSaveBtn" onclick="saveRegular()">🔁 定期便を登録する</button>
@@ -7682,6 +7737,7 @@ function resetRegForm(){
   document.getElementById('rVehicle').value='';
   document.getElementById('rHoliday').value='ask';
   document.getElementById('rNotes').value='';
+  rSetWork(null,null);
   document.getElementById('rReceptionistList').innerHTML=(db.staffs||[]).map(s=>`<option value="${esc(s.name)}">`).join('');
   let last='';try{last=localStorage.getItem('regReceptionistLast')||'';}catch(e){}
   document.getElementById('rReceptionist').value=last;
@@ -7706,6 +7762,7 @@ function editRegular(id){
   document.getElementById('rHoliday').value=rs.holidayMode||'ask';
   document.getElementById('rReceptionist').value=rs.receptionist||'';
   document.getElementById('rNotes').value=rs.notes||'';
+  rSetWork(rs.workType,rs.manifest);
   document.getElementById('rEditBanner').classList.remove('hid');
   document.getElementById('rCancelBtn').classList.remove('hid');
   document.getElementById('rSaveBtn').textContent='💾 変更を保存する';
@@ -7741,7 +7798,7 @@ async function saveRegular(){
   const receptionist=document.getElementById('rReceptionist').value.trim();
   if(!receptionist&&!confirm('連絡担当（受付）が空欄です。\nこの定期便から作られるカードには受付担当が入りません。\n\nこのまま保存しますか？'))return;
   try{if(receptionist)localStorage.setItem('regReceptionistLast',receptionist);}catch(e){}
-  const fields={cust,freq,dows,wom,driver,vehicle,notes,isCarryIn,site,time,holidayMode,receptionist};
+  const fields={cust,freq,dows,wom,driver,vehicle,notes,isCarryIn,site,time,holidayMode,receptionist,...rGetWork()};
   let msg;
   if(_regEditId){
     const rs=db.regulars.find(x=>x.id===_regEditId);
@@ -7760,6 +7817,71 @@ async function saveRegular(){
   alert(msg);
 }
 function regTimeSpec(rs){return rs.time?{enabled:true,time:rs.time}:{enabled:false,time:''};}
+// ----- 定期便設定の「作業種別」「マニフェスト」（カードの画面と同じ決まりで表示を切り替える） -----
+const REG_CON_SIZES=['1㎥BOX','1.5㎥BOX','2㎥BOX','4㎥（2DR）コンテナ','8㎥（4DR）コンテナ','12㎥コンテナ','16㎥コンテナ','フレコンバッグ'];
+const rRadio=(name,def)=>(document.querySelector(`#mRegular input[name="${name}"]:checked`)||{}).value??def;
+const rSetRadio=(name,v)=>{const r=document.querySelector(`#mRegular input[name="${name}"][value="${v}"]`);if(r)r.checked=true;};
+function rRenderConBtns(size,purpose){
+  const sizes=REG_CON_SIZES.slice();if(size&&!sizes.includes(size))sizes.push(size);
+  const sz=size||'1.5㎥BOX';
+  document.getElementById('rWkSizeBtns').innerHTML=sizes.map(s=>`<label class="mfst-btn type-sys"><input type="radio" name="rWkContainerSize" value="${esc(s)}"${s===sz?' checked':''}>${esc(conShort(s))}</label>`).join('');
+  const list=conPurposes().slice();if(purpose&&!list.includes(purpose))list.push(purpose);
+  document.getElementById('rWkPurposeBtns').innerHTML=[['','未選択'],...list.map(p=>[p,p])].map(([v,l])=>`<label class="mfst-btn type-sys"><input type="radio" name="rWkContainerPurpose" value="${esc(v)}"${v===(purpose||'')?' checked':''}>${esc(l)}</label>`).join('');
+}
+function rOnWkTypeChange(){
+  document.getElementById('rContainerOpts').style.display=rRadio('rWkType','')==='container'?'block':'none';
+  rApplyMfstRules();
+}
+function rOnMfstChange(){
+  const needed=rRadio('rMfstNeeded','no'),type=rRadio('rMfstType','paper');
+  const needsDoc=['yes','bring','receive'].includes(needed);
+  document.getElementById('rMfstTypeRow').classList.toggle('hid',!needsDoc);
+  document.getElementById('rMfstSysRow').classList.toggle('hid',!(needsDoc&&type==='electronic'));
+}
+function rMfstRule(){
+  const waste=rRadio('rWkWaste',''),wk=rRadio('rWkType',''),op=rRadio('rWkContainerOp','swap');
+  if(waste==='general')return {mode:'hide',why:'一般廃・資源物のため、マニフェストは不要です。'};
+  if(wk==='container'&&op==='set')return {mode:'hide',why:'コンテナ設置のため、マニフェストは不要です。'};
+  if(wk==='manual'||wk==='container')return {mode:'noNo'};
+  return {mode:'all'};
+}
+function rApplyMfstRules(){
+  const r=rMfstRule(),note=document.getElementById('rMfstHiddenNote');
+  document.getElementById('rMfstSection').classList.toggle('hid',r.mode==='hide');
+  note.classList.toggle('hid',r.mode!=='hide');
+  note.textContent=r.mode==='hide'?'📋 '+r.why:'';
+  document.getElementById('rMfstNoBtn').classList.toggle('hid',r.mode==='noNo');
+  if(r.mode==='noNo'&&rRadio('rMfstNeeded','no')==='no')rSetRadio('rMfstNeeded','yes');
+  rOnMfstChange();
+}
+function rSetWork(wt,m){
+  wt=wt||{};m=m||{};
+  rSetRadio('rWkWaste',wt.waste||'');
+  rSetRadio('rWkType',wt.type||'');
+  rSetRadio('rWkContainerOp',wt.type==='container'?(wt.containerOp||'set'):'swap');
+  rRenderConBtns(wt.containerSize||'',wt.containerPurpose||'');
+  rSetRadio('rMfstNeeded',m.needed||'no');rSetRadio('rMfstType',m.type||'paper');rSetRadio('rMfstSys',m.sys||'jwnet');
+  rOnWkTypeChange();
+}
+function rGetWork(){
+  const wk=rRadio('rWkType','');
+  const workType={type:wk,waste:rRadio('rWkWaste','')};
+  if(wk==='container'){
+    workType.containerOp=rRadio('rWkContainerOp','swap');
+    workType.containerSize=rRadio('rWkContainerSize','');
+    workType.containerPurpose=rRadio('rWkContainerPurpose','');
+  }
+  const manifest=rMfstRule().mode==='hide'?{needed:'no',type:'paper',sys:'jwnet'}
+    :{needed:rRadio('rMfstNeeded','no'),type:rRadio('rMfstType','paper'),sys:rRadio('rMfstSys','jwnet')};
+  return {workType,manifest};
+}
+// 定期便から作るカードの作業種別・マニフェスト（設定がない古い定期便は何も入れない）
+function regWork(rs){
+  const o={};
+  if(rs.workType)o.workType=JSON.parse(JSON.stringify(rs.workType));
+  if(rs.manifest)o.manifest={...rs.manifest};
+  return o;
+}
 // 営業日＝土日祝以外。dir=-1で前の営業日、+1で翌営業日
 function isBizDay(ds){const w=pd(ds).getDay();return w!==0&&w!==6&&!HOLIDAYS[ds];}
 function shiftBizDay(ds,dir){
@@ -7796,6 +7918,11 @@ function applyRegularChange(rs,fields){
     if(!x.receptionist||x.receptionist===(old.receptionist||''))x.receptionist=rs.receptionist||'';
     if(rs.site||old.site)x.siteName=rs.site;
     if(rs.time||old.time)x.timeSpec=regTimeSpec(rs);
+    // 作業種別・マニフェスト：カードで手で変えていなければ、新しい設定に合わせる
+    const same=(a,b)=>sbStable(a||null)===sbStable(b||null);
+    const wtEmpty=w=>!w||(!w.type&&!w.waste);
+    if(rs.workType&&(wtEmpty(x.workType)||same(x.workType,old.workType)))x.workType=regWork(rs).workType;
+    if(rs.manifest&&(!x.manifest||same(x.manifest,old.manifest)||(!old.manifest&&x.manifest.needed==='no')))x.manifest={...rs.manifest};
     if(rs.isCarryIn){x.driver=null;x.vehicle=null;}
     else{
       if(!x.driver||x.driver===old.driver)x.driver=rs.driver;
@@ -7846,7 +7973,7 @@ function genRegDisps(rs){
     const target=regTarget(rs,ds);
     // date＝ルール上の日（重複判定用）、dispatchDate＝実際に行く日
     // 番号は「定期便＋日付」で決める（複数のパソコンが同時に作っても二重にならないように）
-    db.dispatches.push({id:'rg'+rs.id+'-'+ds,customer:rs.cust,date:ds,dispatchDate:target,holShift:target!==ds?HOLIDAYS[ds]:'',status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.isCarryIn?null:rs.driver,vehicle:rs.isCarryIn?null:rs.vehicle,notes:rs.notes,siteName:rs.site||'',timeSpec:regTimeSpec(rs),receptionist:rs.receptionist||'',isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,created:now,updated:now});
+    db.dispatches.push({id:'rg'+rs.id+'-'+ds,customer:rs.cust,date:ds,dispatchDate:target,holShift:target!==ds?HOLIDAYS[ds]:'',status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.isCarryIn?null:rs.driver,vehicle:rs.isCarryIn?null:rs.vehicle,notes:rs.notes,siteName:rs.site||'',timeSpec:regTimeSpec(rs),receptionist:rs.receptionist||'',isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,...regWork(rs),created:now,updated:now});
   }
 }
 function renderRegList(){
@@ -7864,6 +7991,7 @@ function renderRegList(){
         <span class="ritem-del" data-id="${esc(rs.id)}" onclick="event.stopPropagation();delRegular(this.dataset.id)">🗑</span>
       </div>
       <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'':`ドライバー: ${esc(drvName(rs.driver))} ／ 車両: ${esc(vehName(rs.vehicle))} ／ `}${holL}${rs.receptionist?' ／ 📞担当 '+esc(rs.receptionist):' ／ <span style="color:#dc2626">📞担当 未設定</span>'}${rs.site?' ／ 📍'+esc(rs.site):''}${rs.notes?' ／ '+esc(rs.notes):''}</div>
+      <div style="font-size:11px;margin-top:2px;color:${rs.workType&&(rs.workType.type||rs.workType.waste)?'#6d28d9':'#dc2626'}">${rs.workType&&(rs.workType.type||rs.workType.waste)?'🔧 '+esc(workTypeLabel(rs.workType)):'🔧 作業種別 未設定'}${rs.manifest?' ／ 📋 マニフェスト '+esc(mfstLabel(rs.manifest)):''}</div>
     </div>`;}).join('');
 }
 // ================================================================
