@@ -545,8 +545,10 @@ body.signage #signageRoot{display:flex;flex-direction:column;height:100vh;paddin
 /* お知らせ：日付の下の帯 */
 .sg-news{display:flex;align-items:stretch;gap:.6em;background:#111a2e;border:2px solid #b45309;border-radius:.6em;overflow:hidden;font-size:1.25em}
 .sg-news-lbl{background:#b45309;color:#fff;font-weight:900;padding:.3em .8em;display:flex;align-items:center;white-space:nowrap}
-.sg-news-list{display:flex;flex-wrap:wrap;gap:.35em .6em;padding:.35em .4em .35em 0;align-items:center}
-.sg-news-item{color:#fde68a;font-weight:800;padding:.05em .5em;border-radius:.4em;background:#1e293b}
+.sg-news-view{flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;padding:.3em 0}
+.sg-news-track{display:flex;white-space:nowrap;will-change:transform}
+.sg-news-set{display:flex;gap:1.2em;padding-right:4em;flex-shrink:0}
+.sg-news-item{color:#fde68a;font-weight:800;padding:.05em .5em;border-radius:.4em;background:#1e293b;white-space:nowrap}
 .sg-news-item.imp{background:#b91c1c;color:#fff}
 /* 持込み：工場の作業者向けに大きく目立たせる帯 */
 .sg-carry{display:flex;align-items:stretch;gap:.6em;background:#111a2e;border:2px solid #0e7490;border-radius:.6em;overflow:hidden;font-size:1.3em}
@@ -10358,7 +10360,7 @@ function renderSignage(){
       <div class="sg-title">配車予定</div>
       <div class="sg-clock">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}<small>${_sgLoadErr?`<span class="sg-err">⚠ 接続エラー（${upd}時点の内容）</span>`:`最終更新 ${upd}`}</small></div>
     </div>
-    ${news.length?`<div class="sg-news"><div class="sg-news-lbl">📢 お知らせ</div><div class="sg-news-list">${news.map(n=>`<span class="sg-news-item${n.level==='important'?' imp':''}">${n.level==='important'?'🚨 ':''}${esc(n.text)}</span>`).join('')}</div></div>`:''}
+    ${news.length?`<div class="sg-news"><div class="sg-news-lbl">📢 お知らせ</div><div class="sg-news-view"><div class="sg-news-track"><span class="sg-news-set">${news.map(n=>`<span class="sg-news-item${n.level==='important'?' imp':''}">${n.level==='important'?'🚨 ':''}${esc(n.text.replace(/\s*\n\s*/g,'　'))}</span>`).join('')}</span></div></div></div>`:''}
     <div class="sg-cols">${col(false)}${col(true)}</div>
     ${carryBar}
     ${bottom?`<div class="sg-bottom">${bottom}</div>`:''}
@@ -10371,6 +10373,33 @@ function renderSignage(){
     </div>`;
   root.querySelectorAll('.sg-body').forEach((e,i)=>{if(prevScroll[i])e.scrollTop=prevScroll[i];});
   sgStartScroll(prevScroll.some(Boolean));
+  sgNewsSetup(news.map(n=>n.level+n.text).join('\n'));
+}
+// お知らせ：1行に入りきらないときは右から左へ流す（描き直しても流れている位置を引き継ぐ）
+let _sgNewsKey='',_sgNewsPos=0,_sgNewsWait=0,_sgNewsRaf=0,_sgNewsT=0;
+function sgNewsSetup(key){
+  if(key!==_sgNewsKey){_sgNewsKey=key;_sgNewsPos=0;_sgNewsWait=3000;}
+  const view=document.querySelector('#signageRoot .sg-news-view'),track=view&&view.querySelector('.sg-news-track');
+  if(!track){clearInterval(_sgNewsRaf);_sgNewsRaf=0;return;}
+  const set=track.querySelector('.sg-news-set');
+  // 入りきるときは止めておく（余白を除いた幅で判定）
+  if(set.scrollWidth-parseFloat(getComputedStyle(set).paddingRight)<=view.clientWidth){track.style.transform='';clearInterval(_sgNewsRaf);_sgNewsRaf=0;return;}
+  track.appendChild(set.cloneNode(true)); // 切れ目なく流すため、同じ内容を後ろにもう1つ並べる
+  track.style.transform=`translateX(${-_sgNewsPos}px)`;
+  if(!_sgNewsRaf){_sgNewsT=performance.now();_sgNewsRaf=setInterval(sgNewsTick,25);}
+}
+function sgNewsTick(){
+  const now=performance.now(),dt=Math.min(1000,now-_sgNewsT);_sgNewsT=now;
+  const track=document.querySelector('#signageRoot .sg-news-track'),set=track&&track.querySelector('.sg-news-set');
+  if(!set){clearInterval(_sgNewsRaf);_sgNewsRaf=0;return;}
+  if(_sgNewsWait>0)_sgNewsWait-=dt;
+  else{
+    const speed=parseFloat(getComputedStyle(set).fontSize)*4; // 1秒に約4文字分
+    _sgNewsPos+=speed*dt/1000;
+    const w=set.offsetWidth;
+    if(_sgNewsPos>=w){_sgNewsPos-=w;}
+    track.style.transform=`translateX(${-_sgNewsPos}px)`;
+  }
 }
 // 表示日の切り替え（マウスを動かすと下にボタンが出る・キーボードでも可）
 function sgSetDate(ds){_sgManualDate=ds;_sgManualAt=Date.now();renderSignage();document.querySelectorAll('#signageRoot .sg-body').forEach(e=>e.scrollTop=0);sgShowCtrl();}
