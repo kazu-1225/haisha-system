@@ -542,6 +542,12 @@ body.signage #signageRoot{display:flex;flex-direction:column;height:100vh;paddin
 .sg-foot{display:flex;align-items:center;gap:.4em;flex-wrap:wrap}
 .sg-foot.warn b{color:#fca5a5}
 .sg-chip{background:#1e293b;border-radius:.4em;padding:.1em .5em}
+/* お知らせ：日付の下の帯 */
+.sg-news{display:flex;align-items:stretch;gap:.6em;background:#111a2e;border:2px solid #b45309;border-radius:.6em;overflow:hidden;font-size:1.25em}
+.sg-news-lbl{background:#b45309;color:#fff;font-weight:900;padding:.3em .8em;display:flex;align-items:center;white-space:nowrap}
+.sg-news-list{display:flex;flex-wrap:wrap;gap:.35em .6em;padding:.35em .4em .35em 0;align-items:center}
+.sg-news-item{color:#fde68a;font-weight:800;padding:.05em .5em;border-radius:.4em;background:#1e293b}
+.sg-news-item.imp{background:#b91c1c;color:#fff}
 /* 持込み：工場の作業者向けに大きく目立たせる帯 */
 .sg-carry{display:flex;align-items:stretch;gap:.6em;background:#111a2e;border:2px solid #0e7490;border-radius:.6em;overflow:hidden;font-size:1.3em}
 .sg-carry-lbl{background:#0e7490;color:#fff;font-weight:900;padding:.3em .8em;display:flex;align-items:center;white-space:nowrap;letter-spacing:.1em}
@@ -904,6 +910,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
     <button class="plan-btn" style="background:#0e7490" onclick="openSwapDay()" title="急な休み・車両の故障のとき、その日のカードをまとめて別のドライバー・車両へ差し替える">🔁 当日の差し替え</button>
     <button class="plan-btn" style="background:#475569" onclick="openDayPrint()" title="1日分の配車表をA4用紙1枚で印刷">🖨 日次表印刷</button>
     <button class="plan-btn" style="background:#0f172a" onclick="openSignage()" title="工場などのモニター用に、今日の配車を大きく表示する画面を開きます（見るだけ）">📺 サイネージ</button>
+    <button class="plan-btn" style="background:#b45309" onclick="openNotices()" title="サイネージ画面に出すお知らせ・連絡事項を登録します">📢 お知らせ</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
     <button class="ship-add-btn" onclick="openAddShipment()">📦 出荷追加</button>
     <button class="add-btn" onclick="openAddDispatch()">＋ 配車追加</button>
@@ -2799,6 +2806,36 @@ function checkContainerAlerts() {
   </div>
 </div>
 
+<!-- サイネージのお知らせ モーダル -->
+<div class="ovl hid" id="mNotices">
+  <div class="mbox" style="max-width:560px">
+    <div class="mhdr"><h2>📢 サイネージのお知らせ</h2><span class="mcls" onclick="closeM('mNotices')">×</span></div>
+    <div class="mbdy">
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#92400e">
+        💡 登録したお知らせは、表示する期間のあいだ、サイネージ画面の上の帯に出ます（終わった日の翌日から自動で出なくなります）。
+      </div>
+      <div class="fr"><label>お知らせの内容 *</label><textarea id="ntText" rows="2" maxlength="120" placeholder="例: 本日15時から全体朝礼の代わりに安全会議を行います"></textarea></div>
+      <div class="r2">
+        <div class="fr"><label>表示する期間（から）</label><input type="date" id="ntFrom"></div>
+        <div class="fr"><label>（まで）</label><input type="date" id="ntTo"></div>
+      </div>
+      <div class="fr"><label>目立たせ方</label>
+        <div class="reg-kind-row">
+          <label class="reg-kind"><input type="radio" name="ntLevel" value="info" checked><span>📢 通常<small>黄色の文字</small></span></label>
+          <label class="reg-kind"><input type="radio" name="ntLevel" value="important"><span>🚨 重要<small>赤い帯で目立たせる</small></span></label>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-w" id="ntSaveBtn" onclick="saveNotice()">📢 お知らせを登録する</button>
+        <button class="btn btn-s hid" id="ntCancelBtn" onclick="resetNoticeForm()">編集をやめる</button>
+      </div>
+      <hr style="margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#475569">📋 登録中のお知らせ <span style="font-size:11px;font-weight:400;color:#94a3b8">（クリックで編集）</span></div>
+      <div id="noticeList" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden"></div>
+    </div>
+  </div>
+</div>
+
 <!-- 休み・車両不在 モーダル -->
 <div class="ovl hid" id="mAbsence">
   <div class="mbox" style="max-width:480px">
@@ -3361,6 +3398,7 @@ function normalizeDB(){
   if(!db.regSkips)db.regSkips=[];
   if(!db.absences)db.absences=[];
   if(!db.dispatchPatterns||Array.isArray(db.dispatchPatterns))db.dispatchPatterns={};
+  if(!Array.isArray(db.signageNotices))db.signageNotices=[];
   // 旧コンテナサイズ → コンテナ管理の種類名に読み替え
   const LEG={'1.5box':'1.5㎥BOX','2t':'4㎥（2DR）コンテナ','4t':'8㎥（4DR）コンテナ','large':'大型コンテナ'};
   [...db.dispatches,...db.trash.map(t=>t.dp)].forEach(dp=>{const w=dp&&dp.workType;if(w&&LEG[w.containerSize])w.containerSize=LEG[w.containerSize];});
@@ -3629,10 +3667,12 @@ const DAY_DEFAULT_MIN=12*60+30;
 const TIME_WORDS=[
   [/朝一|朝イチ|朝いち|早朝|一番で|1番で|始業/,7*60+30,'朝一'],
   [/AM早|午前早|朝早|早めの午前/,8*60+30,'AM早め'],
-  [/AM|午前/,10*60,'AM中'],
+  [/朝から|朝のうち|朝方|朝中|朝に|朝の/,8*60+30,'朝'],
+  [/(?<![A-Z])AM(?![A-Z])|午前/,10*60,'AM中'],
   [/昼前|お昼前|昼まで/,11*60,'昼前'],
+  [/昼一|昼イチ|昼いち|午後一|午後イチ|午後いち|昼から|昼以降|昼過|昼すぎ|休み明け/,13*60,'昼一'],
   [/正午|お昼|昼頃|昼ごろ|12時頃/,12*60,'昼'],
-  [/PM|午後/,14*60,'PM'],
+  [/(?<![A-Z])PM(?![A-Z])|午後/,14*60,'PM'],
   [/夕方|16時以降|17時/,16*60,'夕方']
 ];
 function hm2min(s){const m=String(s||'').match(/(\d{1,2})\s*[:：]\s*(\d{2})/);return m?(+m[1])*60+(+m[2]):null;}
@@ -3640,10 +3680,13 @@ function hm2min(s){const m=String(s||'').match(/(\d{1,2})\s*[:：]\s*(\d{2})/);r
 function guessDayTime(dp){
   const txt=((dp.caution||'')+' '+(dp.notes||'')).normalize('NFKC').toUpperCase();
   if(!txt.trim())return null;
-  const t=hm2min(txt);
-  if(t!=null&&t>=5*60&&t<=20*60){const m=txt.match(/(\d{1,2})\s*:\s*(\d{2})/);return {min:t,label:m[0].replace(/\s/g,'')};}
-  const h=txt.match(/(\d{1,2})\s*時/);
-  if(h&&+h[1]>=5&&+h[1]<=20)return {min:+h[1]*60,label:h[1]+'時'};
+  // 「午後3時」「PM1:30」や、1〜6時（午前の作業はない時間）は午後として扱う
+  const pmCtx=/(?<![A-Z])PM(?![A-Z])|午後/.test(txt),amCtx=/(?<![A-Z])AM(?![A-Z])|午前|朝(?!日)/.test(txt);
+  const toPm=h=>(h<12&&(pmCtx||(h>=1&&h<=6&&!amCtx)))?h+12:h;
+  const m=txt.match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if(m){const hh=toPm(+m[1]),t=hh*60+(+m[2]);if(t>=5*60&&t<=20*60)return {min:t,label:hh+':'+m[2]};}
+  const h=txt.match(/(\d{1,2})\s*時(?!間)(半)?/);
+  if(h){const hh=toPm(+h[1]);if(hh>=5&&hh<=20)return {min:hh*60+(h[2]?30:0),label:hh+'時'+(h[2]||'')};}
   for(const [re,min,label] of TIME_WORDS)if(re.test(txt))return {min,label};
   return null;
 }
@@ -6278,6 +6321,7 @@ function sbSourceRows(){
     ['regSkips',db.regSkips||[],'dispatch_delete'],['containerSettings',db.containerSettings||{},'container_manage'],
     ['products',db.products||[],'sales'],
     ['dispatchPatterns',db.dispatchPatterns||{},'dispatch_create'], // お客様ごとの「いつものパターン」
+    ['signageNotices',db.signageNotices||[],'dispatch_create'], // サイネージのお知らせ
   ];
   plan.push({table:'app_settings',label:'設定（並び順など）',key:'key',isSettings:true,
     rows:settings.map(([key,value,edit_perm])=>({key,value,edit_perm}))});
@@ -6651,6 +6695,7 @@ const PERM_FN={
   savePatternFromForm:'dispatch_create',deletePattern:'dispatch_create',
   openTpImport:'admin',tpImportApply:'admin',
   openSwapDay:'dispatch_assign',applySwapDay:'dispatch_assign',
+  openNotices:'dispatch_create',saveNotice:'dispatch_create',deleteNotice:'dispatch_create',
   openDayPrint:'print',printDaySchedule:'print',openPrintConfirm:'print',executePrint:'print',printWorkOrder:'print',
   openConAction:'container_manage',saveCON:'container_manage',deleteCON:'container_manage',openConImport:'container_manage',
   executeConImport:'container_manage',saveConSettings:'container_manage',addConEmail:'container_manage',removeConEmail:'container_manage',
@@ -10303,6 +10348,7 @@ function renderSignage(){
     unassigned.length?`<div class="sg-foot warn"><b>🔴 未確定</b>${chip(unassigned.length+'件（ドライバー未定）')}</div>`:''
   ].join('');
   const hol=HOLIDAYS[ds];
+  const news=noticesForDate(ds);
   const t=new Date();
   // 描き直してもスクロール位置を引き継ぐ（件数が多い日も最後まで流れるように）
   const prevScroll=[...root.querySelectorAll('.sg-body')].map(e=>e.scrollTop);
@@ -10312,6 +10358,7 @@ function renderSignage(){
       <div class="sg-title">配車予定</div>
       <div class="sg-clock">${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}<small>${_sgLoadErr?`<span class="sg-err">⚠ 接続エラー（${upd}時点の内容）</span>`:`最終更新 ${upd}`}</small></div>
     </div>
+    ${news.length?`<div class="sg-news"><div class="sg-news-lbl">📢 お知らせ</div><div class="sg-news-list">${news.map(n=>`<span class="sg-news-item${n.level==='important'?' imp':''}">${n.level==='important'?'🚨 ':''}${esc(n.text)}</span>`).join('')}</div></div>`:''}
     <div class="sg-cols">${col(false)}${col(true)}</div>
     ${carryBar}
     ${bottom?`<div class="sg-bottom">${bottom}</div>`:''}
@@ -10410,6 +10457,75 @@ function sgBindControls(){
 // 画面が暗くならないようにする（対応しているブラウザのみ）
 async function sgKeepAwake(){
   try{if(navigator.wakeLock){let lock=await navigator.wakeLock.request('screen');document.addEventListener('visibilitychange',async()=>{if(!document.hidden)try{lock=await navigator.wakeLock.request('screen');}catch(e){}});}}catch(e){}
+}
+// ----- サイネージのお知らせ：db.signageNotices = [{id,text,from,to,level:'info'|'important',by,at}] -----
+let _ntEditId=null;
+function noticesForDate(ds){
+  return (db.signageNotices||[]).filter(n=>n&&n.text&&(n.from||'')<=ds&&ds<=(n.to||n.from||''))
+    .sort((a,b)=>(a.level==='important'?0:1)-(b.level==='important'?0:1)||String(a.at||'').localeCompare(String(b.at||'')));
+}
+function openNotices(){resetNoticeForm();renderNoticeList();openM('mNotices');}
+function resetNoticeForm(){
+  _ntEditId=null;
+  const t=fmt(new Date());
+  document.getElementById('ntText').value='';
+  document.getElementById('ntFrom').value=t;document.getElementById('ntTo').value=t;
+  document.querySelector('input[name="ntLevel"][value="info"]').checked=true;
+  document.getElementById('ntSaveBtn').textContent='📢 お知らせを登録する';
+  document.getElementById('ntCancelBtn').classList.add('hid');
+}
+function editNotice(id){
+  const n=(db.signageNotices||[]).find(x=>x.id===id);if(!n)return;
+  _ntEditId=id;
+  document.getElementById('ntText').value=n.text||'';
+  document.getElementById('ntFrom').value=n.from||'';document.getElementById('ntTo').value=n.to||n.from||'';
+  document.querySelector(`input[name="ntLevel"][value="${n.level==='important'?'important':'info'}"]`).checked=true;
+  document.getElementById('ntSaveBtn').textContent='💾 変更を保存する';
+  document.getElementById('ntCancelBtn').classList.remove('hid');
+  renderNoticeList();
+}
+function renderNoticeList(){
+  const el=document.getElementById('noticeList'),today=fmt(new Date());
+  const list=(db.signageNotices||[]).filter(n=>(n.to||n.from||'')>=today).sort((a,b)=>(a.from||'').localeCompare(b.from||''));
+  const md=s=>{const d=pd(s);return `${d.getMonth()+1}/${d.getDate()}（${DOW_JP[d.getDay()]}）`;};
+  el.innerHTML=list.length?list.map(n=>{
+    const now=n.from<=today;
+    return `<div class="ritem${n.id===_ntEditId?' ritem-editing':''}" data-id="${esc(n.id)}" onclick="editNotice(this.dataset.id)" style="cursor:pointer">
+      <div class="ritem-hdr">
+        <span class="bdg ${n.level==='important'?'bdg-r':'bdg-b'}">${n.level==='important'?'🚨 重要':'📢 通常'}</span>
+        <span class="bdg ${now?'bdg-g':'bdg-b'}">${now?'表示中':'これから'}</span>
+        <span style="font-size:11px;color:#64748b">${md(n.from)}${n.to&&n.to!==n.from?' 〜 '+md(n.to):''}</span>
+        <span class="ritem-del" data-id="${esc(n.id)}" onclick="event.stopPropagation();deleteNotice(this.dataset.id)" title="消す">🗑</span>
+      </div>
+      <div style="font-size:13px;margin-top:3px;white-space:pre-wrap">${esc(n.text)}</div>
+      ${n.by?`<div style="font-size:10px;color:#94a3b8;margin-top:2px">登録：${esc(n.by)}</div>`:''}
+    </div>`;}).join(''):'<div class="empty">登録中のお知らせはありません</div>';
+}
+async function saveNotice(){
+  const text=document.getElementById('ntText').value.trim();
+  let from=document.getElementById('ntFrom').value,to=document.getElementById('ntTo').value||from;
+  if(!text){alert('お知らせの内容を入力してください');return;}
+  if(!from){alert('表示する期間（から）を選んでください');return;}
+  if(to<from){alert('「まで」の日付が「から」より前になっています');return;}
+  const level=(document.querySelector('input[name="ntLevel"]:checked')||{}).value||'info';
+  // 終わってから30日たったお知らせは片付ける
+  const old=fmt(addD(new Date(),-30));
+  const list=(db.signageNotices||[]).filter(n=>(n.to||n.from||'')>=old).map(n=>({...n}));
+  const by=_sbProfile?_sbProfile.display_name:'';
+  if(_ntEditId){
+    const n=list.find(x=>x.id===_ntEditId);
+    if(n)Object.assign(n,{text,from,to,level,by:by||n.by,at:new Date().toISOString()});
+  }else list.push({id:uid(),text,from,to,level,by,at:new Date().toISOString()});
+  db.signageNotices=list;
+  await save();
+  resetNoticeForm();renderNoticeList();
+}
+async function deleteNotice(id){
+  const n=(db.signageNotices||[]).find(x=>x.id===id);if(!n)return;
+  if(!confirm(`このお知らせを消しますか？\n\n${n.text}`))return;
+  db.signageNotices=(db.signageNotices||[]).filter(x=>x.id!==id);
+  if(_ntEditId===id)resetNoticeForm();
+  await save();renderNoticeList();
 }
 // 通常画面から、サイネージ画面を別タブで開く
 function openSignage(){window.open(location.pathname+'?signage=1','_blank');}
