@@ -62,6 +62,10 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 /* ===== LOADING ===== */
 .loading-ovl{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-size:14px;color:#475569}
 .loading-ovl.hid{display:none}
+.reason-chips{display:flex;flex-wrap:wrap;gap:6px}
+.reason-chips label{display:inline-flex;align-items:center;margin:0;padding:5px 12px;border:1.5px solid #a5f3fc;border-radius:16px;font-size:12px;color:#0e7490;background:#fff;cursor:pointer;font-weight:600}
+.reason-chips input{display:none}
+.reason-chips label:has(input:checked){background:#0e7490;color:#fff;border-color:#0e7490}
 .need-input{outline:3px solid #f59e0b!important;outline-offset:2px;border-radius:6px;animation:needFlash 1s ease-in-out 3}
 @keyframes needFlash{50%{outline-color:#fde68a}}
 .sb-gate{position:fixed;inset:0;background:#e2e8f0;z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px}
@@ -897,6 +901,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
     <div class="tsp"></div>
     <button class="reg-btn" onclick="openRegular()">🔁 定期設定</button>
     <button class="plan-btn" onclick="openPlanner()">📅 配車プランナー</button>
+    <button class="plan-btn" style="background:#0e7490" onclick="openSwapDay()" title="急な休み・車両の故障のとき、その日のカードをまとめて別のドライバー・車両へ差し替える">🔁 当日の差し替え</button>
     <button class="plan-btn" style="background:#475569" onclick="openDayPrint()" title="1日分の配車表をA4用紙1枚で印刷">🖨 日次表印刷</button>
     <button class="plan-btn" style="background:#0f172a" onclick="openSignage()" title="工場などのモニター用に、今日の配車を大きく表示する画面を開きます（見るだけ）">📺 サイネージ</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
@@ -1337,6 +1342,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
       <div class="fr"><label>備考・作業内容</label><textarea id="dNotes" rows="3" placeholder="収集品目、数量、特記事項など"></textarea></div>
       <div class="fr"><label>⚠ 注意事項（収集先固有の注意・入構ルール等）</label><textarea id="dCaution" rows="2" placeholder="危険物の有無、駐車場、入構証など"></textarea></div>
     </div>
+    <div id="dChangeLog" class="hid" style="margin:0 18px 10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;padding:8px 10px;font-size:12px;color:#155e75"></div>
     <div class="mftr" style="flex-wrap:wrap;gap:6px">
       <div id="dPermNote" class="hid" style="flex-basis:100%;font-size:12px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px"></div>
       <button class="btn btn-s" onclick="closeM('mDispatch')">キャンセル</button>
@@ -1416,6 +1422,10 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         <div class="cdlg-det" id="cDet"></div>
         <div class="warn-txt" id="cLicWarn">⛔ ドライバーの免許では、この車両を運転できません。確定できないので、ドライバーか車両を変えてください。</div>
         <div class="warn-txt" id="cAbsWarn"></div>
+        <div id="cReasonBox" class="hid" style="margin-top:10px;text-align:left">
+          <div style="font-size:12px;font-weight:700;color:#0e7490;margin-bottom:4px">🔁 確定済みの予定の変更です。理由を選んでください</div>
+          <div class="reason-chips" id="cReasonChips"></div>
+        </div>
       </div>
     </div>
     <div class="mftr ctr">
@@ -2392,6 +2402,49 @@ function checkContainerAlerts() {
 </div>
 
 <!-- ===== MODAL: 印刷確認（担当者選択） ===== -->
+<!-- 変更の理由（確定済みの予定を当日以降に変えたとき） -->
+<div class="ovl hid" id="mReason">
+  <div class="mbox" style="max-width:440px">
+    <div class="mhdr"><h2>🔁 変更の理由</h2><span class="mcls" onclick="reasonAnswer(null)">×</span></div>
+    <div class="mbdy">
+      <div id="mReasonMsg" style="font-size:12px;color:#475569;margin-bottom:8px;white-space:pre-line"></div>
+      <div class="reason-chips" id="mReasonChips"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-s" onclick="reasonAnswer(null)">戻る</button>
+      <button class="btn btn-p" onclick="reasonAnswer(getReason('mReasonChips')||'')">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 当日の差し替え（休み・車両の故障） -->
+<div class="ovl hid" id="mSwap">
+  <div class="mbox lg">
+    <div class="mhdr"><h2>🔁 当日の差し替え</h2><span class="mcls" onclick="closeM('mSwap')">×</span></div>
+    <div class="mbdy">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <label style="font-size:12px;font-weight:700">日付</label><input type="date" id="swDate" onchange="swRender()" style="width:150px">
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;margin:0;cursor:pointer"><input type="radio" name="swKind" value="driver" checked onchange="swRender()" style="width:auto"> 👤 ドライバーを差し替え</label>
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;margin:0;cursor:pointer"><input type="radio" name="swKind" value="vehicle" onchange="swRender()" style="width:auto"> 🚛 車両を差し替え</label>
+      </div>
+      <div class="r2">
+        <div class="fr"><label id="swFromLbl">休んだドライバー</label><select id="swFrom" onchange="swRender()"></select></div>
+        <div class="fr"><label id="swToLbl">代わりのドライバー</label><select id="swTo" onchange="swCheck()"></select></div>
+      </div>
+      <div class="fr" id="swVehRow"><label>車両</label>
+        <select id="swVeh" onchange="swCheck()"></select></div>
+      <div class="fr"><label>差し替えるカード（外したいカードは✓を外す）</label><div id="swCards" style="font-size:12px;max-height:240px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:4px 8px"></div></div>
+      <div class="fr"><label>理由</label><div class="reason-chips" id="swReason"></div></div>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin:0 0 6px;cursor:pointer"><input type="checkbox" id="swAbsence" checked style="width:auto"> <span id="swAbsenceLbl">このドライバーを、この日「休み」として登録する</span></label>
+      <div id="swWarn" style="font-size:12px;color:#b91c1c;white-space:pre-line"></div>
+    </div>
+    <div class="mftr">
+      <button class="btn btn-s" onclick="closeM('mSwap')">キャンセル</button>
+      <button class="btn btn-p" onclick="applySwapDay()">差し替える</button>
+    </div>
+  </div>
+</div>
+
 <!-- T-PLANNERの得意先CSVの読み込み（管理者） -->
 <div class="ovl hid" id="mTpImport">
   <div class="mbox lg">
@@ -4519,7 +4572,8 @@ function onDropToPending(e,elId){
   document.getElementById('cLicWarn').classList.remove('show');
   document.getElementById('cAbsWarn').classList.remove('show');
   setConfirmOk(true);
-  ST.drop={date:null,id:dp.id,newDriver:null,newVehicle:null,returnToPending:true};
+  ST.drop={date:null,id:dp.id,newDriver:null,newVehicle:null,returnToPending:true,needReason:needsChangeReason(dp,null,null,null)};
+  showDropReason(ST.drop.needReason);
   openM('mConfirm');
 }
 function onDrop(e,cell){
@@ -4547,8 +4601,14 @@ function onDrop(e,cell){
   const aw=document.getElementById('cAbsWarn');
   aw.textContent=absMsg?'⚠ '+absMsg.replace(/\n/g,'　'):'';
   aw.classList.toggle('show',!!absMsg);
-  ST.drop={date,id:dp.id,newDriver,newVehicle};
+  ST.drop={date,id:dp.id,newDriver,newVehicle,needReason:needsChangeReason(dp,newDriver,newVehicle,date)};
+  showDropReason(ST.drop.needReason);
   openM('mConfirm');
+}
+// 確定済みの予定を当日以降に動かすときは、確認画面に理由のボタンを出す
+function showDropReason(show){
+  document.getElementById('cReasonBox').classList.toggle('hid',!show);
+  if(show)renderReasonChips('cReasonChips','');
 }
 // 保存前の免許チェック：運転できない組み合わせなら止めて知らせる（OKなら true）
 function licenseOk(driverId,vehicleId){
@@ -4564,6 +4624,11 @@ async function confirmDrop(){
     alert('⛔ ドライバーの免許では、この車両を運転できないため確定できません。');return;
   }
   const dp=(db.dispatches||[]).find(x=>x.id===id);
+  if(dp&&ST.drop.needReason){
+    const reason=getReason('cReasonChips');
+    if(!reason){alert('変更の理由を選んでください');return;}
+    recordChange(dp,returnToPending?{driver:null,vehicle:null,date:null}:{driver:newDriver,vehicle:newVehicle,date},reason);
+  }
   if(dp){
     if(returnToPending){
       // 未割当に戻す：ドライバー・車両・配車日・連絡状態をクリア
@@ -5546,6 +5611,7 @@ function openAddDispatch(date,rid,pending){
   if(rid&&canDo('dispatch_assign')){if(ST.res==='driver')document.getElementById('dDriver').value=rid;else document.getElementById('dVehicle').value=rid;}
   syncAllMPTriggers();
   renderPatternBtns();
+  renderChangeLog(null);
   permAdjustDispatchModal();
   openM('mDispatch');
 }
@@ -5611,6 +5677,7 @@ function editDisp(id){
   } else {
     flowWrap.classList.add('hid');
   }
+  renderChangeLog(dp);
   permAdjustDispatchModal();
   openM('mDispatch');
 }
@@ -5666,6 +5733,15 @@ async function saveDispatch(){
     const same=prev&&prev.status==='confirmed'&&prev.driver===driver&&(prev.vehicle||null)===vehicle&&(prev.dispatchDate||null)===dispatchDate;
     if(!same)finalStatus='pending';
   }
+  // 確定済みの予定を、当日以降にドライバー・車両・日付を変えるときは理由を記録する
+  if(ST.editId){
+    const dp0=(db.dispatches||[]).find(x=>x.id===ST.editId);
+    if(dp0&&needsChangeReason(dp0,driver,vehicle,dispatchDate||date)){
+      const reason=await reasonDialog('確定済みの予定のドライバー・車両・日付を変更します。\n理由を選んでください。');
+      if(!reason)return;
+      recordChange(dp0,{driver,vehicle,date:dispatchDate||date},reason);
+    }
+  }
   if(ST.editId){
     const dp=(db.dispatches||[]).find(x=>x.id===ST.editId);
     // 時間指定を変えたら、手で並べ替えた位置は解除して新しい時刻の順に並べる
@@ -5680,6 +5756,153 @@ async function saveDispatch(){
   }
   await save();closeM('mDispatch');render();
 }
+// ----- 確定済みの予定の変更：理由と記録（予定と実績を正しく残すため） -----
+const CHANGE_REASONS=['休み','体調不良','車両故障','渋滞・順番変更','前の作業が長引いた','その他'];
+function renderReasonChips(id,sel){
+  const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=CHANGE_REASONS.map(r=>`<label><input type="radio" name="rs_${id}" value="${r}"${r===sel?' checked':''}>${r}</label>`).join('');
+}
+// 選んだ理由（「その他」は内容を聞く）。選んでいなければ ''
+function getReason(id){
+  const v=(document.querySelector(`input[name="rs_${id}"]:checked`)||{}).value||'';
+  if(v!=='その他')return v;
+  const t=prompt('理由を入力してください（例：お客様の都合で時間変更）','');
+  return t&&t.trim()?'その他：'+t.trim():'';
+}
+// 確定済みのカードを、作業日の当日以降に、ドライバー・車両・日付を変えるときは理由を聞く
+function needsChangeReason(dp,nd,nv,ndate){
+  if(!dp||dp.status!=='confirmed'||dp.isCarryIn)return false;
+  const w=workDate(dp);if(!w||w>fmt(new Date()))return false;
+  return (dp.driver||null)!==(nd||null)||(dp.vehicle||null)!==(nv||null)||w!==(ndate||w);
+}
+// 変更の記録（だれが・いつ・何から何へ・理由）
+function recordChange(dp,to,reason){
+  const from={driver:dp.driver||null,vehicle:dp.vehicle||null,date:workDate(dp)||null};
+  if(from.driver===(to.driver||null)&&from.vehicle===(to.vehicle||null)&&from.date===(to.date||from.date))return;
+  (dp.changes||(dp.changes=[])).push({at:new Date().toISOString(),by:_sbProfile?_sbProfile.display_name:'',reason,from,to:{driver:to.driver||null,vehicle:to.vehicle||null,date:to.date||from.date}});
+}
+function renderChangeLog(dp){
+  const el=document.getElementById('dChangeLog');if(!el)return;
+  const list=(dp&&dp.changes)||[];
+  if(!list.length){el.classList.add('hid');el.innerHTML='';return;}
+  const f=t=>{const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const part=(a,b,lbl,fn)=>a!==b?`${lbl} ${esc(fn(a))} → <b>${esc(fn(b))}</b>`:'';
+  const dn=id=>id?drvName(id):'未定',vn=id=>id?vehName(id):'未定',dd=s=>s?s.slice(5).replace('-','/'):'未定';
+  el.innerHTML=`<div style="font-weight:700;margin-bottom:4px">🔁 変更の記録（${list.length}件）</div>`+list.map(c=>`<div>・${f(c.at)}　<span style="background:#0e7490;color:#fff;border-radius:8px;padding:0 6px;font-size:11px">${esc(c.reason||'')}</span>　${[part(c.from.driver,c.to.driver,'👤',dn),part(c.from.vehicle,c.to.vehicle,'🚛',vn),part(c.from.date,c.to.date,'📅',dd)].filter(Boolean).join('　')}${c.by?`<span style="color:#64748b">（${esc(c.by)}）</span>`:''}</div>`).join('');
+  el.classList.remove('hid');
+}
+let _reasonResolve=null;
+function reasonDialog(msg){
+  document.getElementById('mReasonMsg').textContent=msg||'確定済みの予定を変更します。理由を選んでください。';
+  renderReasonChips('mReasonChips','');
+  openM('mReason');
+  return new Promise(ok=>{_reasonResolve=ok;});
+}
+function reasonAnswer(r){
+  if(r==='')  {alert('理由を選んでください');return;}
+  closeM('mReason');const ok=_reasonResolve;_reasonResolve=null;if(ok)ok(r);
+}
+
+// ----- 当日の差し替え（急な休み・車両の故障：その日のカードをまとめて差し替える） -----
+function openSwapDay(){
+  document.getElementById('swDate').value=fmt(new Date());
+  document.querySelector('input[name="swKind"][value="driver"]').checked=true;
+  document.getElementById('swFrom').innerHTML='';
+  document.getElementById('swReason').dataset.kind='';
+  document.getElementById('swAbsence').checked=true;
+  swRender();
+  openM('mSwap');
+}
+const swKind=()=>(document.querySelector('input[name="swKind"]:checked')||{}).value||'driver';
+function swDayCards(date,kind,resId){
+  return (db.dispatches||[]).filter(dp=>workDate(dp)===date&&!dp.isCarryIn&&(kind==='driver'?dp.driver:dp.vehicle)&&(!resId||(kind==='driver'?dp.driver:dp.vehicle)===resId));
+}
+function swRender(){
+  const date=document.getElementById('swDate').value,kind=swKind(),drv=kind==='driver';
+  document.getElementById('swFromLbl').textContent=drv?'休んだドライバー':'使えなくなった車両';
+  document.getElementById('swToLbl').textContent=drv?'代わりのドライバー':'代わりの車両';
+  document.getElementById('swVehRow').classList.toggle('hid',!drv);
+  document.getElementById('swAbsenceLbl').textContent=drv?'このドライバーを、この日「休み」として登録する':'この車両を、この日「使えない」として登録する';
+  // この日にカードがあるドライバー（車両）だけを選べる
+  const cnt=new Map();swDayCards(date,kind).forEach(dp=>{const k=drv?dp.driver:dp.vehicle;cnt.set(k,(cnt.get(k)||0)+1);});
+  const res=drv?(db.drivers||[]):(db.vehicles||[]);
+  const fromSel=document.getElementById('swFrom'),prevFrom=fromSel.value;
+  fromSel.innerHTML='<option value="">-- 選んでください --</option>'+res.filter(r=>cnt.has(r.id)).map(r=>`<option value="${r.id}">${esc(r.name)}（${cnt.get(r.id)}件）</option>`).join('');
+  if(cnt.has(prevFrom))fromSel.value=prevFrom;
+  const from=fromSel.value;
+  const toSel=document.getElementById('swTo'),prevTo=toSel.value;
+  toSel.innerHTML='<option value="">-- 選んでください --</option>'+(drv?'<option value="__none">（未割当に戻す）</option>':'')+res.filter(r=>r.id!==from).map(r=>`<option value="${r.id}">${esc(r.name)}${cnt.has(r.id)?`（この日 ${cnt.get(r.id)}件）`:''}</option>`).join('');
+  if([...toSel.options].some(o=>o.value===prevTo))toSel.value=prevTo;
+  if(drv){
+    const vSel=document.getElementById('swVeh'),prevV=vSel.value;
+    vSel.innerHTML='<option value="__keep">そのまま（今の車両で行く）</option>'+(db.vehicles||[]).map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
+    if([...vSel.options].some(o=>o.value===prevV))vSel.value=prevV;
+  }
+  const cards=from?swDayCards(date,kind,from).sort((a,b)=>dayKey(a)-dayKey(b)):[];
+  document.getElementById('swCards').innerHTML=!from?'<div style="color:#94a3b8;padding:6px 0">上で選ぶと、その日のカードが出ます</div>':cards.map(dp=>{
+    const t=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'';
+    const name=dp.dispatchType==='shipment'?(dp.destName||'出荷'):custName(dp.customer);
+    return `<label style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;margin:0;cursor:pointer;font-weight:400"><input type="checkbox" class="swCard" value="${dp.id}" checked style="width:auto" onchange="swCheck()"><span style="width:44px;color:#b45309">${esc(t)}</span><b>${esc(name)}</b><span style="color:#64748b">${drv?'🚛 '+esc(vehName(dp.vehicle)):'👤 '+esc(drvName(dp.driver))}</span>${dp.status==='confirmed'?'':'<span style="color:#dc2626">保留</span>'}</label>`;
+  }).join('');
+  // 理由は、種類（ドライバー／車両）を切り替えたときだけ初期値に戻す（選んだ理由を消さない）
+  const rs=document.getElementById('swReason');
+  if(rs.dataset.kind!==kind){renderReasonChips('swReason',drv?'休み':'車両故障');rs.dataset.kind=kind;}
+  swCheck();
+}
+// 免許で運転できない組み合わせを知らせる
+function swCheck(){
+  const kind=swKind(),to=document.getElementById('swTo').value,warn=[];
+  for(const cb of document.querySelectorAll('.swCard:checked')){
+    const dp=db.dispatches.find(x=>x.id===cb.value);if(!dp||!to||to==='__none')continue;
+    const nd=kind==='driver'?to:dp.driver;
+    const vv=document.getElementById('swVeh').value;
+    const nv=kind==='vehicle'?to:(vv==='__keep'?dp.vehicle:vv);
+    const dr=(db.drivers||[]).find(x=>x.id===nd),ve=(db.vehicles||[]).find(x=>x.id===nv);
+    if(dr&&ve&&!canDrive(dr,ve))warn.push(`⛔ ${custName(dp.customer)}：${dr.name}さんの免許では「${ve.name}」を運転できません（このカードは差し替えません）`);
+  }
+  document.getElementById('swWarn').textContent=warn.join('\n');
+}
+async function applySwapDay(){
+  const date=document.getElementById('swDate').value,kind=swKind(),drv=kind==='driver';
+  const from=document.getElementById('swFrom').value,to=document.getElementById('swTo').value;
+  if(!from){alert(drv?'休んだドライバーを選んでください':'使えなくなった車両を選んでください');return;}
+  if(!to){alert(drv?'代わりのドライバーを選んでください':'代わりの車両を選んでください');return;}
+  const ids=[...document.querySelectorAll('.swCard:checked')].map(x=>x.value);
+  if(!ids.length){alert('差し替えるカードを選んでください');return;}
+  const reason=getReason('swReason');if(!reason){alert('理由を選んでください');return;}
+  const vv=drv?document.getElementById('swVeh').value:'__keep';
+  let done=0;const skipped=[];
+  for(const id of ids){
+    const dp=db.dispatches.find(x=>x.id===id);if(!dp)continue;
+    let nd,nv;
+    if(drv){if(to==='__none'){nd=null;nv=null;}else{nd=to;nv=vv==='__keep'?dp.vehicle:vv;}}
+    else{nd=dp.driver;nv=to;}
+    const dr=(db.drivers||[]).find(x=>x.id===nd),ve=(db.vehicles||[]).find(x=>x.id===nv);
+    if(dr&&ve&&!canDrive(dr,ve)){skipped.push(custName(dp.customer));continue;}
+    recordChange(dp,{driver:nd,vehicle:nv,date:workDate(dp)},reason);
+    dp.driver=nd;dp.vehicle=nv;
+    // 確定の権限がある人は確定のまま。ない人（事務など）は保留。未割当に戻すときも保留
+    if(!(nd&&nv&&canFull('dispatch_confirm')))dp.status='pending';
+    dp.updated=new Date().toISOString();
+    done++;
+  }
+  // 休み・使えない日の登録（同じ日の登録がなければ）
+  let absAdded=false;
+  if(document.getElementById('swAbsence').checked&&done){
+    if(!db.absences)db.absences=[];
+    const exists=db.absences.some(a=>a.kind===kind&&a.resId===from&&a.from<=date&&date<=a.to);
+    if(!exists){
+      const now=new Date().toISOString();
+      db.absences.push({id:uid(),kind,resId:from,from:date,to:date,reason:drv?(reason==='体調不良'?'体調不良':'休み'):'故障',note:'当日の差し替えで登録（'+reason+'）',created:now,updated:now});
+      absAdded=true;
+    }
+  }
+  if(!done){alert('差し替えたカードはありません'+(skipped.length?'（免許で運転できない組み合わせのため）':''));return;}
+  await save();closeM('mSwap');render();
+  const toName=drv?(to==='__none'?'未割当':drvName(to)):vehName(to);
+  alert(`✅ ${done}件を「${toName}」へ差し替えました（理由：${reason}）。${absAdded?`\n${drv?drvName(from)+'さんを休み':vehName(from)+'を使えない日'}として登録しました。`:''}${skipped.length?`\n\n⛔ 免許で運転できないため、差し替えなかったカード：\n・${skipped.join('\n・')}`:''}\n\n作業指示書を印刷済みのカードは、印刷し直してください。`);
+}
+
 // ----- お客様ごとの「いつものパターン」 -----
 // 保存したパターン：db.dispatchPatterns[お客様の番号] = [{id,label,data,at,by}]
 // よく使う組み合わせ：過去の配車カードから自動で見つける（保存したものと同じものは除く）
@@ -6372,6 +6595,7 @@ const PERM_FN={
   markContacted:'contact_update',
   savePatternFromForm:'dispatch_create',deletePattern:'dispatch_create',
   openTpImport:'admin',tpImportApply:'admin',
+  openSwapDay:'dispatch_assign',applySwapDay:'dispatch_assign',
   openDayPrint:'print',printDaySchedule:'print',openPrintConfirm:'print',executePrint:'print',printWorkOrder:'print',
   openConAction:'container_manage',saveCON:'container_manage',deleteCON:'container_manage',openConImport:'container_manage',
   executeConImport:'container_manage',saveConSettings:'container_manage',addConEmail:'container_manage',removeConEmail:'container_manage',
