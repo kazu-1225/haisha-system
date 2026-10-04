@@ -102,6 +102,11 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .pcrd:hover{box-shadow:0 2px 8px rgba(220,38,38,.22)}
 .pcrd-name{font-weight:700;color:#dc2626;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
 .pcrd-info{font-size:10px;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
+/* 未割当カードの収集希望日（あと何日かで色が変わる） */
+.pcrd-want{display:flex;flex-wrap:wrap;align-items:center;gap:0 4px;margin:3px 0 2px;padding:2px 6px;border-radius:5px;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:800;white-space:nowrap}
+.pcrd-want b{margin-left:auto;font-size:11px;flex-shrink:0}
+.pcrd-want.soon{background:#ffedd5;color:#9a3412}
+.pcrd-want.over{background:#dc2626;color:#fff}
 .p-add-btn{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:100px;height:80px;border:2px dashed #fca5a5;border-radius:8px;color:#dc2626;font-size:22px;cursor:pointer;transition:background .15s}
 .p-add-btn:hover{background:#fef2f2}
 
@@ -1213,7 +1218,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         <div class="fr"><label>🚛 配車確定日 <span style="font-size:9px;color:#3b82f6;font-weight:400">※ドラッグ&amp;ドロップで自動入力</span></label><input type="date" id="dDispatchDate"></div>
       </div>
       <div class="r2">
-        <div class="fr"><label>期限（いつまでに）</label><input type="date" id="dDeadline" oninput="updateDeadlineWarn()"></div>
+        <div class="fr"><label>📅 お客様の収集希望日</label><input type="date" id="dDeadline" oninput="updateDeadlineWarn()"></div>
         <div class="fr"><label>種別</label>
           <select id="dType"><option value="spot">スポット（単発）</option><option value="regular">定期便</option></select></div>
       </div>
@@ -1848,7 +1853,7 @@ function writeReadableSheets(data) {
   });
   writeSheet('📋配車一覧',
     ['配車確定日','曜日','お客様名','お客様担当者','担当者電話','収集先名称','収集先担当者','収集先電話','収集先住所',
-     'ドライバー','車両','種別','ステータス','作業種別','マニフェスト','備考','注意事項','受付担当者','受付日','期限','登録日'],
+     'ドライバー','車両','種別','ステータス','作業種別','マニフェスト','備考','注意事項','受付担当者','受付日','収集希望日','登録日'],
     dispAll
   );
 
@@ -4194,7 +4199,7 @@ function _dayCardHTML(dp,seqNo,rowCtx){
       <div class="ec-day-seq">第${seqNo}業務${holBadge}${timeTag}</div>
       <div class="ec-day-cust">${custName(dp.customer)}</div>
       ${regLabel}
-      ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:''}
+      ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">${dlLabel(dp)}:${dp.deadline}</div>`:''}
       ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
     </div>`;
   }
@@ -4219,7 +4224,7 @@ function _dayCardHTML(dp,seqNo,rowCtx){
     ${!isCarryIn?`<div class="ec-day-veh">🚛 ${veh}</div>`:`<div class="ec-day-veh">🏭 持込み${dp.isReg?'（定期）':''}</div>`}
     ${!isShip&&dp.siteName?`<div class="ec-day-site">📍 ${dp.siteName}</div>`:''}
     ${isShip&&dp.destAddr?`<div class="ec-day-site">🏭 ${dp.destAddr.slice(0,20)}</div>`:''}
-    ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:''}
+    ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">${dlLabel(dp)}:${dp.deadline}</div>`:''}
     ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
   </div>`;
 }
@@ -4234,7 +4239,7 @@ function _cardHTML(dp,rowCtx){
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
-  const dlHtml=dp.deadline?`<div class="ec-sub" style="font-size:10px;color:${dlOver?'#dc2626':dlSoon?'#d97706':'#64748b'};font-weight:${dlOver||dlSoon?'700':'400'}">⏰ 期限:${dp.deadline}</div>`:'';
+  const dlHtml=dp.deadline?`<div class="ec-sub" style="font-size:10px;color:${dlOver?'#dc2626':dlSoon?'#d97706':'#64748b'};font-weight:${dlOver||dlSoon?'700':'400'}">${dlLabel(dp)}:${dp.deadline}</div>`:'';
   // 持込みはドラッグ無効（持込み行のみ）
   const dragPart=(isCarryIn&&rowCtx==='carry')
     ?''
@@ -4308,12 +4313,21 @@ function _cardHTML(dp,rowCtx){
   </div>`;
 }
 
+// 配車カードの deadline ＝ お客様の収集希望日（出荷は「期限」のまま）
+function dlLabel(dp){return dp.dispatchType==='shipment'?'⏰ 期限':'📅 希望日';}
+// 未割当カードの希望日：あと何日かで色を変えて目立たせる
+function wantDayHtml(dp){
+  if(!dp.deadline)return '';
+  const today=fmt(new Date()),d=pd(dp.deadline);
+  const n=Math.round((d-pd(today))/86400000);
+  const left=n<0?'⚠過ぎ':n===0?'今日':n===1?'明日':`あと${n}日`;
+  const cls=n<=0?'over':n<=3?'soon':'';
+  return `<div class="pcrd-want ${cls}" title="お客様の収集希望日">${dlLabel(dp)} ${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})<b>${left}</b></div>`;
+}
 function makePcrdHtml(dp){
   const isShip=dp.dispatchType==='shipment';
   const crane=isCraneDisp(dp);
-  const today=fmt(new Date());
-  const dlOver=dp.deadline&&dp.deadline<today;
-  const dlHtml=dp.deadline?`<div class="pcrd-info" style="color:${dlOver?'#dc2626':'#d97706'};font-weight:700">⏰ 期限: ${dp.deadline}${dlOver?' ⚠過ぎています':''}</div>`:'';
+  const dlHtml=wantDayHtml(dp);
   const cardStyle=isShip?'border-color:#ea580c':crane?'background:repeating-linear-gradient(135deg,#fefce8,#fefce8 6px,#fef08a 6px,#fef08a 8px);border-color:#ca8a04':'';
   const nameHtml=isShip
     ?`<div class="pcrd-name" style="color:#ea580c">📦 ${escH(dp.destName)||'出荷'}</div>`
@@ -5090,7 +5104,7 @@ function showDispPopup(e,id,ctx){
   if(isShip){
     rows=`<div class="pop-title" style="color:#c2410c">📦 ${escH(dp.destName)||'出荷'}</div>`;
     rows+=`<div class="pop-row"><span class="pop-label" style="color:#ea580c;font-weight:800">出荷日</span><span class="pop-val" style="color:#ea580c;font-weight:700">${dispDateStr}</span></div>`;
-    if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">期限</span><span class="pop-val">${dp.deadline}</span></div>`;
+    if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">${dp.dispatchType==='shipment'?'期限':'希望日'}</span><span class="pop-val">${dp.deadline}</span></div>`;
     rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
     if(dp.isCarryIn){
       const t=carryInTime(dp);
@@ -5114,7 +5128,7 @@ function showDispPopup(e,id,ctx){
   rows=`<div class="pop-title">${cu?cu.name:'（お客様未設定）'}</div>`;
   rows+=`<div class="pop-row"><span class="pop-label" style="color:#1e40af;font-weight:800">配車確定日</span><span class="pop-val" style="color:#1e40af;font-weight:700">${dispDateStr}</span></div>`;
   rows+=`<div class="pop-row"><span class="pop-label">受付日</span><span class="pop-val" style="font-size:10px;color:#94a3b8">${rcvDateStr}</span></div>`;
-  if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">期限</span><span class="pop-val">${dp.deadline}</span></div>`;
+  if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">${dp.dispatchType==='shipment'?'期限':'希望日'}</span><span class="pop-val">${dp.deadline}</span></div>`;
   rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
   if(workTypeLabel(dp.workType))rows+=`<div class="pop-row"><span class="pop-label" style="color:#6d28d9;font-weight:800">作業種別</span><span class="pop-val" style="font-weight:700;color:#6d28d9">${workTypeLabel(dp.workType)}</span></div>`;
   if(dp.custContact)rows+=`<div class="pop-row"><span class="pop-label">お客様担当</span><span class="pop-val">${dp.custContact}</span></div>`;
@@ -5518,10 +5532,10 @@ function printDaySchedule(ds,withUndated,mode){
     <div class="meta">印刷日時: ${new Date().toLocaleString('ja-JP')}</div></div>
   <div class="sum"><span>✅ 確定 <b>${assigned.length}</b>件</span><span>🔴 未確定 <b>${unassigned.length}</b>件</span><span>🏭 持込み <b>${carry.length}</b>件</span><span>🏛 委託応援 <b>${cs.length}</b>名</span>${withUndated?`<span>📋 日付未定 <b>${undated.length}</b>件</span>`:''}</div>
   ${sec(confTitle,'s-conf',assigned.length,confHead,confRows)}
-  ${sec('🔴 未確定分（ドライバー未定）','s-pend',unassigned.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">期限</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',simpleRows(unassigned,true))}
+  ${sec('🔴 未確定分（ドライバー未定）','s-pend',unassigned.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">希望日</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',simpleRows(unassigned,true))}
   ${sec('🏭 持込み','s-carry',carry.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様</th><th style="width:22%">作業内容</th><th style="width:26%">備考・注意</th>',simpleRows(carry,false))}
   ${sec('🏛 委託応援','s-cs',cs.length,'<th style="width:20%">ドライバー</th><th style="width:15%">車両</th><th style="width:15%">時間</th><th>備考</th>',cs.map(c=>`<tr><td>${esc(drvName(c.driverId))}</td><td>${esc(c.vehicleId?vehName(c.vehicleId):'')}</td><td class="c">${c.startHour}:00〜${c.endHour}:00</td><td>${esc(c.note||'')}</td></tr>`).join(''))}
-  ${withUndated?sec('📋 日付未定の依頼（参考）','s-und',undated.length,'<th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">期限</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',undated.map(dp=>`<tr><td class="c">${kind(dp)}</td><td>${dest(dp)}</td><td class="c">${esc(dp.deadline||'')}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('')):''}
+  ${withUndated?sec('📋 日付未定の依頼（参考）','s-und',undated.length,'<th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">希望日</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',undated.map(dp=>`<tr><td class="c">${kind(dp)}</td><td>${dest(dp)}</td><td class="c">${esc(dp.deadline||'')}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('')):''}
   </div>`;
 
   // 用紙（ドライバー別・車両別・時間順はA4縦、午前・午後はA4横／A3横）
@@ -5660,8 +5674,8 @@ function updateDeadlineWarn(){
   const date=document.getElementById('dDate').value;
   const dl=document.getElementById('dDeadline').value;
   const el=document.getElementById('deadlineWarn');
-  if(dl&&date&&dl<date)el.textContent='⚠ 期限が日付より前です';
-  else if(dl&&dl<fmt(new Date()))el.textContent='⚠ 期限が過ぎています';
+  if(dl&&date&&dl<date)el.textContent='⚠ 収集希望日が受付日より前です';
+  else if(dl&&dl<fmt(new Date()))el.textContent='⚠ 収集希望日が過ぎています';
   else el.textContent='';
 }
 function openAddDispatch(date,rid,pending){
