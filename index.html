@@ -662,6 +662,17 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
 .con-tbl th{background:#f8fafc;color:#64748b;font-size:11px;font-weight:700;padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;white-space:nowrap}
 .con-tbl td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
 .con-tbl tr:hover td{background:#f8faff}
+.con-tbl tr.con-row{cursor:pointer}
+.con-tbl th[data-k]{cursor:pointer;user-select:none}
+.con-tbl th[data-k]:hover{color:#1d4ed8}
+.con-tbl th.sorted{color:#1d4ed8}
+.con-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid #e2e8f0}
+.con-tools input,.con-tools select{border:1.5px solid #cbd5e1;border-radius:8px;padding:5px 8px;font-size:12px;background:#fff}
+.con-tools input{min-width:240px;flex:0 1 300px}
+.con-summary{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#475569}
+.con-summary b{color:#334155;margin-right:2px}
+.con-summary span{background:#f1f5f9;border-radius:10px;padding:2px 8px;cursor:pointer}
+.con-summary span:hover{background:#e0e7ff}
 .con-tbl tr:last-child td{border-bottom:none}
 /* ステータスバッジ */
 .con-status{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap}
@@ -970,8 +981,8 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
         <div style="font-size:12px;font-weight:800;color:#1e3a5f;margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">⚙ アラート基準</div>
         <div class="con-settings-row">
           <span class="con-settings-label">目標設置日数（標準）</span>
-          <input type="number" class="con-settings-input" id="conDefaultTargetDays" min="1" max="999" value="90" onchange="saveConSettings()">
-          <span style="font-size:12px;color:#64748b">日</span>
+          <input type="number" class="con-settings-input" id="conDefaultTargetDays" min="1" max="999" step="1" value="90" onchange="saveConSettings()">
+          <span style="font-size:12px;color:#64748b">日 <span style="font-size:11px;color:#94a3b8">（1日単位。変えると稼働中のコンテナにも反映します。1台ずつ日数を変えたものはそのまま）</span></span>
         </div>
         <div class="con-settings-row">
           <span class="con-settings-label">🟡 警告（目標まで残りN日前）</span>
@@ -1066,25 +1077,38 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
     </div>
     <!-- 稼働中一覧 -->
     <div id="conTabActive" class="con-table-wrap">
+      <!-- 絞り込み・集計・CSV（データとして使えるように） -->
+      <div class="con-tools">
+        <input type="search" id="conQ" placeholder="🔍 顧客名・事業場・CD・管理番号で絞り込み" oninput="renderConView()">
+        <select id="conFState" onchange="renderConView()"><option value="">状態：すべて</option><option value="over">🔴 超過</option><option value="warn">🟡 警告</option><option value="ok">🟢 正常</option></select>
+        <select id="conFType" onchange="renderConView()"></select>
+        <select id="conFPurpose" onchange="renderConView()"></select>
+        <button class="btn btn-s" style="padding:5px 10px;font-size:12px" onclick="conClearFilter()">条件を消す</button>
+        <span id="conCount" style="font-size:12px;color:#475569;font-weight:700"></span>
+        <button class="btn btn-s" style="padding:5px 10px;font-size:12px;margin-left:auto" onclick="exportConCsv()" title="いま表示している一覧をCSVファイルに保存（Excelで開けます）">📄 CSVに保存</button>
+      </div>
+      <div id="conSummary" class="con-summary"></div>
+      <div style="overflow-x:auto">
       <table class="con-tbl">
         <thead>
-          <tr>
-            <th>ステータス</th>
-            <th>T-PLANNERCD</th>
-            <th>顧客名</th>
-            <th>事業場</th>
-            <th>コンテナ種類</th>
-            <th>用途</th>
-            <th>設置/交換日</th>
-            <th>経過日数</th>
-            <th>目標日数</th>
-            <th>残日数</th>
+          <tr id="conActiveHead">
+            <th data-k="status">ステータス</th>
+            <th data-k="tp">T-PLANNERCD</th>
+            <th data-k="cust">顧客名</th>
+            <th data-k="site">事業場</th>
+            <th data-k="type">コンテナ種類</th>
+            <th data-k="purpose">用途</th>
+            <th data-k="date">設置/交換日</th>
+            <th data-k="elapsed">経過日数</th>
+            <th data-k="target">目標日数</th>
+            <th data-k="remain">残日数</th>
             <th>備考</th>
             <th title="ふだんは配車カードから自動で反映されます。漏れを直すときに使います">手動</th>
           </tr>
         </thead>
         <tbody id="conActiveBody"></tbody>
       </table>
+      </div>
       <div id="conActiveEmpty" class="hid" style="padding:30px;text-align:center;color:#94a3b8;font-size:13px">稼働中のコンテナはありません</div>
     </div>
     <!-- 設置履歴 -->
@@ -2995,16 +3019,17 @@ function checkContainerAlerts() {
       <div class="r2">
         <div class="fr">
           <label id="conDateLabel">設置日 *</label>
-          <input type="date" id="conDate">
+          <input type="date" id="conDate" oninput="conElapsedHint()">
         </div>
         <div class="fr" id="conTargetDaysRow">
           <label>目標設置日数</label>
           <div style="display:flex;align-items:center;gap:6px">
-            <input type="number" id="conTargetDays" min="1" max="999" style="width:80px;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px">
+            <input type="number" id="conTargetDays" min="1" max="999" step="1" oninput="conElapsedHint()" style="width:80px;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px">
             <span style="font-size:12px;color:#64748b">日</span>
           </div>
         </div>
       </div>
+      <div id="conElapsed" style="margin:-4px 0 10px;font-size:12px;font-weight:700;border-radius:8px;padding:6px 10px"></div>
       <div class="fr">
         <label>備考</label>
         <input type="text" id="conNote" placeholder="収集品目、注意事項など" autocomplete="off" lang="ja" style="width:100%;border:1.5px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px">
@@ -9481,8 +9506,20 @@ function loadConSettingsUI() {
 }
 function saveConSettings() {
   if (!db.containerSettings) db.containerSettings = {};
-  db.containerSettings.defaultTargetDays = parseInt(document.getElementById('conDefaultTargetDays').value) || 90;
-  db.containerSettings.defaultWarnDays = parseInt(document.getElementById('conDefaultWarnDays').value) || 7;
+  const oldT = db.containerSettings.defaultTargetDays || 90, oldW = db.containerSettings.defaultWarnDays ?? 7;
+  const clamp = (v, lo, hi, d) => { const n = parseInt(v); return isNaN(n) ? d : Math.min(hi, Math.max(lo, n)); };
+  const newT = clamp(document.getElementById('conDefaultTargetDays').value, 1, 999, 90);
+  const newW = clamp(document.getElementById('conDefaultWarnDays').value, 0, 60, 7);
+  document.getElementById('conDefaultTargetDays').value = newT;
+  document.getElementById('conDefaultWarnDays').value = newW;
+  db.containerSettings.defaultTargetDays = newT;
+  db.containerSettings.defaultWarnDays = newW;
+  // 標準を変えたら、稼働中のコンテナにも反映する（1台ずつ別の日数にしたものはそのまま）
+  (db.containerPlacements || []).forEach(p => {
+    if (p.status !== 'active') return;
+    if (newT !== oldT && (!p.targetDays || p.targetDays === oldT)) { p.targetDays = newT; p.updated = new Date().toISOString(); }
+    if (newW !== oldW && (p.warnBeforeDays === undefined || p.warnBeforeDays === oldW)) { p.warnBeforeDays = newW; p.updated = new Date().toISOString(); }
+  });
   const enabled = document.getElementById('conEmailEnabled').checked;
   document.getElementById('conEmailBody').style.display = enabled ? '' : 'none';
   if (!db.containerSettings.emailAlerts) db.containerSettings.emailAlerts = { recipients: [] };
@@ -9786,6 +9823,63 @@ function calcConStatus(placement) {
   return { cls, label, elapsed, remain, target };
 }
 
+// ── 稼働中一覧の絞り込み・並べ替え・集計・CSV ──
+let _conSort = { k: 'remain', dir: 1 };
+function conFillFilterOpts(active) {
+  const fill = (id, label, vals) => {
+    const el = document.getElementById(id); if (!el) return;
+    // 「すべて」と「（未設定）」はどちらも値が空なので、選んでいる位置で見分ける
+    const picked = el.selectedIndex > 0 ? el.value : null;
+    el.innerHTML = `<option value="">${label}：すべて</option>` + vals.map(v => `<option value="${esc(v)}">${esc(v || '（未設定）')}</option>`).join('');
+    el.selectedIndex = picked === null ? 0 : Math.max(0, vals.indexOf(picked) + 1);
+  };
+  fill('conFType', '種類', [...new Set(active.map(p => p.containerType || ''))].sort());
+  fill('conFPurpose', '用途', [...new Set(active.map(p => p.purpose || ''))].sort());
+}
+function conFilterSort(active) {
+  const q = toSearchable((document.getElementById('conQ') || {}).value || '');
+  const fs = (document.getElementById('conFState') || {}).value || '';
+  const ft = document.getElementById('conFType'), fp = document.getElementById('conFPurpose');
+  const tv = ft && ft.selectedIndex > 0 ? ft.value : null, pv = fp && fp.selectedIndex > 0 ? fp.value : null;
+  const rows = active.map(p => ({ p, s: calcConStatus(p) })).filter(({ p, s }) => {
+    if (fs && s.cls !== fs) return false;
+    if (tv !== null && (p.containerType || '') !== tv) return false;
+    if (pv !== null && (p.purpose || '') !== pv) return false;
+    if (q && !toSearchable([p.customerName, p.siteName, conTpcd(p), p.containerNo ? 'No.' + p.containerNo : '', p.notes].join(' ')).includes(q)) return false;
+    return true;
+  });
+  const key = ({ p, s }) => ({ status: s.remain ?? 9999, remain: s.remain ?? 9999, tp: conTpcd(p) || '￿', cust: toSearchable(p.customerName || ''), site: toSearchable(p.siteName || ''),
+    type: p.containerType || '', purpose: p.purpose || '￿', date: p.installDate || '', elapsed: s.elapsed ?? -1, target: s.target || 0 })[_conSort.k];
+  rows.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * _conSort.dir || (a.s.remain ?? 0) - (b.s.remain ?? 0); });
+  return rows.map(r => r.p);
+}
+function conRenderSummary(active, shown) {
+  const cnt = document.getElementById('conCount');
+  if (cnt) cnt.textContent = shown.length === active.length ? `${active.length}台` : `${shown.length}台 ／ 全${active.length}台`;
+  const el = document.getElementById('conSummary'); if (!el) return;
+  const tally = (f) => { const m = {}; shown.forEach(p => { const k = f(p) || '（未設定）'; m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+  const chips = (sel, arr) => arr.map(([k, n]) => `<span onclick="conPick('${sel}','${esc(k === '（未設定）' ? '' : k)}')" title="この条件で絞り込む">${esc(conShort(k) || k)} ${n}</span>`).join('');
+  el.innerHTML = shown.length ? `<b>種類別</b>${chips('conFType', tally(p => p.containerType))}<b style="margin-left:10px">用途別</b>${chips('conFPurpose', tally(p => p.purpose))}` : '';
+}
+function conPick(id, v) { const el = document.getElementById(id); if (!el) return; const o = [...el.options].findIndex((x, i) => i > 0 && x.value === v); if (o > 0) { el.selectedIndex = o; renderConView(); } }
+function conClearFilter() {
+  const q = document.getElementById('conQ'); if (q) q.value = '';
+  ['conFState', 'conFType', 'conFPurpose'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+  renderConView();
+}
+function exportConCsv() {
+  const active = (db.containerPlacements || []).filter(p => p.status === 'active');
+  const rows = conFilterSort(active);
+  if (!rows.length) { alert('保存するコンテナがありません'); return; }
+  const head = ['状態', '経過日数', '目標日数', '残日数', 'T-PLANNERCD', '顧客名', '事業場', 'コンテナ種類', '管理番号', '用途', '設置/交換日', '備考'];
+  const st = { over: '超過', warn: '警告', ok: '正常' };
+  const lines = [head].concat(rows.map(p => { const s = calcConStatus(p);
+    return [st[s.cls] || '', s.elapsed, s.target, s.remain, conTpcd(p), p.customerName || '', p.siteName || '', p.containerType || '', p.containerNo || '', p.purpose || '', p.installDate || '', p.notes || '']; }));
+  const csv = '﻿' + lines.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `コンテナ稼働中_${fmt(new Date())}.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 // ── メインレンダリング ──
 function renderConView() {
   // 日付が変わって作業日を迎えた予定があれば反映してから表示
@@ -9811,15 +9905,21 @@ function renderConView() {
     `<span class="con-alert-badge green">🟢 正常 ${cntOk}件 ／ 稼働中計 ${active.length}件</span>`,
   ].join('');
 
-  // 稼働中一覧
+  // 稼働中一覧（絞り込み・並べ替え・集計）
   const activeBody = document.getElementById('conActiveBody');
-  const sortedActive = [...active].sort((a,b) => {
-    const sa = calcConStatus(a), sb = calcConStatus(b);
-    return (sa.remain ?? 9999) - (sb.remain ?? 9999);
+  conFillFilterOpts(active);
+  const sortedActive = conFilterSort(active);
+  conRenderSummary(active, sortedActive);
+  document.querySelectorAll('#conActiveHead th[data-k]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.k === _conSort.k);
+    th.textContent = th.textContent.replace(/ ?[▲▼]$/,'') + (th.dataset.k === _conSort.k ? (_conSort.dir > 0 ? ' ▲' : ' ▼') : '');
+    th.onclick = () => { _conSort = { k: th.dataset.k, dir: _conSort.k === th.dataset.k ? -_conSort.dir : 1 }; renderConView(); };
   });
   if (sortedActive.length === 0) {
     activeBody.innerHTML = '';
-    document.getElementById('conActiveEmpty').classList.remove('hid');
+    const emp = document.getElementById('conActiveEmpty');
+    emp.textContent = active.length ? '条件に合うコンテナはありません' : '稼働中のコンテナはありません';
+    emp.classList.remove('hid');
   } else {
     document.getElementById('conActiveEmpty').classList.add('hid');
     activeBody.innerHTML = sortedActive.map(p => {
@@ -9829,7 +9929,7 @@ function renderConView() {
         <div class="con-days-track"><div class="con-days-fill ${s.cls}" style="width:${pct}%"></div></div>
         <div class="con-days-num">${s.elapsed}日</div>
       </div>`;
-      return `<tr>
+      return `<tr class="con-row" title="クリックで編集（設置／交換日・目標日数など）" onclick="openConAction('edit','${p.id}')">
         <td><span class="con-status ${s.cls}">${s.label}</span></td>
         <td style="color:#64748b">${esc(conTpcd(p))}</td>
         <td style="font-weight:600">${esc(p.customerName||'')}</td>
@@ -9842,8 +9942,8 @@ function renderConView() {
         <td style="text-align:center;font-weight:600;color:${s.cls==='over'?'#dc2626':s.cls==='warn'?'#d97706':'#16a34a'}">${s.remain !== null ? (s.remain<=0?'超過':`${s.remain}日`):'-'}</td>
         <td style="color:#94a3b8;font-size:11px">${esc(p.notes||'')}</td>
         <td style="white-space:nowrap">
-          <button class="con-act-btn exchange" style="font-size:10px;padding:2px 6px;opacity:.75" title="手で交換を記録（ふだんは配車カードから自動）" onclick="openConAction('exchange','${p.id}')">交換</button>
-          <button class="con-act-btn remove" style="font-size:10px;padding:2px 6px;opacity:.75;margin-left:2px" title="手で撤去を記録（ふだんは配車カードから自動）" onclick="openConAction('remove','${p.id}')">撤去</button>
+          <button class="con-act-btn exchange" style="font-size:10px;padding:2px 6px;opacity:.75" title="手で交換を記録（ふだんは配車カードから自動）" onclick="event.stopPropagation();openConAction('exchange','${p.id}')">交換</button>
+          <button class="con-act-btn remove" style="font-size:10px;padding:2px 6px;opacity:.75;margin-left:2px" title="手で撤去を記録（ふだんは配車カードから自動）" onclick="event.stopPropagation();openConAction('remove','${p.id}')">撤去</button>
         </td>
       </tr>`;
     }).join('');
@@ -9914,7 +10014,7 @@ function openConAction(actionType, placementId) {
   const today = new Date().toISOString().slice(0,10);
 
   // タイトル
-  const titles = {install:'📦 コンテナ 新規設置', exchange:'🔄 コンテナ 交換', remove:'🚛 コンテナ 撤去'};
+  const titles = {install:'📦 コンテナ 新規設置', exchange:'🔄 コンテナ 交換', remove:'🚛 コンテナ 撤去', edit:'✏️ コンテナの編集'};
   document.getElementById('mCONTitle').textContent = titles[actionType];
 
   // アクション種類ボタン（新規設置時のみ選択可能）
@@ -9946,12 +10046,13 @@ function openConAction(actionType, placementId) {
     document.getElementById('conSiteName').value = '';
     _conCustId = '';
   }
-  document.getElementById('conDate').value = today;
+  const isEdit = actionType === 'edit';
+  document.getElementById('conDate').value = isEdit ? (p.installDate || today) : today;
   document.getElementById('conTargetDays').value = (p && p.targetDays) || settings.defaultTargetDays || 90;
-  document.getElementById('conNote').value = '';
+  document.getElementById('conNote').value = isEdit ? (p.notes || '') : '';
 
   // 日付ラベル変更
-  const dateLabels = {install:'設置日 *', exchange:'交換日 *', remove:'撤去日 *'};
+  const dateLabels = {install:'設置日 *（棚卸しのときは前回の設置・交換日）', exchange:'交換日 *', remove:'撤去日 *', edit:'設置／交換日 *'};
   document.getElementById('conDateLabel').textContent = dateLabels[actionType];
 
   // 目標日数フィールドは設置/交換時のみ表示
@@ -9965,8 +10066,23 @@ function openConAction(actionType, placementId) {
     else if (el) { el.disabled = false; el.style.background=''; }
   });
 
-  document.getElementById('conDeleteBtn').style.display = 'none';
+  document.getElementById('conDeleteBtn').style.display = isEdit ? '' : 'none';
+  conElapsedHint();
   openM('mCON');
+}
+// 入れた日付から、今日までの経過日数と目標までの残りをその場で表示する
+function conElapsedHint() {
+  const el = document.getElementById('conElapsed');
+  const d = document.getElementById('conDate').value;
+  if (!el) return;
+  if (!d || _conActionType === 'remove') { el.textContent = ''; el.style.background = 'none'; return; }
+  const today = pd(fmt(new Date())), n = Math.round((today - pd(d)) / 86400000);
+  const t = parseInt(document.getElementById('conTargetDays').value) || (db.containerSettings||{}).defaultTargetDays || 90;
+  const r = t - n;
+  if (n < 0) { el.textContent = `📅 ${-n}日後の日付です`; el.style.background = '#f1f5f9'; el.style.color = '#475569'; return; }
+  el.textContent = `📅 今日で経過 ${n}日 ／ 目標 ${t}日まで ${r > 0 ? '残り ' + r + '日' : (r === 0 ? '今日が目標日' : -r + '日超過')}`;
+  el.style.background = r <= 0 ? '#fee2e2' : '#dcfce7';
+  el.style.color = r <= 0 ? '#991b1b' : '#14532d';
 }
 
 function setConActionType(type) {
@@ -10024,7 +10140,23 @@ function saveCON() {
   if (!db.containerPlacements) db.containerPlacements = [];
   if (!db.containerActions) db.containerActions = [];
 
-  if (actionType === 'install') {
+  if (actionType === 'edit') {
+    // 編集：記録の中身を直す（履歴は増やさない。設置／交換日を変えたら、その日の履歴の日付も直す）
+    const p = (db.containerPlacements||[]).find(x=>x.id===_conEditId);
+    if (!p) { alert('対象コンテナが見つかりません'); return; }
+    const oldDate = p.installDate;
+    Object.assign(p, { containerType, purpose, containerNo, customerName, siteName, installDate: date, targetDays, notes, updated: now });
+    if (customerId) p.customerId = customerId;
+    if (oldDate !== date) {
+      const last = (db.containerActions||[]).filter(a => a.placementId === p.id && a.actionType !== 'remove' && a.actionDate === oldDate)
+        .sort((a,b) => String(b.created||'').localeCompare(String(a.created||'')))[0];
+      if (last) last.actionDate = date;
+    }
+    (db.containerActions||[]).filter(a => a.placementId === p.id).forEach(a => {
+      Object.assign(a, { containerType, purpose, containerNo, customerName, siteName });
+      if (customerId) a.customerId = customerId;
+    });
+  } else if (actionType === 'install') {
     // 新規設置: placement + action
     const newId = uid();
     db.containerPlacements.push({
