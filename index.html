@@ -107,6 +107,12 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .pcrd-want b{margin-left:auto;font-size:11px;flex-shrink:0}
 .pcrd-want.soon{background:#ffedd5;color:#9a3412}
 .pcrd-want.over{background:#dc2626;color:#fff}
+.pcrd-want.go{background:#dcfce7;color:#166534}
+.pcrd-want.any{background:#f1f5f9;color:#475569}
+.want-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.want-chips button{border:1.5px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.want-chips button:hover{border-color:#2563eb;color:#1d4ed8}
+.want-chips button.on{background:#2563eb;border-color:#2563eb;color:#fff}
 .p-add-btn{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:100px;height:80px;border:2px dashed #fca5a5;border-radius:8px;color:#dc2626;font-size:22px;cursor:pointer;transition:background .15s}
 .p-add-btn:hover{background:#fef2f2}
 
@@ -1239,10 +1245,19 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
       <!-- 日程・配車 -->
       <div class="r2">
         <div class="fr"><label>受付日（依頼受付日）</label><input type="date" id="dDate"></div>
-        <div class="fr"><label>🚛 配車確定日 <span style="font-size:9px;color:#3b82f6;font-weight:400">※ドラッグ&amp;ドロップで自動入力</span></label><input type="date" id="dDispatchDate"></div>
+        <div class="fr"><label>🚛 配車確定日 <span style="font-size:9px;color:#3b82f6;font-weight:400">※ドラッグ&amp;ドロップで自動入力</span></label><input type="date" id="dDispatchDate" oninput="updateDeadlineWarn()"></div>
       </div>
       <div class="r2">
-        <div class="fr"><label>📅 お客様の収集希望日</label><input type="date" id="dDeadline" oninput="updateDeadlineWarn()"></div>
+        <div class="fr"><label>📅 お客様の収集希望日 <span id="dWantNote" style="font-size:10px;color:#2563eb;font-weight:700"></span></label><input type="date" id="dDeadline" oninput="onWantDateInput()">
+          <!-- 電話でよくある言い方（押すと日付を自動で入れる／もう一度押すと外れる） -->
+          <div id="dWantChips" class="want-chips">
+            <button type="button" data-w="asap" onclick="setWant('asap')">🔥 なるべく早く</button>
+            <button type="button" data-w="thisweek" onclick="setWant('thisweek')">今週中</button>
+            <button type="button" data-w="nextweek" onclick="setWant('nextweek')">来週中</button>
+            <button type="button" data-w="after" onclick="setWant('after')">○日以降</button>
+            <button type="button" data-w="any" onclick="setWant('any')">いつでもよい</button>
+          </div>
+        </div>
         <div class="fr"><label>種別</label>
           <select id="dType"><option value="spot">スポット（単発）</option><option value="regular">定期便</option></select></div>
       </div>
@@ -3753,8 +3768,13 @@ async function moveDayOrder(id,dir,rowCtx){
 }
 function isCraneDisp(dp){const wtp=dp.workType||{};return!dp.dispatchType&&wtp.type==='container'&&isCraneSize(wtp.containerSize);}
 // 未割当カードのソート：①期限が近い順（なしは最後）②配車確定日が近い順（なしは最後）③登録順
+// 「なるべく早く」はいちばん上（受付が古い順）、「いつでもよい」はいちばん下
 function _sortPending(list){
+  const grp=d=>d.wantType==='asap'?0:d.wantType==='any'?3:d.deadline?1:2;
   return list.sort((a,b)=>{
+    const ga=grp(a),gb=grp(b);
+    if(ga!==gb) return ga-gb;
+    if(ga===0){const ra=a.date||a.created||'',rb=b.date||b.created||'';if(ra!==rb)return ra<rb?-1:1;}
     const dlA=a.deadline||'9999-99-99', dlB=b.deadline||'9999-99-99';
     if(dlA!==dlB) return dlA<dlB?-1:1;
     const wA=a.dispatchDate||a.date||'9999-99-99', wB=b.dispatchDate||b.date||'9999-99-99';
@@ -4224,7 +4244,7 @@ function _dayCardHTML(dp,seqNo,rowCtx){
       <div class="ec-day-seq">第${seqNo}業務${holBadge}${timeTag}</div>
       <div class="ec-day-cust">${custName(dp.customer)}</div>
       ${regLabel}
-      ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">${dlLabel(dp)}:${dp.deadline}</div>`:''}
+      ${wantSmallHtml(dp,'ec-day-note')}
       ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
     </div>`;
   }
@@ -4249,7 +4269,7 @@ function _dayCardHTML(dp,seqNo,rowCtx){
     ${!isCarryIn?`<div class="ec-day-veh">🚛 ${veh}</div>`:`<div class="ec-day-veh">🏭 持込み${dp.isReg?'（定期）':''}</div>`}
     ${!isShip&&dp.siteName?`<div class="ec-day-site">📍 ${dp.siteName}</div>`:''}
     ${isShip&&dp.destAddr?`<div class="ec-day-site">🏭 ${dp.destAddr.slice(0,20)}</div>`:''}
-    ${dp.deadline?`<div class="ec-day-note" style="color:${dlOver?'#dc2626':dlSoon?'#d97706':'#94a3b8'};font-weight:${dlOver||dlSoon?'700':'400'}">${dlLabel(dp)}:${dp.deadline}</div>`:''}
+    ${wantSmallHtml(dp,'ec-day-note')}
     ${dp.notes?`<div class="ec-day-note">📝 ${dp.notes.slice(0,28)}</div>`:''}
   </div>`;
 }
@@ -4264,7 +4284,7 @@ function _cardHTML(dp,rowCtx){
   const today=fmt(new Date());
   const dlOver=dp.deadline&&dp.deadline<today;
   const dlSoon=dp.deadline&&!dlOver&&dp.deadline<=addD(new Date(),3).toISOString().slice(0,10);
-  const dlHtml=dp.deadline?`<div class="ec-sub" style="font-size:10px;color:${dlOver?'#dc2626':dlSoon?'#d97706':'#64748b'};font-weight:${dlOver||dlSoon?'700':'400'}">${dlLabel(dp)}:${dp.deadline}</div>`:'';
+  const dlHtml=wantSmallHtml(dp,'ec-sub').replace('class="ec-sub" style="','class="ec-sub" style="font-size:10px;');
   // 持込みはドラッグ無効（持込み行のみ）
   const dragPart=(isCarryIn&&rowCtx==='carry')
     ?''
@@ -4340,14 +4360,83 @@ function _cardHTML(dp,rowCtx){
 
 // 配車カードの deadline ＝ お客様の収集希望日（出荷は「期限」のまま）
 function dlLabel(dp){return dp.dispatchType==='shipment'?'⏰ 期限':'📅 希望日';}
+// ----- お客様の収集希望日（dp.deadline）と、電話でよくある言い方（dp.wantType） -----
+//  wantType：''＝日付そのもの／asap＝なるべく早く／thisweek・nextweek＝今週中・来週中（締め切り＝土曜日）／after＝その日以降／any＝いつでもよい
+const WANT_LABEL={asap:'🔥 なるべく早く',thisweek:'今週中',nextweek:'来週中',after:'以降',any:'🕊 いつでもよい'};
+const wantMd=s=>{const d=pd(s);return `${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})`;};
+const daysFrom=(a,b)=>Math.round((pd(b)-pd(a))/86400000);
+function thisSaturday(){const d=new Date();d.setHours(0,0,0,0);return fmt(addD(d,6-d.getDay()));}
+// 受付から何日目か（受付日＝1日目）
+function wantAge(dp){const r=dp.date||(dp.created||'').slice(0,10);return r?daysFrom(r,fmt(new Date()))+1:1;}
+// 短い文字（予定表のカード・印刷・CSV用）
+function wantStr(dp){
+  const w=dp.wantType||'';
+  if(dp.dispatchType==='shipment')return dp.deadline||'';
+  if(w==='asap')return 'なるべく早く';
+  if(w==='any')return 'いつでもよい';
+  if(!dp.deadline)return '';
+  if(w==='thisweek')return `今週中(〜${wantMd(dp.deadline)})`;
+  if(w==='nextweek')return `来週中(〜${wantMd(dp.deadline)})`;
+  if(w==='after')return `${wantMd(dp.deadline)}以降`;
+  return wantMd(dp.deadline);
+}
+// 色分け：over＝赤／soon＝オレンジ／go＝緑（以降の日になった）／any＝灰色／''＝青
+function wantState(dp){
+  const w=dp.wantType||'',today=fmt(new Date());
+  if(w==='asap')return wantAge(dp)>=3?'over':'soon';
+  if(w==='any')return 'any';
+  if(!dp.deadline)return '';
+  const n=daysFrom(today,dp.deadline);
+  if(w==='after')return n<=0?'go':'';
+  return n<=0?'over':n<=3?'soon':'';
+}
 // 未割当カードの希望日：あと何日かで色を変えて目立たせる
 function wantDayHtml(dp){
-  if(!dp.deadline)return '';
-  const today=fmt(new Date()),d=pd(dp.deadline);
-  const n=Math.round((d-pd(today))/86400000);
-  const left=n<0?'⚠過ぎ':n===0?'今日':n===1?'明日':`あと${n}日`;
-  const cls=n<=0?'over':n<=3?'soon':'';
-  return `<div class="pcrd-want ${cls}" title="お客様の収集希望日">${dlLabel(dp)} ${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})<b>${left}</b></div>`;
+  const w=dp.wantType||'';
+  if(!dp.deadline&&w!=='asap'&&w!=='any')return '';
+  const cls=wantState(dp),label=dp.dispatchType==='shipment'?'⏰ 期限':'📅';
+  let txt,right='';
+  if(w==='asap'){txt='🔥 なるべく早く';right=`受付${wantAge(dp)}日目`;}
+  else if(w==='any'){txt='🕊 いつでもよい';}
+  else{
+    const n=daysFrom(fmt(new Date()),dp.deadline);
+    if(w==='after'){txt=`${label} ${wantMd(dp.deadline)}以降`;right=n<=0?'配車OK':`あと${n}日から`;}
+    else{
+      txt=w==='thisweek'?`${label} 今週中(〜${wantMd(dp.deadline)})`:w==='nextweek'?`${label} 来週中(〜${wantMd(dp.deadline)})`:`${dlLabel(dp)} ${wantMd(dp.deadline)}`;
+      right=n<0?'⚠過ぎ':n===0?'今日':n===1?'明日':`あと${n}日`;
+    }
+  }
+  return `<div class="pcrd-want ${cls}" title="お客様の収集希望日">${txt}${right?`<b>${right}</b>`:''}</div>`;
+}
+// 予定表のカードに出す小さな希望日
+function wantSmallHtml(dp,cls){
+  const s=wantStr(dp);if(!s)return '';
+  const st=wantState(dp),col={over:'#dc2626',soon:'#d97706',go:'#16a34a'}[st]||'#94a3b8';
+  return `<div class="${cls}" style="color:${col};font-weight:${st==='over'||st==='soon'?'700':'400'}">${dp.dispatchType==='shipment'?'⏰ 期限':'📅 希望'}:${esc(s)}</div>`;
+}
+// ----- 配車追加の画面：言い方ボタン -----
+let _want='';
+function setWant(w){
+  const inp=document.getElementById('dDeadline');
+  if(_want===w){_want='';if(w==='thisweek'||w==='nextweek')inp.value='';}
+  else{
+    _want=w;
+    if(w==='asap'||w==='any')inp.value='';
+    if(w==='thisweek')inp.value=thisSaturday();
+    if(w==='nextweek')inp.value=fmt(addD(pd(thisSaturday()),7));
+    if(w==='after'&&!inp.value){inp.focus();try{inp.showPicker();}catch(e){}}
+  }
+  wantChipsSync();updateDeadlineWarn();
+}
+// 日付を手で入れたら、「なるべく早く」などは外す（「以降」はそのまま）
+function onWantDateInput(){
+  if(_want&&_want!=='after')_want='';
+  wantChipsSync();updateDeadlineWarn();
+}
+function wantChipsSync(){
+  document.querySelectorAll('#dWantChips button').forEach(b=>b.classList.toggle('on',b.dataset.w===_want));
+  const v=document.getElementById('dDeadline').value;
+  document.getElementById('dWantNote').textContent=_want==='after'?(v?`→ ${wantMd(v)} 以降に配車`:'→ 日付を選んでください'):_want==='asap'?'→ なるべく早く':_want==='any'?'→ いつでもよい':(_want&&v)?`→ ${WANT_LABEL[_want]}（〜${wantMd(v)}）`:'';
 }
 function makePcrdHtml(dp){
   const isShip=dp.dispatchType==='shipment';
@@ -5129,7 +5218,7 @@ function showDispPopup(e,id,ctx){
   if(isShip){
     rows=`<div class="pop-title" style="color:#c2410c">📦 ${escH(dp.destName)||'出荷'}</div>`;
     rows+=`<div class="pop-row"><span class="pop-label" style="color:#ea580c;font-weight:800">出荷日</span><span class="pop-val" style="color:#ea580c;font-weight:700">${dispDateStr}</span></div>`;
-    if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">${dp.dispatchType==='shipment'?'期限':'希望日'}</span><span class="pop-val">${dp.deadline}</span></div>`;
+    if(wantStr(dp))rows+=`<div class="pop-row"><span class="pop-label">${dp.dispatchType==='shipment'?'期限':'希望日'}</span><span class="pop-val">${esc(wantStr(dp))}</span></div>`;
     rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
     if(dp.isCarryIn){
       const t=carryInTime(dp);
@@ -5153,7 +5242,7 @@ function showDispPopup(e,id,ctx){
   rows=`<div class="pop-title">${cu?cu.name:'（お客様未設定）'}</div>`;
   rows+=`<div class="pop-row"><span class="pop-label" style="color:#1e40af;font-weight:800">配車確定日</span><span class="pop-val" style="color:#1e40af;font-weight:700">${dispDateStr}</span></div>`;
   rows+=`<div class="pop-row"><span class="pop-label">受付日</span><span class="pop-val" style="font-size:10px;color:#94a3b8">${rcvDateStr}</span></div>`;
-  if(dp.deadline)rows+=`<div class="pop-row"><span class="pop-label">${dp.dispatchType==='shipment'?'期限':'希望日'}</span><span class="pop-val">${dp.deadline}</span></div>`;
+  if(wantStr(dp))rows+=`<div class="pop-row"><span class="pop-label">${dp.dispatchType==='shipment'?'期限':'希望日'}</span><span class="pop-val">${esc(wantStr(dp))}</span></div>`;
   rows+=`<div class="pop-row"><span class="pop-label">ステータス</span><span class="pop-val">${statusStr}</span></div>`;
   if(workTypeLabel(dp.workType))rows+=`<div class="pop-row"><span class="pop-label" style="color:#6d28d9;font-weight:800">作業種別</span><span class="pop-val" style="font-weight:700;color:#6d28d9">${workTypeLabel(dp.workType)}</span></div>`;
   if(dp.custContact)rows+=`<div class="pop-row"><span class="pop-label">お客様担当</span><span class="pop-val">${dp.custContact}</span></div>`;
@@ -5548,7 +5637,7 @@ function printDaySchedule(ds,withUndated,mode){
       });
     });
   }
-  const simpleRows=(arr,withDl)=>arr.map(dp=>`<tr><td class="c">${tmCell(dp)}</td><td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td>${withDl?`<td class="c">${esc(dp.deadline||'')}</td>`:''}<td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('');
+  const simpleRows=(arr,withDl)=>arr.map(dp=>`<tr><td class="c">${tmCell(dp)}</td><td class="c">${kind(dp)}${pendMark(dp)}</td><td>${dest(dp)}</td>${withDl?`<td class="c">${esc(wantStr(dp))}</td>`:''}<td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('');
   const sec=(title,cls,count,head,rows)=>`<div class="sec ${cls}"><div class="sec-h">${title}<span class="cnt">${count}件</span></div>
     ${count?`<table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`:'<div class="none">なし</div>'}</div>`;
 
@@ -5560,7 +5649,7 @@ function printDaySchedule(ds,withUndated,mode){
   ${sec('🔴 未確定分（ドライバー未定）','s-pend',unassigned.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">希望日</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',simpleRows(unassigned,true))}
   ${sec('🏭 持込み','s-carry',carry.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様</th><th style="width:22%">作業内容</th><th style="width:26%">備考・注意</th>',simpleRows(carry,false))}
   ${sec('🏛 委託応援','s-cs',cs.length,'<th style="width:20%">ドライバー</th><th style="width:15%">車両</th><th style="width:15%">時間</th><th>備考</th>',cs.map(c=>`<tr><td>${esc(drvName(c.driverId))}</td><td>${esc(c.vehicleId?vehName(c.vehicleId):'')}</td><td class="c">${c.startHour}:00〜${c.endHour}:00</td><td>${esc(c.note||'')}</td></tr>`).join(''))}
-  ${withUndated?sec('📋 日付未定の依頼（参考）','s-und',undated.length,'<th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">希望日</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',undated.map(dp=>`<tr><td class="c">${kind(dp)}</td><td>${dest(dp)}</td><td class="c">${esc(dp.deadline||'')}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('')):''}
+  ${withUndated?sec('📋 日付未定の依頼（参考）','s-und',undated.length,'<th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">希望日</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',undated.map(dp=>`<tr><td class="c">${kind(dp)}</td><td>${dest(dp)}</td><td class="c">${esc(wantStr(dp))}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('')):''}
   </div>`;
 
   // 用紙（ドライバー別・車両別・時間順はA4縦、午前・午後はA4横／A3横）
@@ -5699,6 +5788,12 @@ function updateDeadlineWarn(){
   const date=document.getElementById('dDate').value;
   const dl=document.getElementById('dDeadline').value;
   const el=document.getElementById('deadlineWarn');
+  const dd=document.getElementById('dDispatchDate').value;
+  if(_want==='after'){
+    // 「○日以降」：その日より前に配車しようとしたら注意する
+    el.textContent=!dl?'⚠ 「以降」の日付を選んでください':(dd&&dd<dl)?`⚠ 配車確定日が、お客様の希望（${wantMd(dl)}以降）より前です`:'';
+    return;
+  }
   if(dl&&date&&dl<date)el.textContent='⚠ 収集希望日が受付日より前です';
   else if(dl&&dl<fmt(new Date()))el.textContent='⚠ 収集希望日が過ぎています';
   else el.textContent='';
@@ -5710,6 +5805,7 @@ function openAddDispatch(date,rid,pending){
   document.getElementById('dDate').value=fmt(new Date()); // 受付日は常に今日
   document.getElementById('dDispatchDate').value=date||'';  // 配車確定日はセルクリック日（未定なら空）
   document.getElementById('dDeadline').value='';
+  _want='';wantChipsSync();
   document.getElementById('dType').value='spot';
   document.getElementById('dStatus').value=pending?'pending':'confirmed';
   document.getElementById('dDriver').value='';
@@ -5762,6 +5858,7 @@ function editDisp(id){
   document.getElementById('dDate').value=dp.date||'';
   document.getElementById('dDispatchDate').value=dp.dispatchDate||dp.date||''; // 旧データはdateを配車確定日として使用
   document.getElementById('dDeadline').value=dp.deadline||'';
+  _want=dp.wantType||'';wantChipsSync();
   document.getElementById('dType').value=dp.isReg?'regular':'spot';
   document.getElementById('dStatus').value=dp.status||'pending';
   document.getElementById('dDriver').value=dp.driver||'';
@@ -5826,6 +5923,7 @@ async function saveDispatch(){
   const date=document.getElementById('dDate').value||null;
   const dispatchDate=document.getElementById('dDispatchDate').value||null;
   const deadline=document.getElementById('dDeadline').value||null;
+  const wantType=_want==='after'&&!deadline?'':_want; // 言い方（なるべく早く・今週中など）
   const isReg=document.getElementById('dType').value==='regular';
   const isCarryIn=document.getElementById('dCarryIn').checked;
   const status=document.getElementById('dStatus').value;
@@ -5888,10 +5986,10 @@ async function saveDispatch(){
       const oldT=(dp.timeSpec&&dp.timeSpec.enabled&&dp.timeSpec.time)||'',newT=(timeSpec.enabled&&timeSpec.time)||'';
       if(oldT!==newT)delete dp.orderMin;
     }
-    if(dp)Object.assign(dp,{customer:cust,date,dispatchDate,deadline,status:finalStatus,driver,vehicle,notes,caution,receptionist,custContact,custPhone,siteName,siteContact,sitePhone,siteAddr,manifest,timeSpec,assistant,measurement,workType,isReg,isCarryIn,updated:new Date().toISOString()});
+    if(dp)Object.assign(dp,{customer:cust,date,dispatchDate,deadline,wantType,status:finalStatus,driver,vehicle,notes,caution,receptionist,custContact,custPhone,siteName,siteContact,sitePhone,siteAddr,manifest,timeSpec,assistant,measurement,workType,isReg,isCarryIn,updated:new Date().toISOString()});
   } else {
     const now=new Date().toISOString();
-    db.dispatches.push({id:uid(),customer:cust,date,dispatchDate,deadline,status:finalStatus,driver,vehicle,notes,caution,receptionist,custContact,custPhone,siteName,siteContact,sitePhone,siteAddr,manifest,timeSpec,assistant,measurement,workType,isReg,isCarryIn,created:now,updated:now});
+    db.dispatches.push({id:uid(),customer:cust,date,dispatchDate,deadline,wantType,status:finalStatus,driver,vehicle,notes,caution,receptionist,custContact,custPhone,siteName,siteContact,sitePhone,siteAddr,manifest,timeSpec,assistant,measurement,workType,isReg,isCarryIn,created:now,updated:now});
   }
   await save();closeM('mDispatch');render();
 }
