@@ -3350,7 +3350,7 @@ async function saveGasUrl(){
     if(data&&typeof data==='object'){
       setSyncStatus('ok');
       // Load from GAS if available
-      if(data.dispatches){db=data;normalizeDB();setServerRev(data._rev);localStorage.setItem('haishaDB2',JSON.stringify(db));render();}
+      if(data.dispatches){db=data;normalizeDB();setServerRev(data._rev);localStorage.setItem('haishaDB2',JSON.stringify(db));_loadFailed=false;gasLoaded();render();}
       alert('✅ 接続成功！Googleスプレッドシートと連携しました。'+(key?'\n🔐 合言葉付きで接続しています。':''));
       checkProtection();
     } else throw new Error('GASから正しい応答がありません');
@@ -3367,6 +3367,10 @@ function clearGasUrl(){
 
 // 読み込みに失敗してローカルのデータで表示しているか（同期表示のクリックで再読込できる）
 let _loadFailed=false;
+// このパソコンがGoogleのデータを正しく読み込めているか、と、読み込んだ時の件数（古いデータでの上書きを防ぐ）
+let _gasOk=false,_gasCounts=null;
+function dbCounts(d){return {reg:(d.regulars||[]).length,disp:(d.dispatches||[]).length,cust:(d.customers||[]).length};}
+function gasLoaded(){_gasOk=true;_gasCounts=dbCounts(db);}
 const LOAD_TIMEOUT_MS=30000,LOAD_TRIES=2;
 async function loadDB(){
   if(SB_MODE){await sbLoadDB();return;}
@@ -3384,7 +3388,7 @@ async function loadDB(){
         if(data&&Array.isArray(data.dispatches)){
           db=data;normalizeDB();setServerRev(data._rev);
           localStorage.setItem('haishaDB2',JSON.stringify(db));
-          _loadFailed=false;
+          _loadFailed=false;gasLoaded();
           setSyncStatus('ok',G_READONLY?`📦 Googleの古いデータ（${SB_CUTOVER_DATE}まで・見るだけ）`:undefined);return;
         }
         throw new Error('GASから正しい応答がありません');
@@ -3393,7 +3397,7 @@ async function loadDB(){
         // 合言葉違いなど、やり直しても直らないエラーはすぐにあきらめる
         const retryable=e.name==='AbortError'||e.name==='TypeError';
         if(t<LOAD_TRIES&&retryable)continue;
-        _loadFailed=true;
+        _loadFailed=true;_gasOk=false;
         const why=e.name==='AbortError'?'GASの応答が遅く読み込めませんでした':gasErrMsg(e);
         setSyncStatus('error',why+'（ローカルを使用・ここをクリックで再読込）');
         break;
@@ -3482,6 +3486,28 @@ async function manualSync(){
   if(!GAS_URL){openSettings();stab('google');return;}
   // 同期中なら「完了後に再実行」フラグを立てて終了
   if(_syncLock){_syncNeeded=true;return;}
+  // ★ 上書き事故の防止①：Googleのデータを正しく読み込めていないパソコンからは送らない
+  //   （設定したばかりのパソコンや、読み込みに失敗したパソコンの古いデータ・見本データで上書きしないため）
+  if(!_gasOk){
+    clearTimeout(_autoSyncTimer);
+    setSyncStatus('error','Googleのデータを読み込めていないため、送信を止めました');
+    if(confirm('⚠ このパソコンは、まだGoogleの最新データを読み込めていません。\n古いデータで上書きしないように、送信を止めました。\n\n［OK］最新のデータを読み込みます（この画面で入力した変更は反映されません）\n［キャンセル］今は何もしません'))await refreshFromServer();
+    return;
+  }
+  // ★ 上書き事故の防止②：読み込んだ時より、定期便・配車カード・お客様が大きく減っていたら確認する
+  {
+    const c=dbCounts(db),b=_gasCounts;
+    const lost=b&&[
+      b.reg-c.reg>=3?`定期便 ${b.reg}件 → ${c.reg}件`:'',
+      b.disp>=20&&c.disp<b.disp*0.5?`配車カード ${b.disp}件 → ${c.disp}件`:'',
+      b.cust>=20&&c.cust<b.cust*0.5?`お客様 ${b.cust}件 → ${c.cust}件`:''
+    ].filter(Boolean);
+    if(lost&&lost.length&&!confirm(`⚠ 読み込んだ時と比べて、データが大きく減っています。\n\n・${lost.join('\n・')}\n\nこのまま送ると、ほかのパソコンでも消えます。\n本当に送りますか？（間違いの場合は［キャンセル］）`)){
+      clearTimeout(_autoSyncTimer);
+      setSyncStatus('error','送信を止めました（データが大きく減っているため）');
+      return;
+    }
+  }
   _syncLock=true;_syncNeeded=false;
   setSyncStatus('saving','同期中...');
   try{
@@ -3493,6 +3519,7 @@ async function manualSync(){
     if(result.error) throw new Error(gasResultErr(result));
     if(result.ok!==true) throw new Error('GASが古いバージョンです。Apps Scriptのコードを更新・再デプロイしてください。');
     if(result.rev!==undefined)setServerRev(result.rev);
+    _gasCounts=dbCounts(JSON.parse(json)); // 送った内容を、次に比べる基準にする
     if(!_syncNeeded)_dirty=false;
     setSyncStatus('ok');
   }catch(e){
