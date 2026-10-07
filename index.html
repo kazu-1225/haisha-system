@@ -2755,7 +2755,7 @@ function checkContainerAlerts() {
       </div>
       <div class="fr">
         <label>収集曜日（複数選択可）</label>
-        <div class="dow-row" id="rDow">
+        <div class="dow-row" id="rDow" onchange="onRegStartChg()">
           <label class="dow-item dsun"><input type="checkbox" value="0"><span>日</span></label>
           <label class="dow-item"><input type="checkbox" value="1"><span>月</span></label>
           <label class="dow-item"><input type="checkbox" value="2"><span>火</span></label>
@@ -2765,8 +2765,12 @@ function checkContainerAlerts() {
           <label class="dow-item dsat"><input type="checkbox" value="6"><span>土</span></label>
         </div>
       </div>
+      <div class="fr"><label>初回の日（この日から始める） <span id="rStartNote" style="font-size:10px;color:#94a3b8;font-weight:400">毎週・毎月は空欄でもかまいません</span></label>
+        <input type="date" id="rStart" oninput="onRegStartChg()">
+        <div id="rStartHint" style="font-size:11px;margin-top:3px"></div>
+      </div>
       <div class="fr hid" id="rWomRow"><label>第何週目</label>
-        <select id="rWom"><option value="1">第1週</option><option value="2">第2週</option><option value="3">第3週</option><option value="4">第4週</option><option value="-1">最終週</option></select>
+        <select id="rWom" onchange="onRegStartChg()"><option value="1">第1週</option><option value="2">第2週</option><option value="3">第3週</option><option value="4">第4週</option><option value="-1">最終週</option></select>
       </div>
       <div class="r2" id="rDrvRow">
         <div class="fr"><label>固定ドライバー（任意）</label><select id="rDriver"><option value="">都度配車</option></select></div>
@@ -7714,9 +7718,7 @@ function generatePlan(){
       if(!rs.dows||!rs.dows.includes(dow))continue;
       if(rs.holidayMode==='skip'&&HOLIDAYS[ds])continue; // 祝日は作らない設定
       let ok=true;
-      if(rs.freq==='monthly'&&rs.wom!=null){const w=getWOM(cur),lw=getWOM(new Date(cur.getFullYear(),cur.getMonth()+1,0));ok=rs.wom===-1?w===lw:w===rs.wom;}
-      if(rs.freq==='biweekly')ok=getWOM(cur)%2===1;
-      if(!ok)continue;
+      if(!regHits(rs,cur))continue;
       /* AI提案 */
       const aiSug=aiSuggestBySite(rs.site||'',rs.cust);
       let drvId=rs.driver||'',vehId=rs.vehicle||'',aiUsed=false;
@@ -7941,6 +7943,7 @@ function resetRegForm(){
   document.getElementById('rCust').value='';
   document.querySelector('input[name="rKind"][value="collect"]').checked=true;
   document.getElementById('rSite').value='';
+  document.getElementById('rStart').value='';
   document.getElementById('rFreq').value='weekly';onFreqChg();
   document.querySelectorAll('#rDow input').forEach(e=>e.checked=false);
   document.getElementById('rTime').value='';
@@ -7964,9 +7967,11 @@ function editRegular(id){
   document.getElementById('rCust').value=rs.cust;
   document.querySelector(`input[name="rKind"][value="${rs.isCarryIn?'carry':'collect'}"]`).checked=true;
   document.getElementById('rSite').value=rs.site||'';
-  document.getElementById('rFreq').value=rs.freq;onFreqChg();
+  document.getElementById('rStart').value=rs.start||'';
+  document.getElementById('rFreq').value=rs.freq;
   if(rs.wom!=null)document.getElementById('rWom').value=rs.wom;
   document.querySelectorAll('#rDow input').forEach(e=>e.checked=rs.dows.includes(parseInt(e.value)));
+  onFreqChg();
   document.getElementById('rTime').value=rs.time||'';
   document.getElementById('rDriver').value=rs.driver||'';
   document.getElementById('rVehicle').value=rs.vehicle||'';
@@ -7990,7 +7995,24 @@ function filterRCust(q){
   document.getElementById('rCust').innerHTML='<option value="">-- お客様を選択 --</option>'+filtered.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${esc(c.name)}${c.tpcd?'（'+esc(tpLabel(c))+'）':''}</option>`).join('');
 }
 function onFreqChg(){
-  document.getElementById('rWomRow').classList.toggle('hid',document.getElementById('rFreq').value!=='monthly');
+  const f=document.getElementById('rFreq').value;
+  document.getElementById('rWomRow').classList.toggle('hid',f!=='monthly');
+  const note=document.getElementById('rStartNote');
+  if(note){note.textContent=f==='biweekly'?'※隔週は必ず入れてください（この日の週から2週ごとになります）':'毎週・毎月は空欄でもかまいません';note.style.color=f==='biweekly'?'#dc2626':'#94a3b8';}
+  onRegStartChg();
+}
+// 初回の日を入れたら、そこから先の予定日を少しだけ見せる（ずれていないか確かめられるように）
+function onRegStartChg(){
+  const el=document.getElementById('rStartHint');if(!el)return;
+  const start=document.getElementById('rStart').value,freq=document.getElementById('rFreq').value;
+  const dows=[...document.querySelectorAll('#rDow input:checked')].map(e=>parseInt(e.value));
+  if(!start){el.innerHTML=freq==='biweekly'?'<span style="color:#dc2626">⚠ 初回の日を入れてください</span>':'';return;}
+  const warn=dows.length&&!dows.includes(pd(start).getDay())?`<span style="color:#dc2626">⚠ 初回の日（${DOW_JP[pd(start).getDay()]}曜）が、選んだ曜日に入っていません。</span> `:'';
+  if(!dows.length){el.innerHTML=warn+'<span style="color:#64748b">曜日を選ぶと、予定日の例が出ます</span>';return;}
+  const rs={freq,dows,start,wom:freq==='monthly'?parseInt(document.getElementById('rWom').value):null};
+  const out=[];const cur=pd(start);
+  for(let i=0;i<120&&out.length<5;i++){if(dows.includes(cur.getDay())&&regHits(rs,cur))out.push(`${cur.getMonth()+1}/${cur.getDate()}(${DOW_JP[cur.getDay()]})`);cur.setDate(cur.getDate()+1);}
+  el.innerHTML=warn+`<span style="color:#1d4ed8">📅 予定日の例：${out.join('、')} …</span>`;
 }
 async function saveRegular(){
   const cust=document.getElementById('rCust').value;
@@ -7999,6 +8021,9 @@ async function saveRegular(){
   const dows=[...document.querySelectorAll('#rDow input:checked')].map(e=>parseInt(e.value));
   if(!dows.length){alert('曜日を選択してください');return;}
   const wom=freq==='monthly'?parseInt(document.getElementById('rWom').value):null;
+  const start=document.getElementById('rStart').value||'';
+  if(freq==='biweekly'&&!start){alert('隔週の定期便は「初回の日」を入れてください。\n（その日の週から2週ごとに予定を作ります）');document.getElementById('rStart').focus();return;}
+  if(start&&!dows.includes(pd(start).getDay())&&!confirm(`初回の日（${DOW_JP[pd(start).getDay()]}曜）が、選んだ曜日に入っていません。\nこのまま保存しますか？`))return;
   const isCarryIn=regKind()==='carry';
   const driver=isCarryIn?null:(document.getElementById('rDriver').value||null);
   const vehicle=isCarryIn?null:(document.getElementById('rVehicle').value||null);
@@ -8009,7 +8034,7 @@ async function saveRegular(){
   const receptionist=document.getElementById('rReceptionist').value.trim();
   if(!receptionist&&!confirm('連絡担当（受付）が空欄です。\nこの定期便から作られるカードには受付担当が入りません。\n\nこのまま保存しますか？'))return;
   try{if(receptionist)localStorage.setItem('regReceptionistLast',receptionist);}catch(e){}
-  const fields={cust,freq,dows,wom,driver,vehicle,notes,isCarryIn,site,time,holidayMode,receptionist,...rGetWork()};
+  const fields={cust,freq,dows,wom,start,driver,vehicle,notes,isCarryIn,site,time,holidayMode,receptionist,...rGetWork()};
   let msg;
   if(_regEditId){
     const rs=db.regulars.find(x=>x.id===_regEditId);
@@ -8151,6 +8176,24 @@ function applyRegularChange(rs,fields){
   genRegDisps(rs);
   return {updated,added:db.dispatches.length-before,removed:drop.length};
 }
+// その日が定期便の日に当たるか（曜日は呼ぶ側で確認済み）
+//  初回の日（rs.start）より前は作らない。隔週は、初回の日の週から2週ごと（月をまたいでも数え続ける）
+//  ※初回の日が入っていない古い隔週は、これまでどおり「月の第1・3・5週」
+function regHits(rs,cur){
+  const ds=fmt(cur);
+  if(rs.start&&ds<rs.start)return false;
+  if(rs.freq==='monthly'&&rs.wom!=null){
+    const w=getWOM(cur),lw=getWOM(new Date(cur.getFullYear(),cur.getMonth()+1,0));
+    return rs.wom===-1?w===lw:w===rs.wom;
+  }
+  if(rs.freq==='biweekly'){
+    if(!rs.start)return getWOM(cur)%2===1;
+    const sun=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-x.getDay());return x;};
+    const weeks=Math.round((sun(cur)-sun(pd(rs.start)))/(7*86400000));
+    return weeks%2===0;
+  }
+  return true;
+}
 // 今月1日〜3ヶ月先の月末までで、この定期便に当たる日付の一覧
 function regDates(rs){
   const out=[];
@@ -8159,13 +8202,7 @@ function regDates(rs){
   const cur=new Date(today.getFullYear(),today.getMonth(),1);
   while(cur<=end){
     if(rs.dows.includes(cur.getDay())){
-      let ok=true;
-      if(rs.freq==='monthly'&&rs.wom!=null){
-        const w=getWOM(cur),lw=getWOM(new Date(cur.getFullYear(),cur.getMonth()+1,0));
-        ok=rs.wom===-1?w===lw:w===rs.wom;
-      }
-      if(rs.freq==='biweekly')ok=getWOM(cur)%2===1;
-      if(ok)out.push(fmt(cur));
+      if(regHits(rs,cur))out.push(fmt(cur));
     }
     cur.setDate(cur.getDate()+1);
   }
@@ -8199,6 +8236,7 @@ function renderRegList(){
         <span class="bdg ${rs.isCarryIn?'bdg-b':'bdg-g'}">${rs.isCarryIn?'🏭 持込み':'🚛 収集'}</span>
         <strong>${esc(custName(rs.cust))}</strong>
         <span class="bdg bdg-b">${fn[rs.freq]||rs.freq}${wLabel} ${rs.dows.map(d=>DOW_JP[d]).join('・')}曜${rs.time?' '+esc(rs.time):''}</span>
+        ${rs.start?`<span class="bdg bdg-g">初回 ${(d=>`${d.getMonth()+1}/${d.getDate()}`)(pd(rs.start))}〜</span>`:rs.freq==='biweekly'?'<span class="bdg bdg-r">⚠ 初回の日 未設定</span>':''}
         <span class="ritem-del" data-id="${esc(rs.id)}" onclick="event.stopPropagation();delRegular(this.dataset.id)">🗑</span>
       </div>
       <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'':`ドライバー: ${esc(drvName(rs.driver))} ／ 車両: ${esc(vehName(rs.vehicle))} ／ `}${holL}${rs.receptionist?' ／ 📞担当 '+esc(rs.receptionist):' ／ <span style="color:#dc2626">📞担当 未設定</span>'}${rs.site?' ／ 📍'+esc(rs.site):''}${rs.notes?' ／ '+esc(rs.notes):''}</div>
