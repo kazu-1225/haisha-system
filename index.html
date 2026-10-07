@@ -2772,6 +2772,9 @@ function checkContainerAlerts() {
         <input type="date" id="rStart" oninput="onRegStartChg()">
         <div id="rStartHint" style="font-size:11px;margin-top:3px"></div>
       </div>
+      <div class="fr"><label>終了日（この日まで） <span style="font-size:10px;color:#94a3b8;font-weight:400">空欄＝ずっと続く。季節だけ・取引終了のときに入れます</span></label>
+        <input type="date" id="rEnd" oninput="onRegStartChg()">
+      </div>
       <!-- 毎月（第○○曜日）：第1・3、第2・4、第1・3・5 など複数選べる -->
       <div class="fr hid" id="rWomRow"><label>第何○曜日（複数選択可）</label>
         <div class="dow-row" id="rWoms" onchange="onRegStartChg()">
@@ -2898,6 +2901,28 @@ function checkContainerAlerts() {
       <hr style="margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#475569">📋 登録済み定期便一覧 <span style="font-size:11px;font-weight:400;color:#94a3b8">（クリックで編集）</span></div>
       <div id="regularList" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 定期便のカードの削除（この日だけ／この日以降すべて） -->
+<div class="ovl hid" id="mRegDel">
+  <div class="mbox" style="max-width:460px">
+    <div class="mhdr"><h2>🗑 定期便の予定を削除</h2><span class="mcls" onclick="regDelAnswer(null)">×</span></div>
+    <div class="mbdy">
+      <div id="rdTitle" style="font-size:14px;font-weight:800;margin-bottom:12px"></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-s" style="display:block;width:100%;text-align:left;padding:12px 14px" onclick="regDelAnswer('one')">
+          <div style="font-size:14px;font-weight:800">この日だけ削除</div>
+          <div style="font-size:11px;color:#64748b;font-weight:400;margin-top:2px">ほかの日の予定はそのままです（ごみ箱から戻せます）。</div>
+        </button>
+        <button class="btn btn-d" id="rdAfter" style="display:block;width:100%;text-align:left;padding:12px 14px;background:#fef2f2;color:#991b1b;border:1.5px solid #fca5a5" onclick="regDelAnswer('after')">
+          <div style="font-size:14px;font-weight:800" id="rdAfterTxt"></div>
+          <div style="font-size:11px;font-weight:400;margin-top:2px" id="rdAfterSub"></div>
+        </button>
+        <div id="rdNoPerm" class="hid" style="font-size:11px;color:#64748b">※ この日以降をまとめて削除するには、定期便の設定ができる人（管理者・配車係）にお願いしてください。</div>
+        <button class="btn btn-s" onclick="regDelAnswer(null)">キャンセル</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3600,10 +3625,13 @@ async function handleSyncConflict(){
 // サーバーから最新データを読み込み直して画面を描き直す
 async function refreshFromServer(){
   await loadDB();
+  checkAppVer();
   for(const rs of db.regulars)genRegDisps(rs);
+  const tidied=_loadFailed?0:regTidy();
   _dirty=false;
   render();
   if(SB_MODE&&!_loadFailed)save(); // 新しく作られた定期便の予定などを送る
+  else if(tidied&&!G_READONLY)save();
 }
 
 // 他のパソコンで更新されていないか確認し、未保存の変更がなければ自動で最新にする
@@ -6398,12 +6426,52 @@ function dispCheckAnswer(save){
 
 const TRASH_MSG='この配車予定を削除しますか？\n（ごみ箱に移動します。'+'30日間は元に戻せます）';
 async function delDispatch(){
-  if(!ST.editId)return;if(!confirm(TRASH_MSG))return;
+  if(!ST.editId)return;
+  const dp=db.dispatches.find(x=>x.id===ST.editId);
+  if(dp&&dp.isReg&&dp.regId){if(await delRegCard(dp))closeM('mDispatch');return;}
+  if(!confirm(TRASH_MSG))return;
   const ids=[ST.editId];trashDispatches(ids);await save();closeM('mDispatch');render();showUndo('配車予定をごみ箱に移動しました',ids);
 }
 async function qDel(id){
+  const dp=db.dispatches.find(x=>x.id===id);
+  if(dp&&dp.isReg&&dp.regId){await delRegCard(dp);return;}
   if(!confirm(TRASH_MSG))return;
   trashDispatches([id]);await save();render();showUndo('配車予定をごみ箱に移動しました',[id]);
+}
+// ----- 定期便のカードの削除：「この日だけ」か「この日以降すべて（定期便をその前日で終わりにする）」を選ぶ -----
+let _rdResolve=null;
+function regDelDialog(dp,rs){
+  const d=pd(dp.date),md=x=>`${x.getMonth()+1}/${x.getDate()}(${DOW_JP[x.getDay()]})`;
+  const n=db.dispatches.filter(x=>x.isReg&&x.regId===dp.regId&&(x.date||'')>=dp.date).length;
+  document.getElementById('rdTitle').textContent=`${custName(dp.customer)}　${md(d)} の定期便`;
+  document.getElementById('rdAfterTxt').textContent=`${md(d)} 以降の予定 ${n}件 をすべて削除`;
+  document.getElementById('rdAfterSub').textContent=rs?`この定期便は ${md(addD(d,-1))} で終わりになります（定期便設定に終了日が入ります）。`:'';
+  const canEnd=!!rs&&canDo('regular_manage');
+  document.getElementById('rdAfter').classList.toggle('hid',!canEnd);
+  document.getElementById('rdNoPerm').classList.toggle('hid',canEnd||!rs);
+  openM('mRegDel');
+  return new Promise(res=>{_rdResolve=res;});
+}
+function regDelAnswer(v){closeM('mRegDel');if(_rdResolve){const r=_rdResolve;_rdResolve=null;r(v);}}
+async function delRegCard(dp){
+  const rs=(db.regulars||[]).find(r=>r.id===dp.regId);
+  const ans=await regDelDialog(dp,rs);
+  if(!ans)return false;
+  if(ans==='one'){
+    trashDispatches([dp.id],'定期便のこの日だけ削除');await save();render();
+    showUndo('この日の定期便の予定をごみ箱に移動しました',[dp.id]);return true;
+  }
+  // この日以降すべて：定期便に終了日（この日の前日）を付けて、以降の予定をごみ箱へ
+  const end=fmt(addD(pd(dp.date),-1));
+  rs.end=end;
+  const ids=db.dispatches.filter(x=>x.isReg&&x.regId===rs.id&&(x.date||'')>=dp.date).map(x=>x.id);
+  const moved=trashDispatches(ids,'定期便の終了（この日以降を削除）');
+  // 終了日で止めるので「作り直さない印」はいらない（終了日を消したら作り直せるように）
+  const keys=new Set(moved.map(x=>x.regId+'|'+x.date));
+  db.regSkips=(db.regSkips||[]).filter(k=>!keys.has(k));
+  await save();render();try{renderRegList();}catch(e){}
+  alert(`✅ ${ids.length}件の予定をごみ箱へ移し、この定期便を ${end.replace(/-/g,'/')} で終わりにしました。\n\n間違えた場合は、「🔁 定期設定」でこの定期便を開き、「終了日」を消して保存すると、予定が作り直されます。`);
+  return true;
 }
 function chkLic(){
   const dr=db.drivers.find(x=>x.id===document.getElementById('dDriver').value);
@@ -6538,6 +6606,7 @@ function sbSourceRows(){
     ['products',db.products||[],'sales'],
     ['dispatchPatterns',db.dispatchPatterns||{},'dispatch_create'], // お客様ごとの「いつものパターン」
     ['signageNotices',db.signageNotices||[],'dispatch_create'], // サイネージのお知らせ
+    ['appVer',db.appVer||0,'dispatch_create'], // 最後に保存した画面の版（古い版の画面が定期便の予定を作らないように）
   ];
   plan.push({table:'app_settings',label:'設定（並び順など）',key:'key',isSettings:true,
     rows:settings.map(([key,value,edit_perm])=>({key,value,edit_perm}))});
@@ -6799,7 +6868,7 @@ async function sbStartRealtime(){
         const changed=p.eventType==='DELETE'?sbApplyRemote(t,p.old,true,false):sbApplyRemote(t,p.new,false,false);
         if(changed)sbScheduleRender();
         // 定期便の設定が変わったら、予定を作る役割の画面で作り直す
-        if(changed&&p.table==='regulars'&&!SIGNAGE&&canGenReg()){clearTimeout(_sbRegTimer);_sbRegTimer=setTimeout(()=>{for(const rs of db.regulars)genRegDisps(rs);save();},1500);}
+        if(changed&&p.table==='regulars'&&!SIGNAGE&&canGenReg()){clearTimeout(_sbRegTimer);_sbRegTimer=setTimeout(()=>{for(const rs of db.regulars)genRegDisps(rs);regTidy();save();},1500);}
       })
       .subscribe(st=>{
         const was=_sbLive;_sbLive=st==='SUBSCRIBED';
@@ -6889,7 +6958,32 @@ function permAlert(req,extra){
   alert(`⛔ この操作はできません。\n（必要な権限：${permName(req)}${req.endsWith('!')?'（○）':''}）${extra?'\n\n'+extra:''}\n\n必要な場合は、管理者に相談してください。`);
 }
 // 定期便の予定を自動で作るのは、定期便の設定と配車の確定ができる人の画面だけ（ほかの人が作ると「保留」になるため）
-function canGenReg(){return canDo('regular_manage')&&canFull('dispatch_confirm');}
+function canGenReg(){return !appStale()&&canDo('regular_manage')&&canFull('dispatch_confirm');}
+// ----- 古い版の画面が、古い決まりで定期便の予定を作らないようにする -----
+//  新しい版で保存すると、データに版の番号（appVer）が残る。それより古い画面は予定を作らず、読み込み直しを案内する
+const APP_VER=20261007;
+function appStale(){return !!db&&(db.appVer||0)>APP_VER;}
+let _staleWarned=false;
+function checkAppVer(){
+  if(!db)return;
+  if(appStale()){
+    if(!_staleWarned){_staleWarned=true;alert('⚠ このパソコンの配車システムは古い版です。\n定期便の予定がずれないように、予定の自動作成を止めています。\n\nキーボードの Ctrl + F5 を押して、読み込み直してください。');}
+    return;
+  }
+  if((db.appVer||0)<APP_VER)db.appVer=APP_VER; // 次の保存で記録される
+}
+// ----- 定期便の予定の点検：設定と合わない今日以降の予定（削除済みの定期便の予定・数え方が変わってずれた予定）をごみ箱へ -----
+function regTidy(){
+  if(!canGenReg()||!db)return 0;
+  const today=fmt(new Date()),t=new Date(),end=fmt(new Date(t.getFullYear(),t.getMonth()+3,0));
+  const valid=new Map((db.regulars||[]).map(rs=>[rs.id,new Set(regDates(rs).filter(ds=>!(rs.holidayMode==='skip'&&HOLIDAYS[ds])))]));
+  const bad=(db.dispatches||[]).filter(x=>x.isReg&&x.regId&&(x.date||'')>=today&&(x.date||'')<=end&&!(valid.get(x.regId)||new Set()).has(x.date));
+  if(!bad.length)return 0;
+  const ids=bad.map(x=>x.id);
+  trashDispatches(ids,'定期便の点検（設定と合わない予定）');
+  try{showUndo(`定期便の点検：設定と合わない予定 ${ids.length}件をごみ箱へ移しました`,ids);}catch(e){}
+  return ids.length;
+}
 function isMyCard(id){return !!_sbUid&&_sbCreatedBy.get(id)===_sbUid;}
 // このカードをごみ箱へ移せるか（△は自分が登録した未割当のカードだけ）
 function canTrashCard(dp){
@@ -7988,7 +8082,7 @@ function resetRegForm(){
   document.getElementById('rCust').value='';
   document.querySelector('input[name="rKind"][value="collect"]').checked=true;
   document.getElementById('rSite').value='';
-  document.getElementById('rStart').value='';
+  document.getElementById('rStart').value='';document.getElementById('rEnd').value='';
   document.querySelectorAll('#rDow input,#rWoms input,#rClosed input').forEach(e=>e.checked=false);
   document.getElementById('rWomMode').value='nth';
   document.getElementById('rMdays').value='';document.getElementById('rApprox').checked=false;
@@ -8016,7 +8110,7 @@ function editRegular(id){
   document.getElementById('rCust').value=rs.cust;
   document.querySelector(`input[name="rKind"][value="${rs.isCarryIn?'carry':'collect'}"]`).checked=true;
   document.getElementById('rSite').value=rs.site||'';
-  document.getElementById('rStart').value=rs.start||'';
+  document.getElementById('rStart').value=rs.start||'';document.getElementById('rEnd').value=rs.end||'';
   document.getElementById('rFreq').value=rs.freq;
   const setChecks=(sel,arr)=>document.querySelectorAll(sel+' input').forEach(e=>e.checked=(arr||[]).includes(parseInt(e.value)));
   setChecks('#rDow',rs.dows);
@@ -8082,7 +8176,7 @@ function regDrawDates(){
 function readRegRule(){
   const freq=document.getElementById('rFreq').value;
   const checks=sel=>[...document.querySelectorAll(sel+' input:checked')].map(e=>parseInt(e.value));
-  const r={freq,start:document.getElementById('rStart').value||'',dows:isDateType(freq)?[]:checks('#rDow'),wom:null,
+  const r={freq,start:document.getElementById('rStart').value||'',end:document.getElementById('rEnd').value||'',dows:isDateType(freq)?[]:checks('#rDow'),wom:null,
     woms:freq==='monthly'?checks('#rWoms'):[],womMode:document.getElementById('rWomMode').value,
     mdays:freq==='monthday'?[...new Set((document.getElementById('rMdays').value||'').normalize('NFKC').split(/[^\d]+/).map(Number).filter(n=>n>=1&&n<=31))].sort((a,b)=>a-b):[],
     approx:freq==='monthday'&&document.getElementById('rApprox').checked,
@@ -8122,6 +8216,7 @@ async function saveRegular(){
   if(freq==='monthly'&&!rule.woms.length){alert('「第何○曜日」を選んでください（例：第1と第3）');return;}
   if(freq==='monthday'&&!rule.mdays.length){alert('日にちを入れてください（例：10, 25）');document.getElementById('rMdays').focus();return;}
   if(freq==='dates'&&!rule.dates.length){alert('収集する日を1つ以上追加してください');return;}
+  if(rule.end&&start&&rule.end<start){alert('終了日が初回の日より前になっています');return;}
   if(freq==='biweekly'&&!start){alert('隔週の定期便は「初回の日」を入れてください。\n（その日の週から2週ごとに予定を作ります）');document.getElementById('rStart').focus();return;}
   if(start&&!isDateType(freq)&&!dows.includes(pd(start).getDay())&&!confirm(`初回の日（${DOW_JP[pd(start).getDay()]}曜）が、選んだ曜日に入っていません。\nこのまま保存しますか？`))return;
   const isCarryIn=regKind()==='carry';
@@ -8324,6 +8419,7 @@ function regHits(rs,cur){
 function regMatch(rs,cur){
   const ds=fmt(cur);
   if(rs.start&&ds<rs.start)return false;
+  if(rs.end&&ds>rs.end)return false;
   if(rs.freq==='dates')return (rs.dates||[]).includes(ds);
   if(rs.freq==='monthend')return new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+1).getDate()===1;
   if(rs.freq==='monthday'){
@@ -8345,7 +8441,7 @@ function regDates(rs){
     cur.setDate(cur.getDate()+1);
   }
   // 日付指定は、3ヶ月より先の日付も入っていれば作る
-  if(rs.freq==='dates')(rs.dates||[]).forEach(d=>{if(d>fmt(end)&&!(rs.start&&d<rs.start))out.push(d);});
+  if(rs.freq==='dates')(rs.dates||[]).forEach(d=>{if(d>fmt(end)&&!(rs.start&&d<rs.start)&&!(rs.end&&d>rs.end))out.push(d);});
   return out;
 }
 function genRegDisps(rs){
@@ -8395,6 +8491,7 @@ function renderRegList(){
         <strong>${esc(custName(rs.cust))}</strong>
         <span class="bdg bdg-b">${esc(regRuleLabel(rs))}${rs.time?' '+esc(rs.time):''}</span>
         ${rs.start?`<span class="bdg bdg-g">初回 ${(d=>`${d.getMonth()+1}/${d.getDate()}`)(pd(rs.start))}〜</span>`:rs.freq==='biweekly'?'<span class="bdg bdg-r">⚠ 初回の日 未設定</span>':''}
+        ${rs.end?(rs.end<fmt(new Date())?'<span class="bdg" style="background:#e2e8f0;color:#475569">終了済み（'+rs.end.slice(5).replace('-','/')+'まで）</span>':'<span class="bdg bdg-o">〜'+rs.end.slice(5).replace('-','/')+' で終了</span>'):''}
         ${rs.freq==='dates'&&!(rs.dates||[]).some(d=>d>=fmt(new Date()))?'<span class="bdg bdg-r">⚠ これからの日付が未登録（FAX・カレンダーを確認）</span>':''}
         <span class="ritem-del" data-id="${esc(rs.id)}" onclick="event.stopPropagation();delRegular(this.dataset.id)">🗑</span>
       </div>
@@ -8609,14 +8706,14 @@ async function undoDelete(){
 }
 
 async function delRegular(id){
-  if(!confirm('この定期便設定を削除しますか？'))return;
-  const withDisps=confirm('生成済みの配車予定（今日以降の分）も一緒に削除しますか？\n\n【OK】設定＋未来の配車予定を削除（配車予定はごみ箱へ移動）\n【キャンセル】設定のみ削除（カレンダー上の予定は残す）');
+  // 設定だけ消すと、持ち主のいない予定が残って二重に見えるため、今日以降の予定も必ず一緒にごみ箱へ（ごみ箱から戻せる）
+  if(!confirm('この定期便設定を削除しますか？\n\n今日以降の配車予定も一緒にごみ箱へ移します（ごみ箱から戻せます）。'))return;
   db.regulars=db.regulars.filter(x=>x.id!==id);
-  if(withDisps){
-    const today=fmt(new Date());
-    trashDispatches(db.dispatches.filter(x=>x.isReg&&x.regId===id&&(x.dispatchDate||x.date||'')>=today).map(x=>x.id),'定期便設定の削除');
-  }
+  const today=fmt(new Date());
+  const ids=db.dispatches.filter(x=>x.isReg&&x.regId===id&&(x.date||'')>=today).map(x=>x.id);
+  trashDispatches(ids,'定期便設定の削除');
   await save();renderRegList();render();
+  if(ids.length)try{showUndo(`定期便を削除し、今日以降の予定 ${ids.length}件をごみ箱へ移しました`,ids);}catch(e){}
 }
 
 // ================================================================
@@ -11041,9 +11138,11 @@ window.addEventListener('DOMContentLoaded',async()=>{
     catch(e){alert('権限を読み込めませんでした（'+sbErrJa(e)+'）。\n画面を読み込み直してください。');_perm={};applyPermUI();}
   }
   await Promise.all([loadDB(),loadHolidays()]);
+  checkAppVer();
   for(const rs of db.regulars)genRegDisps(rs);
+  const tidied=_loadFailed?0:regTidy();
   if(SB_MODE){if(!_loadFailed)save();} // 変わった行だけ送る（定期便の予定・コンテナ反映など）
-  else if(!G_READONLY&&syncContainers())save();
+  else if(!G_READONLY&&(syncContainers()||tidied))save();
   document.getElementById('dCust').addEventListener('change',refreshConTargets);
   document.getElementById('loadOvl').classList.add('hid');
   setView('week');
