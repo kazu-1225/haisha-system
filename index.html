@@ -2746,14 +2746,17 @@ function checkContainerAlerts() {
       <div class="r2">
         <div class="fr"><label>頻度</label>
           <select id="rFreq" onchange="onFreqChg()">
-            <option value="weekly">毎週</option>
+            <option value="weekly">毎週（曜日固定）</option>
             <option value="biweekly">隔週（2週に1回）</option>
-            <option value="monthly">毎月（第○週）</option>
+            <option value="monthly">毎月（第○○曜日）</option>
+            <option value="monthday">毎月（○日）</option>
+            <option value="monthend">毎月（月末）</option>
+            <option value="dates">日付を指定（FAX・カレンダーで届く）</option>
           </select>
         </div>
         <div class="fr"><label>時間指定（任意）</label><input type="time" id="rTime"></div>
       </div>
-      <div class="fr">
+      <div class="fr" id="rDowRow">
         <label>収集曜日（複数選択可）</label>
         <div class="dow-row" id="rDow" onchange="onRegStartChg()">
           <label class="dow-item dsun"><input type="checkbox" value="0"><span>日</span></label>
@@ -2769,8 +2772,51 @@ function checkContainerAlerts() {
         <input type="date" id="rStart" oninput="onRegStartChg()">
         <div id="rStartHint" style="font-size:11px;margin-top:3px"></div>
       </div>
-      <div class="fr hid" id="rWomRow"><label>第何週目</label>
-        <select id="rWom" onchange="onRegStartChg()"><option value="1">第1週</option><option value="2">第2週</option><option value="3">第3週</option><option value="4">第4週</option><option value="-1">最終週</option></select>
+      <!-- 毎月（第○○曜日）：第1・3、第2・4、第1・3・5 など複数選べる -->
+      <div class="fr hid" id="rWomRow"><label>第何○曜日（複数選択可）</label>
+        <div class="dow-row" id="rWoms" onchange="onRegStartChg()">
+          <label class="dow-item"><input type="checkbox" value="1"><span>第1</span></label>
+          <label class="dow-item"><input type="checkbox" value="2"><span>第2</span></label>
+          <label class="dow-item"><input type="checkbox" value="3"><span>第3</span></label>
+          <label class="dow-item"><input type="checkbox" value="4"><span>第4</span></label>
+          <label class="dow-item"><input type="checkbox" value="5"><span>第5</span></label>
+          <label class="dow-item"><input type="checkbox" value="-1"><span>最終</span></label>
+        </div>
+        <select id="rWomMode" onchange="onRegStartChg()" style="margin-top:6px">
+          <option value="nth">その月の○回目の曜日で数える（例：第2水曜＝その月の2回目の水曜日）</option>
+          <option value="week">カレンダーの第○週目で数える（例：「第3週目の月曜日」）</option>
+        </select>
+      </div>
+      <!-- 毎月（○日） -->
+      <div class="fr hid" id="rMdayRow"><label>日にち（いくつでも。「,」や「・」で区切る）</label>
+        <input type="text" id="rMdays" placeholder="例：10, 25　／　5・15・25　／　20" oninput="onRegStartChg()">
+        <label style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:600"><input type="checkbox" id="rApprox" style="width:auto;margin:0" onchange="onRegStartChg()"> 「頃」（その日の前後でもよい）</label>
+      </div>
+      <!-- 日付を指定（依頼FAX・お客様のカレンダー） -->
+      <div class="fr hid" id="rDatesRow"><label>収集する日（お客様から届いた日付を足していきます）</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><input type="date" id="rDateAdd" style="max-width:180px"><button type="button" class="btn btn-s" onclick="regAddDate()">＋ この日を追加</button></div>
+        <div id="rDateList" class="want-chips" style="margin-top:6px"></div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">月末に翌月分のFAXやカレンダーが届いたら、この定期便を開いて日付を足し、「変更を保存する」を押します。</div>
+      </div>
+      <!-- 毎月（○日）・月末：休みに当たったときのずらし方 -->
+      <div class="fr hid" id="rShiftRow"><label>収集日が休みに当たったら</label>
+        <select id="rShift" onchange="onRegStartChg()">
+          <option value="prev">前の営業日にずらして作る</option>
+          <option value="next">翌営業日にずらして作る</option>
+          <option value="ask">そのまま作り「🎌 要確認」と表示する</option>
+        </select>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px;font-weight:600">
+          <label style="display:inline-flex;align-items:center;gap:5px"><input type="checkbox" id="rSatOk" style="width:auto;margin:0" onchange="onRegStartChg()"> 土曜も収集できる</label>
+          <label style="display:inline-flex;align-items:center;gap:5px"><input type="checkbox" id="rHolOk" style="width:auto;margin:0" onchange="onRegStartChg()"> 祝日も収集できる</label>
+        </div>
+        <div style="font-size:12px;font-weight:600;margin-top:6px">お客様の定休日（この曜日も休みとして扱う）</div>
+        <div class="dow-row" id="rClosed" onchange="onRegStartChg()">
+          <label class="dow-item"><input type="checkbox" value="1"><span>月</span></label>
+          <label class="dow-item"><input type="checkbox" value="2"><span>火</span></label>
+          <label class="dow-item"><input type="checkbox" value="3"><span>水</span></label>
+          <label class="dow-item"><input type="checkbox" value="4"><span>木</span></label>
+          <label class="dow-item"><input type="checkbox" value="5"><span>金</span></label>
+        </div>
       </div>
       <div class="r2" id="rDrvRow">
         <div class="fr"><label>固定ドライバー（任意）</label><select id="rDriver"><option value="">都度配車</option></select></div>
@@ -2780,7 +2826,7 @@ function checkContainerAlerts() {
         <input type="text" id="rReceptionist" list="rReceptionistList" placeholder="例: 福島（スタッフから選択または入力）" autocomplete="off">
         <datalist id="rReceptionistList"></datalist>
       </div>
-      <div class="fr"><label>祝日と重なった日</label>
+      <div class="fr" id="rHolRow"><label>祝日と重なった日</label>
         <select id="rHoliday">
           <option value="ask">予定を作り「🎌 要確認」と表示する</option>
           <option value="prev">前の営業日にずらして作る</option>
@@ -7715,10 +7761,9 @@ function generatePlan(){
   while(cur<=end){
     const dow=cur.getDay(),ds=fmt(cur);
     for(const rs of regulars){
-      if(!rs.dows||!rs.dows.includes(dow))continue;
       if(rs.holidayMode==='skip'&&HOLIDAYS[ds])continue; // 祝日は作らない設定
       let ok=true;
-      if(!regHits(rs,cur))continue;
+      if(!regMatch(rs,cur))continue;
       /* AI提案 */
       const aiSug=aiSuggestBySite(rs.site||'',rs.cust);
       let drvId=rs.driver||'',vehId=rs.vehicle||'',aiUsed=false;
@@ -7944,8 +7989,12 @@ function resetRegForm(){
   document.querySelector('input[name="rKind"][value="collect"]').checked=true;
   document.getElementById('rSite').value='';
   document.getElementById('rStart').value='';
+  document.querySelectorAll('#rDow input,#rWoms input,#rClosed input').forEach(e=>e.checked=false);
+  document.getElementById('rWomMode').value='nth';
+  document.getElementById('rMdays').value='';document.getElementById('rApprox').checked=false;
+  _regDates=[];regDrawDates();
+  document.getElementById('rShift').value='prev';document.getElementById('rSatOk').checked=false;document.getElementById('rHolOk').checked=false;
   document.getElementById('rFreq').value='weekly';onFreqChg();
-  document.querySelectorAll('#rDow input').forEach(e=>e.checked=false);
   document.getElementById('rTime').value='';
   document.getElementById('rDriver').value='';
   document.getElementById('rVehicle').value='';
@@ -7969,8 +8018,15 @@ function editRegular(id){
   document.getElementById('rSite').value=rs.site||'';
   document.getElementById('rStart').value=rs.start||'';
   document.getElementById('rFreq').value=rs.freq;
-  if(rs.wom!=null)document.getElementById('rWom').value=rs.wom;
-  document.querySelectorAll('#rDow input').forEach(e=>e.checked=rs.dows.includes(parseInt(e.value)));
+  const setChecks=(sel,arr)=>document.querySelectorAll(sel+' input').forEach(e=>e.checked=(arr||[]).includes(parseInt(e.value)));
+  setChecks('#rDow',rs.dows);
+  // 古い「毎月」は第○週が1つだけ（カレンダーの週で数える）
+  setChecks('#rWoms',rs.woms||(rs.wom!=null?[rs.wom]:[]));
+  document.getElementById('rWomMode').value=rs.womMode||(rs.woms?'nth':'week');
+  document.getElementById('rMdays').value=(rs.mdays||[]).join(', ');document.getElementById('rApprox').checked=!!rs.approx;
+  _regDates=(rs.dates||[]).slice();regDrawDates();
+  document.getElementById('rShift').value=rs.shift||'prev';document.getElementById('rSatOk').checked=!!rs.satOk;document.getElementById('rHolOk').checked=!!rs.holOk;
+  setChecks('#rClosed',rs.closed);
   onFreqChg();
   document.getElementById('rTime').value=rs.time||'';
   document.getElementById('rDriver').value=rs.driver||'';
@@ -7994,47 +8050,90 @@ function filterRCust(q){
   const filtered=q?custs.filter(c=>toSearchable(c.name).includes(qs)||toSearchable(c.kana||'').includes(qs)||(qc&&String(c.tpcd||'')===qc)):custs;
   document.getElementById('rCust').innerHTML='<option value="">-- お客様を選択 --</option>'+filtered.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${esc(c.name)}${c.tpcd?'（'+esc(tpLabel(c))+'）':''}</option>`).join('');
 }
+// 頻度の種類：曜日で決まるもの（毎週・隔週・毎月第○○曜）と、日付で決まるもの（毎月○日・月末・日付指定）
+const REG_DATE_TYPES=['monthday','monthend','dates'];
+const isDateType=f=>REG_DATE_TYPES.includes(f);
+let _regDates=[]; // 「日付を指定」で入れた日付
 function onFreqChg(){
   const f=document.getElementById('rFreq').value;
+  document.getElementById('rDowRow').classList.toggle('hid',isDateType(f));
   document.getElementById('rWomRow').classList.toggle('hid',f!=='monthly');
+  document.getElementById('rMdayRow').classList.toggle('hid',f!=='monthday');
+  document.getElementById('rDatesRow').classList.toggle('hid',f!=='dates');
+  document.getElementById('rShiftRow').classList.toggle('hid',f!=='monthday'&&f!=='monthend');
+  document.getElementById('rHolRow').classList.toggle('hid',isDateType(f));
   const note=document.getElementById('rStartNote');
-  if(note){note.textContent=f==='biweekly'?'※隔週は必ず入れてください（この日の週から2週ごとになります）':'毎週・毎月は空欄でもかまいません';note.style.color=f==='biweekly'?'#dc2626':'#94a3b8';}
+  if(note){note.textContent=f==='biweekly'?'※隔週は必ず入れてください（この日の週から2週ごとになります）':'空欄でもかまいません（この日より前の予定は作りません）';note.style.color=f==='biweekly'?'#dc2626':'#94a3b8';}
   onRegStartChg();
 }
-// 初回の日を入れたら、そこから先の予定日を少しだけ見せる（ずれていないか確かめられるように）
+function regAddDate(){
+  const v=document.getElementById('rDateAdd').value;if(!v)return;
+  if(!_regDates.includes(v))_regDates.push(v);
+  _regDates.sort();document.getElementById('rDateAdd').value='';regDrawDates();onRegStartChg();
+}
+function regDelDate(v){_regDates=_regDates.filter(x=>x!==v);regDrawDates();onRegStartChg();}
+function regDrawDates(){
+  const today=fmt(new Date());
+  document.getElementById('rDateList').innerHTML=_regDates.length?_regDates.map(v=>{const d=pd(v);
+    return `<button type="button" class="${v>=today?'on':''}" title="押すと消します" onclick="regDelDate('${v}')">${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]}) ×</button>`;}).join('')
+    :'<span style="font-size:11px;color:#94a3b8">まだ日付がありません</span>';
+}
+// 画面の入力から、定期便の決まり（日付の決め方）を読み取る
+function readRegRule(){
+  const freq=document.getElementById('rFreq').value;
+  const checks=sel=>[...document.querySelectorAll(sel+' input:checked')].map(e=>parseInt(e.value));
+  const r={freq,start:document.getElementById('rStart').value||'',dows:isDateType(freq)?[]:checks('#rDow'),wom:null,
+    woms:freq==='monthly'?checks('#rWoms'):[],womMode:document.getElementById('rWomMode').value,
+    mdays:freq==='monthday'?[...new Set((document.getElementById('rMdays').value||'').normalize('NFKC').split(/[^\d]+/).map(Number).filter(n=>n>=1&&n<=31))].sort((a,b)=>a-b):[],
+    approx:freq==='monthday'&&document.getElementById('rApprox').checked,
+    dates:freq==='dates'?_regDates.slice():[],
+    shift:document.getElementById('rShift').value,satOk:document.getElementById('rSatOk').checked,holOk:document.getElementById('rHolOk').checked,
+    closed:checks('#rClosed'),holidayMode:document.getElementById('rHoliday').value};
+  // 日付で決まる定期便：祝日の扱いは「休みに当たったら」で決める
+  if(freq==='monthday'||freq==='monthend')r.holidayMode=r.holOk?'normal':'ask';
+  if(freq==='dates')r.holidayMode='normal';
+  return r;
+}
+// 予定日の例を見せる（ずれていないか、その場で確かめられるように）
 function onRegStartChg(){
   const el=document.getElementById('rStartHint');if(!el)return;
-  const start=document.getElementById('rStart').value,freq=document.getElementById('rFreq').value;
-  const dows=[...document.querySelectorAll('#rDow input:checked')].map(e=>parseInt(e.value));
-  if(!start){el.innerHTML=freq==='biweekly'?'<span style="color:#dc2626">⚠ 初回の日を入れてください</span>':'';return;}
-  const warn=dows.length&&!dows.includes(pd(start).getDay())?`<span style="color:#dc2626">⚠ 初回の日（${DOW_JP[pd(start).getDay()]}曜）が、選んだ曜日に入っていません。</span> `:'';
-  if(!dows.length){el.innerHTML=warn+'<span style="color:#64748b">曜日を選ぶと、予定日の例が出ます</span>';return;}
-  const rs={freq,dows,start,wom:freq==='monthly'?parseInt(document.getElementById('rWom').value):null};
-  const out=[];const cur=pd(start);
-  for(let i=0;i<120&&out.length<5;i++){if(dows.includes(cur.getDay())&&regHits(rs,cur))out.push(`${cur.getMonth()+1}/${cur.getDate()}(${DOW_JP[cur.getDay()]})`);cur.setDate(cur.getDate()+1);}
-  el.innerHTML=warn+`<span style="color:#1d4ed8">📅 予定日の例：${out.join('、')} …</span>`;
+  const rs=readRegRule(),f=rs.freq;
+  const need=f==='biweekly'&&!rs.start?'⚠ 初回の日を入れてください'
+    :!isDateType(f)&&!rs.dows.length?'曜日を選ぶと、予定日の例が出ます'
+    :f==='monthly'&&!rs.woms.length?'「第何○曜日」を選ぶと、予定日の例が出ます'
+    :f==='monthday'&&!rs.mdays.length?'日にちを入れると、予定日の例が出ます'
+    :f==='dates'&&!rs.dates.length?'日付を追加すると、予定日の例が出ます':'';
+  if(need){el.innerHTML=`<span style="color:${need.startsWith('⚠')?'#dc2626':'#64748b'}">${need}</span>`;return;}
+  const warn=rs.start&&!isDateType(f)&&!rs.dows.includes(pd(rs.start).getDay())?`<span style="color:#dc2626">⚠ 初回の日（${DOW_JP[pd(rs.start).getDay()]}曜）が、選んだ曜日に入っていません。</span> `:'';
+  const today=fmt(new Date()),from=rs.start&&rs.start>today?rs.start:today;
+  const md=s=>{const d=pd(s);return `${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})`;};
+  const out=[];const cur=pd(from);
+  for(let i=0;i<400&&out.length<6;i++){
+    if(regMatch(rs,cur)){const ds=fmt(cur),t=regTarget(rs,ds);out.push(t!==ds?`${md(ds)}→<b>${md(t)}</b>`:md(ds));}
+    cur.setDate(cur.getDate()+1);
+  }
+  el.innerHTML=warn+`<span style="color:#1d4ed8">📅 これからの予定日：${out.join('、')||'（なし）'}${out.length>=6?' …':''}</span>`;
 }
 async function saveRegular(){
   const cust=document.getElementById('rCust').value;
   if(!cust){alert('お客様を選択してください');return;}
-  const freq=document.getElementById('rFreq').value;
-  const dows=[...document.querySelectorAll('#rDow input:checked')].map(e=>parseInt(e.value));
-  if(!dows.length){alert('曜日を選択してください');return;}
-  const wom=freq==='monthly'?parseInt(document.getElementById('rWom').value):null;
-  const start=document.getElementById('rStart').value||'';
+  const rule=readRegRule(),freq=rule.freq,dows=rule.dows,start=rule.start;
+  if(!isDateType(freq)&&!dows.length){alert('曜日を選択してください');return;}
+  if(freq==='monthly'&&!rule.woms.length){alert('「第何○曜日」を選んでください（例：第1と第3）');return;}
+  if(freq==='monthday'&&!rule.mdays.length){alert('日にちを入れてください（例：10, 25）');document.getElementById('rMdays').focus();return;}
+  if(freq==='dates'&&!rule.dates.length){alert('収集する日を1つ以上追加してください');return;}
   if(freq==='biweekly'&&!start){alert('隔週の定期便は「初回の日」を入れてください。\n（その日の週から2週ごとに予定を作ります）');document.getElementById('rStart').focus();return;}
-  if(start&&!dows.includes(pd(start).getDay())&&!confirm(`初回の日（${DOW_JP[pd(start).getDay()]}曜）が、選んだ曜日に入っていません。\nこのまま保存しますか？`))return;
+  if(start&&!isDateType(freq)&&!dows.includes(pd(start).getDay())&&!confirm(`初回の日（${DOW_JP[pd(start).getDay()]}曜）が、選んだ曜日に入っていません。\nこのまま保存しますか？`))return;
   const isCarryIn=regKind()==='carry';
   const driver=isCarryIn?null:(document.getElementById('rDriver').value||null);
   const vehicle=isCarryIn?null:(document.getElementById('rVehicle').value||null);
   const notes=document.getElementById('rNotes').value.trim();
   const site=document.getElementById('rSite').value.trim();
   const time=document.getElementById('rTime').value||'';
-  const holidayMode=document.getElementById('rHoliday').value;
   const receptionist=document.getElementById('rReceptionist').value.trim();
   if(!receptionist&&!confirm('連絡担当（受付）が空欄です。\nこの定期便から作られるカードには受付担当が入りません。\n\nこのまま保存しますか？'))return;
   try{if(receptionist)localStorage.setItem('regReceptionistLast',receptionist);}catch(e){}
-  const fields={cust,freq,dows,wom,start,driver,vehicle,notes,isCarryIn,site,time,holidayMode,receptionist,...rGetWork()};
+  const fields={cust,...rule,driver,vehicle,notes,isCarryIn,site,time,receptionist,...rGetWork()};
   let msg;
   if(_regEditId){
     const rs=db.regulars.find(x=>x.id===_regEditId);
@@ -8127,11 +8226,31 @@ function shiftBizDay(ds,dir){
 }
 // 定期便の予定日（ルール上の日）から、実際に行く日を決める（祝日ずらし設定を反映）
 function regTarget(rs,ds){
+  // 毎月○日・月末：日曜・祝日・お客様の定休日（土曜は「土曜も収集できる」以外）に当たったらずらす
+  if(rs.freq==='monthday'||rs.freq==='monthend'){
+    if(regDayOk(rs,ds)||rs.shift==='ask')return ds;
+    const dir=rs.shift==='next'?1:-1;let d=pd(ds);
+    for(let i=0;i<14;i++){d=addD(d,dir);const s=fmt(d);if(regDayOk(rs,s))return s;}
+    return ds;
+  }
   if(!HOLIDAYS[ds])return ds;
   if(rs.holidayMode==='prev')return shiftBizDay(ds,-1);
   if(rs.holidayMode==='next')return shiftBizDay(ds,1);
   return ds;
 }
+// その日にお客様のところへ行けるか（毎月○日・月末で使う）
+function regDayOk(rs,ds){
+  const w=pd(ds).getDay();
+  if(w===0)return false;
+  if(w===6&&!rs.satOk)return false;
+  if(HOLIDAYS[ds]&&!rs.holOk)return false;
+  if((rs.closed||[]).includes(w))return false;
+  return true;
+}
+// ずらしたときにカードに出す理由（「○○の振替」）
+function regShiftLabel(ds){const w=pd(ds).getDay();return HOLIDAYS[ds]||(w===0?'日曜':w===6?'土曜':'お客様の休み');}
+// カードの備考（「頃」のときは前後してもよいことを書き足す）
+function regNotes(rs){return [rs.notes,rs.approx?'※日にちは前後してもよい（○日頃）':''].filter(Boolean).join(' ');}
 // 定期便の内容を変えたとき、今日以降の予定に反映する
 // ・新しい曜日・頻度に合わない日の予定 → ごみ箱へ
 // ・合う日の予定 → お客様・備考などを更新（ドライバー・車両は手で変えていなければ更新）
@@ -8150,7 +8269,7 @@ function applyRegularChange(rs,fields){
   const now=new Date().toISOString();
   let updated=0;
   future.filter(x=>valid.has(x.date)).forEach(x=>{
-    x.customer=rs.cust;x.notes=rs.notes;x.isCarryIn=!!rs.isCarryIn;
+    x.customer=rs.cust;x.notes=regNotes(rs);x.isCarryIn=!!rs.isCarryIn;
     if(!x.receptionist||x.receptionist===(old.receptionist||''))x.receptionist=rs.receptionist||'';
     if(rs.site||old.site)x.siteName=rs.site;
     if(rs.time||old.time)x.timeSpec=regTimeSpec(rs);
@@ -8167,7 +8286,7 @@ function applyRegularChange(rs,fields){
     // 祝日ずらしの設定変更を反映（手で日付を動かしたカードはそのまま）
     if((x.dispatchDate||x.date)===regTarget(old,x.date)){
       x.dispatchDate=regTarget(rs,x.date);
-      x.holShift=x.dispatchDate!==x.date?HOLIDAYS[x.date]:'';
+      x.holShift=x.dispatchDate!==x.date?regShiftLabel(x.date):'';
     }
     x.status=(x.isCarryIn||(x.driver&&x.vehicle))?'confirmed':'pending';
     x.updated=now;updated++;
@@ -8182,9 +8301,16 @@ function applyRegularChange(rs,fields){
 function regHits(rs,cur){
   const ds=fmt(cur);
   if(rs.start&&ds<rs.start)return false;
-  if(rs.freq==='monthly'&&rs.wom!=null){
-    const w=getWOM(cur),lw=getWOM(new Date(cur.getFullYear(),cur.getMonth()+1,0));
-    return rs.wom===-1?w===lw:w===rs.wom;
+  if(rs.freq==='monthly'){
+    // 第○○曜日（複数可）。数え方：nth＝その月の○回目の曜日／week＝カレンダーの第○週目（古い設定はこちら）
+    const woms=rs.woms||(rs.wom!=null?[rs.wom]:[]);if(!woms.length)return true;
+    const lastDay=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
+    if((rs.womMode||(rs.woms?'nth':'week'))==='nth'){
+      const n=Math.ceil(cur.getDate()/7),isLast=cur.getDate()+7>lastDay;
+      return woms.some(w=>w===-1?isLast:w===n);
+    }
+    const w=getWOM(cur),lw=getWOM(new Date(cur.getFullYear(),cur.getMonth(),lastDay));
+    return woms.some(x=>x===-1?w===lw:w===x);
   }
   if(rs.freq==='biweekly'){
     if(!rs.start)return getWOM(cur)%2===1;
@@ -8194,6 +8320,20 @@ function regHits(rs,cur){
   }
   return true;
 }
+// その日が定期便の日に当たるか（曜日・日付の決め方すべて）
+function regMatch(rs,cur){
+  const ds=fmt(cur);
+  if(rs.start&&ds<rs.start)return false;
+  if(rs.freq==='dates')return (rs.dates||[]).includes(ds);
+  if(rs.freq==='monthend')return new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+1).getDate()===1;
+  if(rs.freq==='monthday'){
+    // 31日など、その月にない日は月末にする
+    const last=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
+    return (rs.mdays||[]).some(m=>Math.min(m,last)===cur.getDate());
+  }
+  if(!(rs.dows||[]).includes(cur.getDay()))return false;
+  return regHits(rs,cur);
+}
 // 今月1日〜3ヶ月先の月末までで、この定期便に当たる日付の一覧
 function regDates(rs){
   const out=[];
@@ -8201,11 +8341,11 @@ function regDates(rs){
   const end=new Date(today.getFullYear(),today.getMonth()+3,0);
   const cur=new Date(today.getFullYear(),today.getMonth(),1);
   while(cur<=end){
-    if(rs.dows.includes(cur.getDay())){
-      if(regHits(rs,cur))out.push(fmt(cur));
-    }
+    if(regMatch(rs,cur))out.push(fmt(cur));
     cur.setDate(cur.getDate()+1);
   }
+  // 日付指定は、3ヶ月より先の日付も入っていれば作る
+  if(rs.freq==='dates')(rs.dates||[]).forEach(d=>{if(d>fmt(end)&&!(rs.start&&d<rs.start))out.push(d);});
   return out;
 }
 function genRegDisps(rs){
@@ -8221,22 +8361,41 @@ function genRegDisps(rs){
     const target=regTarget(rs,ds);
     // date＝ルール上の日（重複判定用）、dispatchDate＝実際に行く日
     // 番号は「定期便＋日付」で決める（複数のパソコンが同時に作っても二重にならないように）
-    db.dispatches.push({id:'rg'+rs.id+'-'+ds,customer:rs.cust,date:ds,dispatchDate:target,holShift:target!==ds?HOLIDAYS[ds]:'',status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.isCarryIn?null:rs.driver,vehicle:rs.isCarryIn?null:rs.vehicle,notes:rs.notes,siteName:rs.site||'',timeSpec:regTimeSpec(rs),receptionist:rs.receptionist||'',isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,...regWork(rs),created:now,updated:now});
+    db.dispatches.push({id:'rg'+rs.id+'-'+ds,customer:rs.cust,date:ds,dispatchDate:target,holShift:target!==ds?regShiftLabel(ds):'',status:(rs.isCarryIn||(rs.driver&&rs.vehicle))?'confirmed':'pending',driver:rs.isCarryIn?null:rs.driver,vehicle:rs.isCarryIn?null:rs.vehicle,notes:regNotes(rs),siteName:rs.site||'',timeSpec:regTimeSpec(rs),receptionist:rs.receptionist||'',isReg:true,regId:rs.id,isCarryIn:rs.isCarryIn||false,...regWork(rs),created:now,updated:now});
   }
+}
+// 一覧に出す「いつ行くか」の文字
+function regRuleLabel(rs){
+  const dw=(rs.dows||[]).map(d=>DOW_JP[d]).join('・')+'曜';
+  if(rs.freq==='weekly')return '毎週 '+dw;
+  if(rs.freq==='biweekly')return '隔週 '+dw;
+  if(rs.freq==='monthly'){
+    const woms=rs.woms||(rs.wom!=null?[rs.wom]:[]);
+    const w=woms.map(x=>x===-1?'最終':x).join('・');
+    return (rs.womMode||(rs.woms?'nth':'week'))==='nth'?`毎月 第${w} ${dw}`:`毎月 第${w}週目の${dw}`;
+  }
+  if(rs.freq==='monthday')return `毎月 ${(rs.mdays||[]).join('・')}日${rs.approx?'頃':''}`;
+  if(rs.freq==='monthend')return '毎月 月末';
+  if(rs.freq==='dates'){const t=fmt(new Date()),nx=(rs.dates||[]).filter(d=>d>=t);return `日付指定（これから ${nx.length}回${nx.length?'・次 '+(d=>`${d.getMonth()+1}/${d.getDate()}`)(pd(nx[0])):''}）`;}
+  return rs.freq;
+}
+function regShiftText(rs){
+  if(rs.freq==='dates')return '📅 届いた日付で作る';
+  const s={prev:'休みなら前の営業日へ',next:'休みなら翌営業日へ',ask:'休みなら要確認'}[rs.shift||'prev'];
+  return '🎌 '+[s,rs.satOk?'土曜可':'土曜×',rs.holOk?'祝日可':'',(rs.closed||[]).length?'定休 '+rs.closed.map(d=>DOW_JP[d]).join('・'):''].filter(Boolean).join('・');
 }
 function renderRegList(){
   const el=document.getElementById('regularList');
   if(!(db.regulars||[]).length){el.innerHTML='<div class="empty">定期便の登録はありません</div>';return;}
-  const fn={weekly:'毎週',biweekly:'隔週',monthly:'毎月'};
   el.innerHTML=db.regulars.map(rs=>{
-    const wLabel=rs.freq==='monthly'?` 第${rs.wom===-1?'最終':rs.wom}週`:'';
-    const holL={ask:'🎌祝日は要確認',prev:'🎌祝日は前の営業日へ',next:'🎌祝日は翌営業日へ',skip:'🎌祝日は作らない',normal:'🎌祝日も実施'}[rs.holidayMode||'ask'];
+    const holL=isDateType(rs.freq)?regShiftText(rs):{ask:'🎌祝日は要確認',prev:'🎌祝日は前の営業日へ',next:'🎌祝日は翌営業日へ',skip:'🎌祝日は作らない',normal:'🎌祝日も実施'}[rs.holidayMode||'ask'];
     return`<div class="ritem${rs.id===_regEditId?' ritem-editing':''}" data-id="${esc(rs.id)}" onclick="editRegular(this.dataset.id)" style="cursor:pointer" title="クリックで編集">
       <div class="ritem-hdr">
         <span class="bdg ${rs.isCarryIn?'bdg-b':'bdg-g'}">${rs.isCarryIn?'🏭 持込み':'🚛 収集'}</span>
         <strong>${esc(custName(rs.cust))}</strong>
-        <span class="bdg bdg-b">${fn[rs.freq]||rs.freq}${wLabel} ${rs.dows.map(d=>DOW_JP[d]).join('・')}曜${rs.time?' '+esc(rs.time):''}</span>
+        <span class="bdg bdg-b">${esc(regRuleLabel(rs))}${rs.time?' '+esc(rs.time):''}</span>
         ${rs.start?`<span class="bdg bdg-g">初回 ${(d=>`${d.getMonth()+1}/${d.getDate()}`)(pd(rs.start))}〜</span>`:rs.freq==='biweekly'?'<span class="bdg bdg-r">⚠ 初回の日 未設定</span>':''}
+        ${rs.freq==='dates'&&!(rs.dates||[]).some(d=>d>=fmt(new Date()))?'<span class="bdg bdg-r">⚠ これからの日付が未登録（FAX・カレンダーを確認）</span>':''}
         <span class="ritem-del" data-id="${esc(rs.id)}" onclick="event.stopPropagation();delRegular(this.dataset.id)">🗑</span>
       </div>
       <div style="font-size:11px;color:#64748b;margin-top:3px">${rs.isCarryIn?'':`ドライバー: ${esc(drvName(rs.driver))} ／ 車両: ${esc(vehName(rs.vehicle))} ／ `}${holL}${rs.receptionist?' ／ 📞担当 '+esc(rs.receptionist):' ／ <span style="color:#dc2626">📞担当 未設定</span>'}${rs.site?' ／ 📍'+esc(rs.site):''}${rs.notes?' ／ '+esc(rs.notes):''}</div>
