@@ -8924,7 +8924,8 @@ function closeM(id){
     ovl.style.alignItems='';ovl.style.justifyContent='';
   }
 }
-document.querySelectorAll('.ovl').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)closeM(o.id);}));
+// 背景で「押して離した」ときだけ閉じる（入力欄で文字を選びながら背景で離したときは閉じない）
+document.querySelectorAll('.ovl').forEach(o=>{let downOnOvl=false;o.addEventListener('mousedown',e=>{downOnOvl=e.target===o;});o.addEventListener('click',e=>{if(e.target===o&&downOnOvl)closeM(o.id);downOnOvl=false;});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.ovl:not(.hid)').forEach(o=>closeM(o.id));closeMP();}});
 
 // ================================================================
