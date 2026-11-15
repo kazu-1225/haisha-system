@@ -4635,7 +4635,7 @@ function makePcrdHtml(dp){
     :`<div class="pcrd-name">🔴 ${custName(dp.customer)}</div>`;
   const infoHtml=isShip
     ?`<div class="pcrd-info">${workDate(dp)?`🚛 出荷日: ${workDate(dp)}`:'🚛 出荷日: 未定'}</div>`
-    :`<div class="pcrd-info">${workDate(dp)?`🚛 配車日: ${workDate(dp)}`:'🚛 配車日: 未定'}${dp.date&&dp.date!==workDate(dp)?`<span style="font-size:9px;color:#94a3b8"> (受付: ${dp.date})</span>`:''}</div>`;
+    :`<div class="pcrd-info">📝 受付日: ${dp.date||'—'}</div>${dp.dispatchDate?`<div class="pcrd-info">🚛 配車日: ${dp.dispatchDate}</div>`:''}`;
   const editFn=isShip?`editShipment('${dp.id}')`:`editDisp('${dp.id}')`;
   return`<div class="pcrd" draggable="true" style="${cardStyle}"
     ondragstart="onDragStart(event,'${dp.id}')" ondragend="onDragEnd(event)"
@@ -4664,8 +4664,8 @@ function togglePendGroup(k){
 function pendGroupOf(dp){
   const w=dp.wantType||'';
   if(w==='asap')return 'urgent';
-  const key=(w==='fixed'&&dp.deadline)||workDate(dp)||dp.deadline||'';
-  if(!key||(w==='any'&&!workDate(dp)))return 'none';
+  const key=(w==='fixed'&&dp.deadline)||dp.dispatchDate||dp.deadline||'';
+  if(!key||(w==='any'&&!dp.dispatchDate))return 'none';
   const t=new Date();t.setHours(0,0,0,0);
   const tomorrow=new Date(t);tomorrow.setDate(t.getDate()+1);
   const week=new Date(t);week.setDate(t.getDate()+7);
