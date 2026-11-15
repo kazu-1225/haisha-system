@@ -506,6 +506,10 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .ews-chip.ews-done{border-left-color:#2563eb;background:#eff6ff;border-color:#93c5fd}
 .ews-chip.ews-warn{border-left-color:#dc2626;background:#fef2f2}
 .ews-chip.ews-cxl{opacity:.55;text-decoration:line-through}
+.ews-chip.ews-unas{border-style:dashed;border-left-style:solid}
+.ews-chip .ews-who{display:inline-block;background:#ffedd5;color:#9a3412;border-radius:8px;padding:0 6px;font-size:10px;font-weight:700}
+.ews-chip .ews-who.none{background:#fee2e2;color:#dc2626}
+.ews-chip.dragging{opacity:.4}
 .ews-chip b{color:#9a3412}
 .ews-chip .ews-addr{color:#475569}
 .ews-chip .ews-sub{color:#94a3b8;font-size:10px}
@@ -4117,6 +4121,7 @@ function render(){
       else if(dow===6)cc+=' td-sat';
       const disps=cellDisps(ds,rid);
       const csBands=(db.contractSupports||[]).filter(cs=>cs.date===ds&&cs.driverId===rid);
+      const ewsMine=ewsJobsOf(ds).filter(j=>ewsResOf(j)===rid);
       // 休み（ドライバー）・不在（車両）の日はグレー表示＋理由
       const ab=absenceOf(type,rid,ds);
       if(ab)cc+=' td-absent';
@@ -4139,7 +4144,7 @@ function render(){
         row+=`<td class="${cc} day-ev-cell" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
           onclick="cellClick(event,'${ds}','${rid}')">
-          ${absHtml}<div class="day-cell-wrap">${csBadges}${dayHtml||(ab?'':`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`)}</div></td>`;
+          ${absHtml}<div class="day-cell-wrap">${csBadges}${ewsMine.map(j=>ewsChipHtml(j,true,'res')).join('')}${dayHtml||(ab||ewsMine.length?'':`<span class="day-empty-lbl">業務なし（クリックで追加）</span>`)}</div></td>`;
       } else {
         const bandHtml=csBands.map(cs=>{
           const lp=(cs.startHour/24*100).toFixed(1);
@@ -4149,7 +4154,7 @@ function render(){
         const cards=disps.map(dp=>cardHTML(dp,'drv')).join('');
         row+=`<td class="${cc}" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-          onclick="cellClick(event,'${ds}','${rid}')">${absHtml}<div class="cell-scrl">${bandHtml}${cards}</div></td>`;
+          onclick="cellClick(event,'${ds}','${rid}')">${absHtml}<div class="cell-scrl">${bandHtml}${ewsMine.map(j=>ewsChipHtml(j,false,'res')).join('')}${cards}</div></td>`;
       }
     }
     return row+'</tr>';
@@ -4270,7 +4275,7 @@ function render(){
       if(ds===today)cc+=' td-now';else if(holName)cc+=' td-hol';
       const items=ewsJobsOf(ds);
       const inner=items.map(j=>ewsChipHtml(j,isDay)).join('');
-      ewsRow+=`<td class="${cc}" data-date="${ds}">${FIX_COLLAPSED.ews?ewsSummary(items):(isDay?`<div class="ews-day-list">${inner}</div>`:`<div style="min-height:28px;padding:1px">${fixScrl(inner,items.length)}</div>`)}</td>`;
+      ewsRow+=`<td class="${cc}" data-date="${ds}" ondragover="ewsOverRow(event)" ondragleave="onLeave(event)" ondrop="ewsDropRow(event,this)">${FIX_COLLAPSED.ews?ewsSummary(items):(isDay?`<div class="ews-day-list">${inner}</div>`:`<div style="min-height:28px;padding:1px">${fixScrl(inner,items.length)}</div>`)}</td>`;
     }
     ewsRow+='</tr>';
     tb+=ewsRow;
@@ -4938,6 +4943,7 @@ function onDropToPending(e,elId){
   e.preventDefault();
   document.getElementById(elId).classList.remove('pending-drop-over');
   if(!ST.drag)return;
+  if(ST.drag.ews){const id=ST.drag.ews;ST.drag=null;ewsAssign(id,null,null);return;}
   const dp=(db.dispatches||[]).find(x=>x.id===ST.drag.id);
   if(!dp)return;
   // すでに未割当なら何もしない
@@ -4957,6 +4963,7 @@ function onDropToPending(e,elId){
 function onDrop(e,cell){
   e.preventDefault();cell.classList.remove('drag-over');
   if(!ST.drag)return;
+  if(ST.drag.ews){ewsDropOnCell(cell);return;}
   const date=cell.dataset.date,rid=cell.dataset.rid;
   if(!rid)return; // 持込み行・定期便ヘッダーへのドロップは無視（ドライバー・車両消去防止）
   const dp=(db.dispatches||[]).find(x=>x.id===ST.drag.id);
@@ -5753,6 +5760,7 @@ function printDaySchedule(ds,withUndated,mode){
   const assigned=day.filter(dp=>!dp.isCarryIn&&dp.driver);
   const unassigned=day.filter(dp=>!dp.isCarryIn&&!dp.driver).sort(byTime);
   const cs=(db.contractSupports||[]).filter(c=>c.date===ds).sort((a,b)=>a.startHour-b.startHour);
+  const ews=ewsJobsOf(ds).filter(j=>j.status!=='CANCELLED');
   const undated=withUndated?(db.dispatches||[]).filter(dp=>!workDate(dp)&&!dp.isReg&&!dp.isCarryIn).sort((a,b)=>(a.deadline||'9999')<(b.deadline||'9999')?-1:1):[];
 
   // 確定分：並べ方（ドライバー別／車両別／時間順）を切り替える
@@ -5794,11 +5802,12 @@ function printDaySchedule(ds,withUndated,mode){
   let body=`<div class="page" id="pg">
   <div class="hdr"><div><div class="co">廃棄物収集・運搬</div><div class="ttl">日次配車表　${dateLabel}${hol?`<span class="hol">${esc(hol)}</span>`:''}</div></div>
     <div class="meta">印刷日時: ${new Date().toLocaleString('ja-JP')}</div></div>
-  <div class="sum"><span>✅ 確定 <b>${assigned.length}</b>件</span><span>🔴 未確定 <b>${unassigned.length}</b>件</span><span>🏭 持込み <b>${carry.length}</b>件</span><span>🏛 委託応援 <b>${cs.length}</b>名</span>${withUndated?`<span>📋 日付未定 <b>${undated.length}</b>件</span>`:''}</div>
+  <div class="sum"><span>✅ 確定 <b>${assigned.length}</b>件</span><span>🔴 未確定 <b>${unassigned.length}</b>件</span><span>🏭 持込み <b>${carry.length}</b>件</span><span>🏛 委託応援 <b>${cs.length}</b>名</span>${ews.length?`<span>🛒 EWS+ <b>${ews.length}</b>件</span>`:''}${withUndated?`<span>📋 日付未定 <b>${undated.length}</b>件</span>`:''}</div>
   ${sec(confTitle,'s-conf',assigned.length,confHead,confRows)}
   ${sec('🔴 未確定分（ドライバー未定）','s-pend',unassigned.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">希望日</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',simpleRows(unassigned,true))}
   ${sec('🏭 持込み','s-carry',carry.length,'<th style="width:6%">時間</th><th style="width:9%">種別</th><th>お客様</th><th style="width:22%">作業内容</th><th style="width:26%">備考・注意</th>',simpleRows(carry,false))}
   ${sec('🏛 委託応援','s-cs',cs.length,'<th style="width:20%">ドライバー</th><th style="width:15%">車両</th><th style="width:15%">時間</th><th>備考</th>',cs.map(c=>`<tr><td>${esc(drvName(c.driverId))}</td><td>${esc(c.vehicleId?vehName(c.vehicleId):'')}</td><td class="c">${c.startHour}:00〜${c.endHour}:00</td><td>${esc(c.note||'')}</td></tr>`).join(''))}
+  ${ews.length?sec('🛒 EWS+（エディオン）','s-cs',ews.length,'<th style="width:6%">時間</th><th style="width:13%">ドライバー</th><th style="width:10%">車両</th><th>お客様・住所</th><th style="width:15%">SC・店舗</th><th style="width:12%">依頼ID</th>',ews.map(j=>`<tr><td class="c">${esc(j.time||'')}</td><td>${j.driverId?esc(drvName(j.driverId)):'<b style="color:#dc2626">未定</b>'}</td><td>${esc(j.vehicleId?vehName(j.vehicleId):(j.vehicle||''))}</td><td><b>${esc(j.name)}</b><br>${esc(j.addr)}</td><td>${esc(j.sc)}<br>${esc(j.store)}</td><td style="font-size:9px">${esc(j.id)}<br>${esc(j.manifest)}</td></tr>`).join('')):''}
   ${withUndated?sec('📋 日付未定の依頼（参考）','s-und',undated.length,'<th style="width:9%">種別</th><th>お客様・収集先</th><th style="width:10%">希望日</th><th style="width:18%">作業内容</th><th style="width:22%">備考・注意</th>',undated.map(dp=>`<tr><td class="c">${kind(dp)}</td><td>${dest(dp)}</td><td class="c">${esc(wantStr(dp))}</td><td>${work(dp)}</td><td>${note(dp)}</td></tr>`).join('')):''}
   </div>`;
 
@@ -8837,12 +8846,15 @@ function ewsArea(a){
   const m=a.match(/^(.+?郡.+?[町村]|.+?市.+?区|.+?[市区町村])/);
   return m?m[1]:a.slice(0,8);
 }
-function ewsChipHtml(j,big){
-  const warn=ewsWarn(j);
-  const cls=j.status==='CANCELLED'?' ews-cxl':j.amount?' ews-done':warn?' ews-warn':'';
+function ewsChipHtml(j,big,where){
+  const warn=ewsWarn(j),rid=ewsResOf(j),inRes=where==='res';
+  const cls=(j.status==='CANCELLED'?' ews-cxl':j.amount?' ews-done':warn?' ews-warn':'')+(!rid&&!inRes?' ews-unas':'');
+  const other=ST.res==='vehicle'?(j.driverId?drvName(j.driverId):''):(j.vehicleId?vehName(j.vehicleId):'');
+  const who=inRes?(other?`<span class="ews-who">${esc(other)}</span>`:''):(rid?`<span class="ews-who">→ ${esc(ST.res==='vehicle'?vehName(rid):drvName(rid))}</span>`:(j.status==='CANCELLED'||j.amount?'':'<span class="ews-who none">未配車</span>'));
   const tip=`${j.time||''} ${j.name||''}\n${j.addr||''}\n${j.sc||''}／${j.store||''}／${j.vehicle||''}`;
-  return `<div class="ews-chip${cls}" data-ews-id="${esc(j.id)}" onclick="event.stopPropagation();openEwsJob(this.dataset.ewsId)" title="${esc(tip)}">
-    <div><b>${esc(j.time||'時間なし')}</b> ${esc(j.name||'')}${j.amount?' 💴':''}${warn?' ⚠':''}${j.status==='CANCELLED'?' 中止':''}</div>
+  const drag=j.status==='CANCELLED'?'':` draggable="true" ondragstart="ewsDragStart(event,this.dataset.ewsId)" ondragend="onDragEnd(event)"`;
+  return `<div class="ews-chip${cls}" data-ews-id="${esc(j.id)}"${drag} onclick="event.stopPropagation();openEwsJob(this.dataset.ewsId)" title="${esc(tip)}">
+    <div>${inRes?'🛒 ':''}<b>${esc(j.time||'時間なし')}</b> ${esc(j.name||'')}${j.amount?' 💴':''}${warn?' ⚠':''}${j.status==='CANCELLED'?' 中止':''} ${who}</div>
     <div class="ews-addr">${esc(big?(j.addr||''):ewsArea(j.addr))}</div>
     ${big?`<div class="ews-sub">${esc(j.sc||'')}／${esc(j.vehicle||'')}${j.qty!=null&&j.qty!==''?'／'+esc(j.qty)+'m³':''}</div>`:''}
   </div>`;
@@ -8851,7 +8863,8 @@ function ewsSummary(items){
   if(!items.length)return `<div class="fix-sum fix-sum-empty" onclick="event.stopPropagation();toggleFixRow('ews')"></div>`;
   const live=items.filter(j=>j.status!=='CANCELLED');
   const fix=live.filter(j=>j.amount),warn=live.filter(ewsWarn).length;
-  const html=(warn?`<span class="fix-pend">⚠登録なし ${warn}</span>`:'')+`<span class="fix-done">${live.length}件</span>`+(fix.length?`<span class="fix-done">💴${ewsYen(fix.reduce((s,j)=>s+ewsTotal(j.amount),0))}</span>`:'');
+  const unas=live.filter(j=>!j.amount&&!ewsResOf(j)).length;
+  const html=(unas?`<span class="fix-pend">🔴未配車 ${unas}</span>`:'')+(warn?`<span class="fix-pend">⚠登録なし ${warn}</span>`:'')+`<span class="fix-done">${live.length}件</span>`+(fix.length?`<span class="fix-done">💴${ewsYen(fix.reduce((s,j)=>s+ewsTotal(j.amount),0))}</span>`:'');
   return `<div class="fix-sum" onclick="event.stopPropagation();toggleFixRow('ews')" title="クリックで開く">${html}</div>`;
 }
 // --- EWS+の画面で動く部分（お気に入りバーのボタンの中身）。この関数の文字がそのままボタンになる ---
@@ -8916,6 +8929,42 @@ window.addEventListener('message',e=>{
   _ewsPending=e.data;
   openM('mEWS');ewsRenderImport();
 });
+// ドライバー表示なら担当ドライバー、車両表示なら車両
+function ewsResOf(j){return (ST.res==='vehicle'?j.vehicleId:j.driverId)||'';}
+function ewsDragStart(e,id){ST.drag={ews:id};e.dataTransfer.setData('text/plain','ews:'+id);setTimeout(()=>e.target.classList.add('dragging'),0);}
+function ewsOverRow(e){if(ST.drag&&ST.drag.ews){e.preventDefault();e.currentTarget.classList.add('drag-over');}}
+function ewsDropRow(e,cell){
+  e.preventDefault();cell.classList.remove('drag-over');
+  if(!ST.drag||!ST.drag.ews)return;
+  const id=ST.drag.ews;ST.drag=null;
+  const j=(db.ewsJobs||[]).find(x=>x.id===id);
+  if(j&&(j.driverId||j.vehicleId))ewsAssign(id,null,null);
+}
+function ewsDropOnCell(cell){
+  const id=ST.drag.ews;ST.drag=null;
+  const j=(db.ewsJobs||[]).find(x=>x.id===id);if(!j)return;
+  const date=cell.dataset.date,rid=cell.dataset.rid;
+  if(!rid)return;
+  if(date!==j.date){alert(`EWS+の案件は、希望回収日（${j.date}）がEWS+で決まっています。\n${j.date} のマスへ入れてください。\n（日を変えるときは、EWS+側で変えてから取り込み直してください）`);return;}
+  const drv=ST.res==='vehicle'?(j.driverId||null):rid,veh=ST.res==='vehicle'?rid:(j.vehicleId||null);
+  ewsAssign(id,drv,veh);
+}
+async function ewsAssign(id,drv,veh){
+  const j=(db.ewsJobs||[]).find(x=>x.id===id);if(!j)return;
+  if(drv||veh){
+    const dr=(db.drivers||[]).find(x=>x.id===drv),ve=(db.vehicles||[]).find(x=>x.id===veh);
+    const warns=[];
+    if(dr&&ve&&!canDrive(dr,ve))warns.push(`${dr.name}さんは ${ve.name} を運転できる免許がありません。`);
+    const ab=absenceWarn(drv,veh,j.date);if(ab)warns.push(ab);
+    if(warns.length&&!confirm('⚠ '+warns.join('\n⚠ ')+'\n\nこのまま割り当てますか？'))return;
+  }
+  j.driverId=drv||null;j.vehicleId=veh||null;j.assignedAt=new Date().toISOString();
+  await save();render();
+  if(!document.getElementById('mEWSJob').classList.contains('hid'))openEwsJob(id);
+}
+function ewsAssignFromModal(id){
+  ewsAssign(id,document.getElementById('ewsJobDrv').value||null,document.getElementById('ewsJobVeh').value||null);
+}
 function openEwsImport(){_ewsPending=null;openM('mEWS');ewsRenderImport();}
 function ewsKind(r){
   const c=(db.ewsJobs||[]).find(x=>x.id===r.id);
@@ -8991,6 +9040,7 @@ function openEwsJob(id){
       ${row('廃棄物',esc(j.waste))}
       ${row('依頼ID',esc(j.id))}
       ${row('マニフェスト',esc(j.manifest))}
+      ${row('担当',j.status==='CANCELLED'?'<span style="color:#64748b">中止の案件です</span>':`<select id="ewsJobDrv" style="border:1.5px solid #cbd5e1;border-radius:6px;padding:4px"><option value="">ドライバー未定</option>${getOrderedResources((db.drivers||[]).slice(),'driver').map(d=>`<option value="${esc(d.id)}"${d.id===j.driverId?' selected':''}>${esc(d.name)}</option>`).join('')}</select> <select id="ewsJobVeh" style="border:1.5px solid #cbd5e1;border-radius:6px;padding:4px"><option value="">車両未定</option>${getOrderedResources((db.vehicles||[]).slice(),'vehicle').map(v=>`<option value="${esc(v.id)}"${v.id===j.vehicleId?' selected':''}>${esc(v.name)}</option>`).join('')}</select> <button class="btn btn-p" style="padding:4px 10px" onclick="ewsAssignFromModal('${esc(j.id)}')">決める</button>`)}
       ${row('EWSの状態',esc(EWS_ST[j.status]||j.status))}
       ${a?row('金額',`運搬 ${ewsYen(a.transport)}／処分 ${ewsYen(a.disposal)}${a.other?'／その他 '+ewsYen(a.other):''}<br><b>合計 ${ewsYen(ewsTotal(a))}</b>（回収 ${esc(a.collected)}・${a.check==='CHECKED'?'エディオン確認済':'エディオン確認待ち'}）`+(lines?`<div style="color:#64748b;margin-top:4px">${lines}</div>`:'')):row('金額','<span style="color:#64748b">回収登録の後、もう一度取り込むと入ります</span>')}
       ${row('取り込んだ日時',j.updated?(()=>{const t=new Date(j.updated);return esc(fmt(t)+' '+p2(t.getHours())+':'+p2(t.getMinutes()));})():'')}
@@ -11125,6 +11175,7 @@ function renderSignage(){
   const carry=sortDay(day.filter(dp=>dp.isCarryIn));
   const unassigned=day.filter(dp=>!dp.isCarryIn&&!dp.driver);
   const cs=(db.contractSupports||[]).filter(c=>c.date===ds);
+  const ews=ewsJobsOf(ds).filter(j=>j.status!=='CANCELLED');
   const abs=(db.absences||[]).filter(a=>a.from<=ds&&ds<=a.to);
   const section=(title,cls,arr)=>arr.length?`<div class="sg-sec ${cls}">${title}<span>${arr.length}件</span></div>${sortRows(arr).map(sgRow).join('')}`:'';
   const col=pm=>{
@@ -11147,6 +11198,7 @@ function renderSignage(){
   const carryBar=carry.length?`<div class="sg-carry"><div class="sg-carry-lbl">🏭 持込み<span>${carry.length}件</span></div><div class="sg-carry-list">${carry.map(carryItem).join('')}</div></div>`:'';
   const bottom=[
     cs.length?`<div class="sg-foot"><b>🏛 委託応援</b>${cs.map(c=>chip(`${esc(drvName(c.driverId).split(/[\s　]+/)[0])} ${c.startHour}-${c.endHour}時`)).join('')}</div>`:'',
+    ews.length?`<div class="sg-foot"><b>🛒 EWS+</b>${ews.map(j=>chip(`${j.driverId?esc(drvName(j.driverId).split(/[\s　]+/)[0]):'未定'} ${esc(j.time||'')} ${esc(ewsArea(j.addr))}`)).join('')}</div>`:'',
     abs.length?`<div class="sg-foot"><b>🌴 休み・車両不在</b>${abs.map(a=>chip(`${esc(a.kind==='driver'?drvName(a.resId):vehName(a.resId))}（${esc(a.reason)}）`)).join('')}</div>`:'',
     unassigned.length?`<div class="sg-foot warn"><b>🔴 未確定</b>${chip(unassigned.length+'件（ドライバー未定）')}</div>`:''
   ].join('');
