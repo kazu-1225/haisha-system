@@ -501,6 +501,22 @@ tr.row-drag-over .res-cell{background:#dbeafe !important;outline:2px dashed #3b8
 .fix-sum{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:20px;cursor:pointer;font-size:10px;font-weight:700}
 .fix-sum-empty{min-height:16px}
 .fix-pend{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;padding:0 6px}
+.ews-chip{background:#fff7ed;border:1px solid #fdba74;border-left:4px solid #ea580c;border-radius:5px;padding:2px 5px;margin:2px 0;cursor:pointer;font-size:11px;line-height:1.35}
+.ews-chip:hover{filter:brightness(.97)}
+.ews-chip.ews-done{border-left-color:#2563eb;background:#eff6ff;border-color:#93c5fd}
+.ews-chip.ews-warn{border-left-color:#dc2626;background:#fef2f2}
+.ews-chip.ews-cxl{opacity:.55;text-decoration:line-through}
+.ews-chip b{color:#9a3412}
+.ews-chip .ews-addr{color:#475569}
+.ews-chip .ews-sub{color:#94a3b8;font-size:10px}
+.ews-day-list{display:flex;flex-wrap:wrap;gap:4px;padding:2px;min-height:28px}
+.ews-day-list .ews-chip{width:220px;margin:0}
+.ews-tbl{border-collapse:collapse;width:100%;font-size:12px}
+.ews-tbl th,.ews-tbl td{border-bottom:1px solid #e2e8f0;padding:4px 6px;text-align:left;vertical-align:top}
+.ews-tbl th{background:#f1f5f9}
+.ews-k{display:inline-block;border-radius:9px;padding:0 7px;font-size:11px;white-space:nowrap}
+.ews-k-new{background:#dcfce7}.ews-k-chg{background:#fef3c7}.ews-k-same{background:#f1f5f9;color:#64748b}.ews-k-amt{background:#dbeafe}.ews-k-cxl{background:#fee2e2}
+.ews-bm{display:inline-block;background:#ea580c;color:#fff!important;padding:7px 14px;border-radius:7px;text-decoration:none;font-weight:700;cursor:grab}
 .fix-done{background:#fff;color:#475569;border:1px solid #cbd5e1;border-radius:10px;padding:0 6px}
 .cs-bar-outer{position:relative;height:26px;background:#f3f4f6;border-radius:6px;margin:2px 0;overflow:visible}
 .cs-bar{position:absolute;top:2px;bottom:2px;background:#c4b5fd;border:1.5px solid #7c3aed;border-radius:5px;display:flex;align-items:center;min-width:20px;cursor:pointer;overflow:visible;box-sizing:border-box}
@@ -933,6 +949,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
     <button class="plan-btn" onclick="openPlanner()">📅 配車プランナー</button>
     <button class="plan-btn" style="background:#0e7490" onclick="openSwapDay()" title="急な休み・車両の故障のとき、その日のカードをまとめて別のドライバー・車両へ差し替える">🔁 当日の差し替え</button>
     <button class="plan-btn" style="background:#475569" onclick="openDayPrint()" title="1日分の配車表をA4用紙1枚で印刷">🖨 日次表印刷</button>
+    <button class="plan-btn" style="background:#ea580c" onclick="openEwsImport()" title="EWS+（エディオン）の案件を取り込みます">🛒 EWS+取り込み</button>
     <button class="plan-btn" style="background:#0f172a" onclick="openSignage()" title="工場などのモニター用に、今日の配車を大きく表示する画面を開きます（見るだけ）">📺 サイネージ</button>
     <button class="plan-btn" style="background:#b45309" onclick="openNotices()" title="サイネージ画面に出すお知らせ・連絡事項を登録します">📢 お知らせ</button>
     <button class="set-btn" onclick="openSettings()">⚙ 設定</button>
@@ -3027,6 +3044,18 @@ function checkContainerAlerts() {
 <div id="undoToast" class="undo-toast hid"></div>
 
 <!-- 委託応援 モーダル -->
+<div class="ovl hid" id="mEWS">
+  <div class="mbox" style="max-width:900px">
+    <div class="mhdr"><h2>🛒 EWS+（エディオン）取り込み</h2><span class="mcls" onclick="closeM('mEWS')">×</span></div>
+    <div class="mbdy" id="ewsBody"></div>
+  </div>
+</div>
+<div class="ovl hid" id="mEWSJob">
+  <div class="mbox" style="max-width:540px">
+    <div class="mhdr"><h2>🛒 EWS+ 案件</h2><span class="mcls" onclick="closeM('mEWSJob')">×</span></div>
+    <div class="mbdy" id="ewsJobBody"></div>
+  </div>
+</div>
 <div class="ovl hid" id="mCS">
   <div class="mbox" style="max-width:480px">
     <div class="mhdr"><h2 id="mCSTitle">🏛 委託応援 登録</h2><span class="mcls" onclick="closeM('mCS')">×</span></div>
@@ -3494,6 +3523,7 @@ function normalizeDB(){
   if(!db.dispatches)db.dispatches=[];
   if(!db.contractSupports)db.contractSupports=[];
   if(!db.staffs)db.staffs=[];
+  if(!db.ewsJobs)db.ewsJobs=[];
   if(!db.printLogs)db.printLogs=[];
   if(!db.containerPlacements)db.containerPlacements=[];
   if(!db.containerActions)db.containerActions=[];
@@ -4229,6 +4259,21 @@ function render(){
     }
     csRow+='</tr>';
     tb+=csRow;
+  }
+
+  // ===== EWS+（エディオン）専用行 =====
+  {
+    let ewsRow=`<tr class="ews-fixed-hdr${FIX_COLLAPSED.ews?' fix-collapsed':''}">`+fixHdr('ews','🛒 EWS+','#c2410c','#fff7ed','#fdba74','上の🛒で取り込み');
+    for(const dt of (isDay?[dates[0]]:dates)){
+      const ds=fmt(dt),holName=HOLIDAYS[ds]||'';
+      let cc='ews-fixed-cell'+(isDay?' ev-cell day-ev-cell':'')+(isMonth?' td-month':'');
+      if(ds===today)cc+=' td-now';else if(holName)cc+=' td-hol';
+      const items=ewsJobsOf(ds);
+      const inner=items.map(j=>ewsChipHtml(j,isDay)).join('');
+      ewsRow+=`<td class="${cc}" data-date="${ds}">${FIX_COLLAPSED.ews?ewsSummary(items):(isDay?`<div class="ews-day-list">${inner}</div>`:`<div style="min-height:28px;padding:1px">${fixScrl(inner,items.length)}</div>`)}</td>`;
+    }
+    ewsRow+='</tr>';
+    tb+=ewsRow;
   }
 
   if(!resources.length){
@@ -6997,7 +7042,8 @@ const PERM_FN={
   openPlanner:'dispatch_assign',generatePlan:'dispatch_assign',applyPlan:'dispatch_assign',applyAI:'dispatch_assign',
   moveDayOrder:'dispatch_assign',onRowDragStart:'dispatch_assign',onRowDrop:'dispatch_assign',toggleUsageGroup:'dispatch_assign',
   advanceJobStatus:'dispatch_assign',
-  openAddCS:'dispatch_assign',openEditCS:'dispatch_assign',saveCS:'dispatch_assign',deleteCS:'dispatch_assign',
+  openAddCS:'dispatch_assign',
+  openEwsImport:'dispatch_assign',ewsDoImport:'dispatch_assign',ewsDeleteJob:'dispatch_delete',openEditCS:'dispatch_assign',saveCS:'dispatch_assign',deleteCS:'dispatch_assign',
   qDel:'dispatch_delete',delDispatch:'dispatch_delete',restoreTrash:'dispatch_delete',purgeTrash:'trash_purge!',
   openRegular:'regular_manage',saveRegular:'regular_manage',editRegular:'regular_manage',delRegular:'regular_manage',
   openAddAbsence:'absence_manage',openEditAbsence:'absence_manage',saveAbsence:'absence_manage',deleteAbsence:'absence_manage',
@@ -8770,6 +8816,195 @@ function copyGasCode(){
 // ================================================================
 let _csEditId=null,_csDrag=null;
 
+// ===== EWS+（エディオン）の取り込み =====
+// EWS+の画面でお気に入りバーの「🛒 配車へ取り込み」を押す → この画面にデータが届く → 確認して取り込む
+// お客様の情報はEWS+の画面からこの画面へ直接渡すだけで、ほかへは送らない
+const EWS_ORIGIN='https://edaha3838.com';
+const EWS_ST={COLLECTOR_ASSIGNED:'業者確定',MANIFEST_REGISTERED:'回収登録済',COMPLETED:'完了',CANCELLED:'中止',REVERSE_AUCTION:'逆オークション中',REQUESTING:'依頼中'};
+const EWS_WARN_DAYS=3; // 回収日からこの日数たっても回収登録がなければ⚠（土日を考えて3日）
+let _ewsPending=null;
+function ewsJobsOf(ds){return (db.ewsJobs||[]).filter(j=>j.date===ds).sort((a,b)=>(a.time||'').localeCompare(b.time||''));}
+function ewsTotal(a){return a?(a.transport||0)+(a.disposal||0)+(a.other||0):0;}
+function ewsYen(n){return '¥'+Math.round(n||0).toLocaleString();}
+function ewsWarn(j){
+  if(j.amount||j.status==='CANCELLED'||!j.date)return false;
+  const d=new Date();d.setDate(d.getDate()-EWS_WARN_DAYS);
+  return j.date<=fmt(d);
+}
+// 住所から「市・区・町」までを取り出す（週・月表示用）
+function ewsArea(a){
+  a=String(a||'').replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/,'');
+  const m=a.match(/^(.+?郡.+?[町村]|.+?市.+?区|.+?[市区町村])/);
+  return m?m[1]:a.slice(0,8);
+}
+function ewsChipHtml(j,big){
+  const warn=ewsWarn(j);
+  const cls=j.status==='CANCELLED'?' ews-cxl':j.amount?' ews-done':warn?' ews-warn':'';
+  const tip=`${j.time||''} ${j.name||''}\n${j.addr||''}\n${j.sc||''}／${j.store||''}／${j.vehicle||''}`;
+  return `<div class="ews-chip${cls}" data-ews-id="${esc(j.id)}" onclick="event.stopPropagation();openEwsJob(this.dataset.ewsId)" title="${esc(tip)}">
+    <div><b>${esc(j.time||'時間なし')}</b> ${esc(j.name||'')}${j.amount?' 💴':''}${warn?' ⚠':''}${j.status==='CANCELLED'?' 中止':''}</div>
+    <div class="ews-addr">${esc(big?(j.addr||''):ewsArea(j.addr))}</div>
+    ${big?`<div class="ews-sub">${esc(j.sc||'')}／${esc(j.vehicle||'')}${j.qty!=null&&j.qty!==''?'／'+esc(j.qty)+'m³':''}</div>`:''}
+  </div>`;
+}
+function ewsSummary(items){
+  if(!items.length)return `<div class="fix-sum fix-sum-empty" onclick="event.stopPropagation();toggleFixRow('ews')"></div>`;
+  const live=items.filter(j=>j.status!=='CANCELLED');
+  const fix=live.filter(j=>j.amount),warn=live.filter(ewsWarn).length;
+  const html=(warn?`<span class="fix-pend">⚠登録なし ${warn}</span>`:'')+`<span class="fix-done">${live.length}件</span>`+(fix.length?`<span class="fix-done">💴${ewsYen(fix.reduce((s,j)=>s+ewsTotal(j.amount),0))}</span>`:'');
+  return `<div class="fix-sum" onclick="event.stopPropagation();toggleFixRow('ews')" title="クリックで開く">${html}</div>`;
+}
+// --- EWS+の画面で動く部分（お気に入りバーのボタンの中身）。この関数の文字がそのままボタンになる ---
+function ewsGrab(){
+  var DEST='__DEST__',O=new URL(DEST).origin;
+  if(location.hostname!=='edaha3838.com'){alert('EWS+（廃棄物依頼管理）の画面で押してください');return;}
+  var ds=[].slice.call(document.querySelectorAll('input[type=date]')).map(function(i){return i.value;});
+  var from=ds[0],to=ds[1]||ds[0];
+  if(!from){
+    var t=new Date(Date.now()+864e5+9*36e5).toISOString().slice(0,10);
+    from=prompt('取り込む希望回収日を入れてください（例 2026-11-18）',t);if(!from)return;to=from;
+  }
+  if(to<from){var x=from;from=to;to=x;}
+  var w=window.open(DEST,'haisha_ews');
+  (async function(){
+    var all=[],page=1,total=1;
+    while((page-1)*100<total&&page<=50){
+      var r=await fetch('/api/waste-requests?page='+page+'&pageSize=100&sortBy=created_at&sortDir=desc').then(function(x){return x.json();});
+      total=r.total||0;all=all.concat(r.data||[]);page++;
+    }
+    var mine=all.filter(function(d){return /大栄/.test(d.selected_collector_name||'')&&d.waste_discharge_date>=from&&d.waste_discharge_date<=to;});
+    var recMap={};
+    if(mine.some(function(d){return d.collection_record_id;})){
+      var cr=await fetch('/api/collection-records').then(function(x){return x.json();});
+      [].concat((cr.data||{}).records||[]).forEach(function(r){recMap[r.id]=r;});
+    }
+    var out=mine.map(function(d){
+      var it=(d.estimated_waste_items||[])[0]||{},rec=recMap[d.collection_record_id],amt=null;
+      if(rec){
+        var items=[];
+        (rec.waste_items||[]).forEach(function(w){
+          if(w.disposal_cost)items.push({name:w.waste_name,qty:w.actual_quantity,unit:w.actual_unit,cost:w.disposal_cost});
+          (w.sub_items||[]).forEach(function(s){items.push({name:s.waste_name,qty:s.actual_quantity,unit:s.actual_unit,cost:s.disposal_cost});});
+        });
+        var others=(rec.other_costs||[]).map(function(o){return {name:o.work_name,qty:o.quantity,unit:o.unit,cost:o.subtotal||0};});
+        amt={collected:(rec.collection_date||'').slice(0,10),transport:rec.transport_cost||0,disposal:rec.disposal_cost||0,
+          other:others.reduce(function(s,o){return s+o.cost;},0),check:rec.admin_check_status||'',billingMonth:rec.billing_month||'',items:items,others:others};
+      }
+      return {id:d.request_id,manifest:d.manifest_number||'',name:d.customer_name||'',addr:d.customer_address||'',sc:d.generator_site_name||'',store:d.store_name||'',
+        date:d.waste_discharge_date||'',time:d.collection_time||'',vehicle:d.vehicle_type||'',qty:d.estimated_quantity,waste:it.waste_type||'',status:d.status||'',
+        lat:d.reference_lat==null?null:d.reference_lat,lon:d.reference_lon==null?null:d.reference_lon,amount:amt};
+    });
+    var msg={type:'ews-data',nonce:String(Date.now()),from:from,to:to,rows:out,scanned:all.length,total:total};
+    var ack=false,tries=0;
+    window.addEventListener('message',function(e){if(e.origin===O&&e.data==='ews-ack')ack=true;});
+    var iv=setInterval(function(){
+      if(ack){clearInterval(iv);return;}
+      if(w.closed||++tries>90){clearInterval(iv);alert('配車システムに届きませんでした。配車システムが開いてログインできているか確かめて、もう一度押してください。');return;}
+      try{w.postMessage(msg,O);}catch(e){}
+    },1000);
+  })().catch(function(e){alert('EWS+のデータを読み取れませんでした：'+e.message);});
+}
+function ewsBookmarkletHref(){
+  const dest=location.origin+location.pathname;
+  return 'javascript:'+encodeURIComponent('('+ewsGrab.toString().replace('__DEST__',dest)+')()');
+}
+// EWS+から届いたデータを受け取る（EWS+の画面からだけ受け付ける）
+window.addEventListener('message',e=>{
+  if(e.origin!==EWS_ORIGIN||!e.data||e.data.type!=='ews-data'||!Array.isArray(e.data.rows))return;
+  try{e.source.postMessage('ews-ack',EWS_ORIGIN);}catch(_){}
+  if(_ewsPending&&_ewsPending.nonce===e.data.nonce)return;
+  _ewsPending=e.data;
+  openM('mEWS');ewsRenderImport();
+});
+function openEwsImport(){_ewsPending=null;openM('mEWS');ewsRenderImport();}
+function ewsKind(r){
+  const c=(db.ewsJobs||[]).find(x=>x.id===r.id);
+  if(r.status==='CANCELLED')return c&&c.status==='CANCELLED'?['same','変わりなし']:['cxl','中止'];
+  if(!c)return ['new','新規'];
+  if(r.amount&&!c.amount)return ['amt','金額確定'];
+  const f=['name','addr','sc','store','date','time','vehicle','qty','status'];
+  if(f.some(k=>String(c[k]??'')!==String(r[k]??''))||ewsTotal(c.amount)!==ewsTotal(r.amount))return ['chg','変更'];
+  return ['same','変わりなし'];
+}
+function ewsRenderImport(msg){
+  const el=document.getElementById('ewsBody');
+  const p=_ewsPending;
+  const guide=`<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7">
+    <b>使い方</b><br>
+    ① 下のオレンジのボタンを、ブラウザのお気に入りバーへドラッグする（パソコンごとに1回だけ）<br>
+    <a class="ews-bm" href="${ewsBookmarkletHref()}" onclick="event.preventDefault();alert('このボタンは、お気に入りバーへドラッグして使います。')">🛒 配車へ取り込み</a><br>
+    ② <a href="${EWS_ORIGIN}/requests" target="_blank" rel="noopener">EWS+の「廃棄物依頼管理」</a>で、希望回収日の期間を入れる<br>
+    ③ お気に入りバーの「🛒 配車へ取り込み」を押す → この画面に確認が出ます</div>`;
+  if(!p){
+    el.innerHTML=(msg?`<div style="background:#dcfce7;border-radius:8px;padding:8px 12px;margin-bottom:10px">${msg}</div>`:'')+guide+
+      `<p style="color:#64748b;font-size:12px;margin-top:10px">⏳ EWS+からのデータを待っています…</p>`;
+    return;
+  }
+  const rows=p.rows.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const cnt={};
+  const tr=rows.map(r=>{const k=ewsKind(r);cnt[k[1]]=(cnt[k[1]]||0)+1;
+    return `<tr><td><span class="ews-k ews-k-${k[0]}">${k[1]}</span></td><td style="white-space:nowrap">${esc(r.date)}<br>${esc(r.time)}</td><td>${esc(r.name)}<br><span style="color:#64748b">${esc(r.addr)}</span></td><td>${esc(r.sc)}<br><span style="color:#64748b">${esc(r.store)}</span></td><td>${esc(EWS_ST[r.status]||r.status)}</td><td style="text-align:right">${r.amount?ewsYen(ewsTotal(r.amount)):'-'}</td></tr>`;}).join('');
+  const sum=Object.entries(cnt).map(([k,v])=>`${k} ${v}件`).join('／');
+  const short=p.scanned<p.total;
+  el.innerHTML=`<div style="font-size:14px;font-weight:700;margin-bottom:6px">希望回収日 ${esc(p.from)}${p.to!==p.from?' 〜 '+esc(p.to):''}　大栄の案件 ${rows.length}件 <span style="font-weight:400;color:#475569">（${sum||'なし'}）</span></div>`+
+    (short?`<div style="color:#dc2626;font-weight:700;margin-bottom:6px">⚠ EWS+の全件を読み切れていません（${p.scanned}/${p.total}件）。取り込まずに、もう一度ボタンを押してください。</div>`:'')+
+    `<div style="max-height:55vh;overflow:auto"><table class="ews-tbl"><tr><th>区分</th><th>希望日時</th><th>お客様・住所</th><th>SC・店舗</th><th>EWSの状態</th><th style="text-align:right">金額</th></tr>${tr||'<tr><td colspan="6" style="color:#64748b">この期間に大栄の案件はありません</td></tr>'}</table></div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-s" onclick="_ewsPending=null;ewsRenderImport()">やめる</button>
+      <button class="btn btn-p" onclick="ewsDoImport()" ${short||!rows.length?'disabled':''}>取り込む</button></div>`;
+}
+async function ewsDoImport(){
+  const p=_ewsPending;if(!p)return;
+  if(!db.ewsJobs)db.ewsJobs=[];
+  const now=new Date().toISOString();
+  let n=0;
+  const F=['manifest','name','addr','sc','store','date','time','vehicle','qty','waste','status','lat','lon','amount'];
+  p.rows.forEach(r=>{
+    if(!r||!r.id)return;
+    const c=db.ewsJobs.find(x=>x.id===r.id);
+    if(c){
+      if(ewsKind(r)[0]==='same')return;
+      F.forEach(k=>{c[k]=r[k]===undefined?null:r[k];});c.updated=now;
+    }else{
+      const j={id:r.id,created:now,updated:now};F.forEach(k=>{j[k]=r[k]===undefined?null:r[k];});
+      db.ewsJobs.push(j);
+    }
+    n++;
+  });
+  _ewsPending=null;
+  await save();render();
+  ewsRenderImport(`✅ ${n}件を取り込みました（変わりのないものはそのまま）。配車画面の「🛒 EWS+」の行に出ています。`);
+}
+function openEwsJob(id){
+  const j=(db.ewsJobs||[]).find(x=>x.id===id);if(!j)return;
+  const a=j.amount,warn=ewsWarn(j);
+  const row=(k,v)=>`<tr><th style="width:110px;background:#f8fafc">${k}</th><td>${v}</td></tr>`;
+  const lines=a?a.items.concat(a.others||[]).map(x=>`${esc(x.name)}　${esc(x.qty)}${esc(x.unit)}　${ewsYen(x.cost)}`).join('<br>'):'';
+  document.getElementById('ewsJobBody').innerHTML=
+    (warn?`<div style="background:#fee2e2;color:#b91c1c;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-weight:700">⚠ 回収日から${EWS_WARN_DAYS}日たっても、EWS+に回収登録がありません。受渡確認票が出ているか確かめてください。</div>`:'')+
+    `<table class="ews-tbl">
+      ${row('希望日時',esc(j.date)+' '+esc(j.time))}
+      ${row('お客様',esc(j.name))}
+      ${row('住所',esc(j.addr)+(j.addr?` <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(j.addr)}" target="_blank" rel="noopener">🗺地図</a>`:''))}
+      ${row('依頼SC・店舗',esc(j.sc)+'／'+esc(j.store))}
+      ${row('車両・数量',esc(j.vehicle)+(j.qty!=null&&j.qty!==''?'／'+esc(j.qty)+'m³':''))}
+      ${row('廃棄物',esc(j.waste))}
+      ${row('依頼ID',esc(j.id))}
+      ${row('マニフェスト',esc(j.manifest))}
+      ${row('EWSの状態',esc(EWS_ST[j.status]||j.status))}
+      ${a?row('金額',`運搬 ${ewsYen(a.transport)}／処分 ${ewsYen(a.disposal)}${a.other?'／その他 '+ewsYen(a.other):''}<br><b>合計 ${ewsYen(ewsTotal(a))}</b>（回収 ${esc(a.collected)}・${a.check==='CHECKED'?'エディオン確認済':'エディオン確認待ち'}）`+(lines?`<div style="color:#64748b;margin-top:4px">${lines}</div>`:'')):row('金額','<span style="color:#64748b">回収登録の後、もう一度取り込むと入ります</span>')}
+      ${row('取り込んだ日時',j.updated?(()=>{const t=new Date(j.updated);return esc(fmt(t)+' '+p2(t.getHours())+':'+p2(t.getMinutes()));})():'')}
+    </table>
+    <div style="margin-top:12px;display:flex;justify-content:space-between">
+      <button class="btn btn-s" style="color:#dc2626" onclick="ewsDeleteJob('${esc(j.id)}')">この案件を消す</button>
+      <button class="btn btn-s" onclick="closeM('mEWSJob')">閉じる</button></div>`;
+  openM('mEWSJob');
+}
+async function ewsDeleteJob(id){
+  if(!confirm('この案件を配車システムから消しますか？\n（EWS+の中身は変わりません。もう一度取り込めば戻ります）'))return;
+  db.ewsJobs=(db.ewsJobs||[]).filter(x=>x.id!==id);
+  closeM('mEWSJob');await save();render();
+}
 function openAddCS(date){
   _csEditId=null;
   document.getElementById('mCSTitle').textContent='🏛 委託応援 登録';
