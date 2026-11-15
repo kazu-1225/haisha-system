@@ -51,6 +51,31 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .sidebar .pending-body,.sidebar .contact-body{flex-direction:column;overflow-x:hidden;overflow-y:visible;max-height:none;padding:6px 8px;gap:5px}
 .sidebar .pending-body.pending-drop-over,.sidebar .crane-pending-body.pending-drop-over{outline:2px dashed #dc2626}
 .sidebar .pcrd{min-width:0;width:100%;box-sizing:border-box;cursor:grab}
+.pgrp-h{display:flex;align-items:center;gap:6px;padding:3px 6px;margin-top:2px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;user-select:none}
+.pgrp-h .pgrp-n{margin-left:auto;border-radius:9px;padding:0 7px;font-size:10px;background:#fff}
+.pgrp-h.g-urgent{background:#fee2e2;color:#b91c1c}
+.pgrp-h.g-week{background:#ffedd5;color:#9a3412}
+.pgrp-h.g-later{background:#dbeafe;color:#1d4ed8}
+.pgrp-h.g-none{background:#f1f5f9;color:#475569}
+/* A：持ち駒をつかんだとき、置ける場所を色で示す */
+td.dg-ok{background:#dcfce7!important;box-shadow:inset 0 0 0 2px #22c55e}
+td.dg-warn{background:#fef9c3!important;box-shadow:inset 0 0 0 2px #eab308}
+td.dg-ng{background:#e5e7eb!important;opacity:.45}
+/* D：日を選んで絞り込む */
+th.dt-hd{cursor:pointer}
+th.dt-hd:hover{filter:brightness(.95)}
+th.dt-picked{box-shadow:inset 0 0 0 3px #2563eb;background:#dbeafe!important}
+.pend-daybar{display:flex;align-items:center;gap:6px;background:#dbeafe;color:#1d4ed8;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700}
+.pend-daybar button{margin-left:auto;border:1px solid #93c5fd;background:#fff;color:#1d4ed8;border-radius:5px;font-size:10px;padding:1px 6px;cursor:pointer}
+/* B・C：盤の空き具合と締め切りの山 */
+.dd-row{display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin-top:2px}
+.dd-b{font-size:9px;font-weight:700;border-radius:7px;padding:0 4px;line-height:14px}
+.dd-fix{background:#fee2e2;color:#b91c1c}
+.dd-dl{background:#ffedd5;color:#9a3412}
+.dd-free{background:#dcfce7;color:#166534}
+.dd-full{background:#f1f5f9;color:#64748b}
+.load-bar{height:3px;border-radius:2px;background:#f1f5f9;margin:1px 2px 2px;overflow:hidden}
+.load-bar i{display:block;height:100%}
 .sidebar .pcrd-name,.sidebar .pcrd-info{max-width:none;overflow:hidden;text-overflow:ellipsis}
 .sidebar .p-add-btn{width:100%;height:36px;font-size:16px;min-width:0}
 .sidebar .ccrd{min-width:0;width:100%;box-sizing:border-box}
@@ -1255,6 +1280,7 @@ td.td-absent{background:repeating-linear-gradient(135deg,#e5e7eb 0 6px,#f3f4f6 6
             <button type="button" data-w="thisweek" onclick="setWant('thisweek')">今週中</button>
             <button type="button" data-w="nextweek" onclick="setWant('nextweek')">来週中</button>
             <button type="button" data-w="after" onclick="setWant('after')">○日以降</button>
+            <button type="button" data-w="fixed" onclick="setWant('fixed')" title="工事のコンテナ設置・撤去など、お客様が決めた日で動かせないとき">📌 指定日（変更不可）</button>
             <button type="button" data-w="any" onclick="setWant('any')">いつでもよい</button>
           </div>
         </div>
@@ -4027,7 +4053,7 @@ function render(){
       else if(dow===6)cls+=' td-sat';
       const top=isMonth?`${dt.getDate()}<br><small style="font-weight:400">${DOW_JP[dow]}</small>`:`${dt.getMonth()+1}/${dt.getDate()}<br><small style="font-weight:400">${DOW_JP[dow]}</small>`;
       const holBadge=holName?`<span class="dt-hol-name">🎌 ${holName}</span>`:'';
-      th+=`<th class="${cls}">${top}${holBadge}</th>`;
+      th+=`<th class="${cls}${ST.pendDay===ds?' dt-picked':''}" onclick="togglePendDay('${ds}')" title="押すと、この日に置ける未割当の依頼だけを左に表示します（もう一度押すと戻る）">${top}${holBadge}${dayDemandHtml(ds,isMonth)}</th>`;
     }
   }
   th+='</tr>';
@@ -4119,7 +4145,7 @@ function render(){
         const cards=disps.map(dp=>cardHTML(dp,'drv')).join('');
         row+=`<td class="${cc}" data-date="${ds}" data-rid="${rid}"
           ondragover="onOver(event)" ondragleave="onLeave(event)" ondrop="onDrop(event,this)"
-          onclick="cellClick(event,'${ds}','${rid}')">${absHtml}<div class="cell-scrl">${bandHtml}${cards}</div></td>`;
+          onclick="cellClick(event,'${ds}','${rid}')">${loadBarHtml(disps.length)}${absHtml}<div class="cell-scrl">${bandHtml}${cards}</div></td>`;
       }
     }
     return row+'</tr>';
@@ -4467,7 +4493,7 @@ function _cardHTML(dp,rowCtx){
 function dlLabel(dp){return dp.dispatchType==='shipment'?'⏰ 期限':'📅 希望日';}
 // ----- お客様の収集希望日（dp.deadline）と、電話でよくある言い方（dp.wantType） -----
 //  wantType：''＝日付そのもの／asap＝なるべく早く／thisweek・nextweek＝今週中・来週中（締め切り＝土曜日）／after＝その日以降／any＝いつでもよい
-const WANT_LABEL={asap:'🔥 なるべく早く',thisweek:'今週中',nextweek:'来週中',after:'以降',any:'🕊 いつでもよい'};
+const WANT_LABEL={fixed:'📌 指定日',asap:'🔥 なるべく早く',thisweek:'今週中',nextweek:'来週中',after:'以降',any:'🕊 いつでもよい'};
 const wantMd=s=>{const d=pd(s);return `${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})`;};
 const daysFrom=(a,b)=>Math.round((pd(b)-pd(a))/86400000);
 function thisSaturday(){const d=new Date();d.setHours(0,0,0,0);return fmt(addD(d,6-d.getDay()));}
@@ -4480,6 +4506,7 @@ function wantStr(dp){
   if(w==='asap')return 'なるべく早く';
   if(w==='any')return 'いつでもよい';
   if(!dp.deadline)return '';
+  if(w==='fixed')return `📌${wantMd(dp.deadline)}指定`;
   if(w==='thisweek')return `今週中(〜${wantMd(dp.deadline)})`;
   if(w==='nextweek')return `来週中(〜${wantMd(dp.deadline)})`;
   if(w==='after')return `${wantMd(dp.deadline)}以降`;
@@ -4506,6 +4533,7 @@ function wantDayHtml(dp){
   else{
     const n=daysFrom(fmt(new Date()),dp.deadline);
     if(w==='after'){txt=`${label} ${wantMd(dp.deadline)}以降`;right=n<=0?'配車OK':`あと${n}日から`;}
+    else if(w==='fixed'){txt=`📌 指定日 ${wantMd(dp.deadline)}（変更不可）`;right=n<0?'⚠過ぎ':n===0?'今日':n===1?'明日':`あと${n}日`;}
     else{
       txt=w==='thisweek'?`${label} 今週中(〜${wantMd(dp.deadline)})`:w==='nextweek'?`${label} 来週中(〜${wantMd(dp.deadline)})`:`${dlLabel(dp)} ${wantMd(dp.deadline)}`;
       right=n<0?'⚠過ぎ':n===0?'今日':n===1?'明日':`あと${n}日`;
@@ -4529,19 +4557,19 @@ function setWant(w){
     if(w==='asap'||w==='any')inp.value='';
     if(w==='thisweek')inp.value=thisSaturday();
     if(w==='nextweek')inp.value=fmt(addD(pd(thisSaturday()),7));
-    if(w==='after'&&!inp.value){inp.focus();try{inp.showPicker();}catch(e){}}
+    if((w==='after'||w==='fixed')&&!inp.value){inp.focus();try{inp.showPicker();}catch(e){}}
   }
   wantChipsSync();updateDeadlineWarn();
 }
 // 日付を手で入れたら、「なるべく早く」などは外す（「以降」はそのまま）
 function onWantDateInput(){
-  if(_want&&_want!=='after')_want='';
+  if(_want&&_want!=='after'&&_want!=='fixed')_want='';
   wantChipsSync();updateDeadlineWarn();
 }
 function wantChipsSync(){
   document.querySelectorAll('#dWantChips button').forEach(b=>b.classList.toggle('on',b.dataset.w===_want));
   const v=document.getElementById('dDeadline').value;
-  document.getElementById('dWantNote').textContent=_want==='after'?(v?`→ ${wantMd(v)} 以降に配車`:'→ 日付を選んでください'):_want==='asap'?'→ なるべく早く':_want==='any'?'→ いつでもよい':(_want&&v)?`→ ${WANT_LABEL[_want]}（〜${wantMd(v)}）`:'';
+  document.getElementById('dWantNote').textContent=_want==='fixed'?(v?`→ ${wantMd(v)} に必ず（変更不可）`:'→ 日付を選んでください'):_want==='after'?(v?`→ ${wantMd(v)} 以降に配車`:'→ 日付を選んでください'):_want==='asap'?'→ なるべく早く':_want==='any'?'→ いつでもよい':(_want&&v)?`→ ${WANT_LABEL[_want]}（〜${wantMd(v)}）`:'';
 }
 function makePcrdHtml(dp){
   const isShip=dp.dispatchType==='shipment';
@@ -4566,15 +4594,80 @@ function makePcrdHtml(dp){
     <div class="pcrd-info">🚛 ${vehName(dp.vehicle)} ／ 👤 ${drvName(dp.driver)}</div>
   </div>`;
 }
-function renderPending(){
+// 未割当の案件を、希望日で4つに分ける
+// 配車日が決まっているものはその日、なければ希望日（〜まで・以降の日）で見る
+const PEND_GROUPS=[
+  {k:'urgent',label:'🔥 急ぎ（明日まで）・期限切れ'},
+  {k:'week',label:'📅 1週間以内'},
+  {k:'later',label:'🗓 8日後以降'},
+  {k:'none',label:'🕊 日付未定・いつでも'},
+];
+let PEND_GRP_CLOSED={};
+try{PEND_GRP_CLOSED=JSON.parse(localStorage.getItem('haishaPendGrpClosed')||'{}')||{};}catch(e){}
+function togglePendGroup(k){
+  PEND_GRP_CLOSED[k]=!PEND_GRP_CLOSED[k];
+  try{localStorage.setItem('haishaPendGrpClosed',JSON.stringify(PEND_GRP_CLOSED));}catch(e){}
+  renderPending();
+}
+function pendGroupOf(dp){
+  const w=dp.wantType||'';
+  if(w==='asap')return 'urgent';
+  const key=(w==='fixed'&&dp.deadline)||workDate(dp)||dp.deadline||'';
+  if(!key||(w==='any'&&!workDate(dp)))return 'none';
+  const t=new Date();t.setHours(0,0,0,0);
+  const tomorrow=new Date(t);tomorrow.setDate(t.getDate()+1);
+  const week=new Date(t);week.setDate(t.getDate()+7);
+  if(key<=fmt(tomorrow))return 'urgent';
+  if(key<=fmt(week))return 'week';
+  return 'later';
+}
+// C：その日が締め切り・指定日の未割当の数／B：仕事がまだ入っていないドライバーの数
+function dayDemandHtml(ds,small){
   const pend=pendingDisps();
-  document.getElementById('pCnt').textContent=pend.length;
+  const fix=pend.filter(dp=>dp.wantType==='fixed'&&dp.deadline===ds).length;
+  const dl=pend.filter(dp=>dp.wantType!=='fixed'&&dp.wantType!=='after'&&dp.wantType!=='any'&&dp.deadline===ds).length;
+  let free=0,total=0;
+  if(ds>=fmt(new Date())&&!small){
+    (db.drivers||[]).forEach(d=>{
+      if(absenceOf('driver',d.id,ds))return;
+      total++;
+      if(!(db.dispatches||[]).some(dp=>dp.driver===d.id&&workDate(dp)===ds&&!dp.isCarryIn))free++;
+    });
+  }
+  const b=[];
+  if(fix)b.push(`<span class="dd-b dd-fix" title="この日が指定日（変更不可）の未割当">📌${fix}</span>`);
+  if(dl)b.push(`<span class="dd-b dd-dl" title="この日が希望日（締め切り）の未割当">⏰${dl}</span>`);
+  if(total)b.push(`<span class="dd-b ${free?'dd-free':'dd-full'}" title="この日まだ仕事が入っていないドライバー（休みの人は除く）">空き${free}人</span>`);
+  return b.length?`<div class="dd-row">${b.join('')}</div>`:'';
+}
+// B：マスの仕事量（件数）を細い棒で出す。この件数で満杯の目安
+const DAY_LOAD_FULL=5;
+function loadBarHtml(n){
+  if(!n)return '';
+  const r=Math.min(n/DAY_LOAD_FULL,1),col=n>=DAY_LOAD_FULL?'#ef4444':n>=DAY_LOAD_FULL-1?'#f59e0b':'#22c55e';
+  return `<div class="load-bar" title="この日の仕事 ${n}件（${DAY_LOAD_FULL}件で満杯の目安）"><i style="width:${Math.round(r*100)}%;background:${col}"></i></div>`;
+}
+function togglePendDay(ds){ST.pendDay=ST.pendDay===ds?null:ds;render();}
+function renderPending(){
+  const pendAll=pendingDisps();
+  const pend=ST.pendDay?pendAll.filter(dp=>dateFit(dp,ST.pendDay)==='ok'):pendAll;
+  document.getElementById('pCnt').textContent=pendAll.length;
   const body=document.getElementById('pendingBody');
   let html=`<div class="p-add-btn" onclick="openAddDispatch(null,null,true)" title="未定の新規依頼を追加">＋</div>`;
+  if(ST.pendDay){
+    const d=pd(ST.pendDay);
+    html+=`<div class="pend-daybar">📅 ${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})に置ける依頼 ${pend.length}件<button onclick="togglePendDay(null)" title="すべて表示に戻す">✕ 全部</button></div>`;
+  }
   if(!pend.length){
-    html+=`<div style="display:flex;align-items:center;color:#94a3b8;font-size:12px;padding:8px">未割当の案件はありません ✅</div>`;
+    html+=`<div style="display:flex;align-items:center;color:#94a3b8;font-size:12px;padding:8px">${ST.pendDay?'この日に置ける依頼はありません':'未割当の案件はありません ✅'}</div>`;
   } else {
-    html+=pend.map(makePcrdHtml).join('');
+    PEND_GROUPS.forEach(g=>{
+      const list=pend.filter(dp=>pendGroupOf(dp)===g.k);
+      if(!list.length)return;
+      const closed=!!PEND_GRP_CLOSED[g.k];
+      html+=`<div class="pgrp-h g-${g.k}" onclick="togglePendGroup('${g.k}')" title="クリックで${closed?'開く':'たたむ'}"><span>${closed?'▶':'▼'}</span>${g.label}<span class="pgrp-n">${list.length}件</span></div>`;
+      if(!closed)html+=list.map(makePcrdHtml).join('');
+    });
   }
   body.innerHTML=html;
 
@@ -4875,8 +4968,36 @@ function toggleCranePending(){
 // ================================================================
 // DRAG & DROP
 // ================================================================
-function onDragStart(e,id){ST.drag={id};e.dataTransfer.setData('text/plain',id);setTimeout(()=>e.target.classList.add('dragging'),0);}
-function onDragEnd(e){e.target.classList.remove('dragging');}
+function onDragStart(e,id){ST.drag={id};e.dataTransfer.setData('text/plain',id);setTimeout(()=>{e.target.classList.add('dragging');dropGuide(id);},0);}
+function onDragEnd(e){e.target.classList.remove('dragging');clearDropGuide();}
+// 日付がお客様の希望に合うか：ok＝合う／warn＝希望の範囲外（置けるが注意）／ng＝置けない（過去の日・指定日と違う日）
+function dateFit(dp,ds){
+  if(ds<fmt(new Date()))return 'ng';
+  const w=dp.wantType||'',dl=dp.deadline;
+  if(w==='fixed'&&dl)return ds===dl?'ok':'ng';
+  if(w==='after'&&dl)return ds>=dl?'ok':'warn';
+  if(dl&&w!=='any'&&w!=='asap')return ds<=dl?'ok':'warn';
+  return 'ok';
+}
+// その人（車両）にその日置けるか：休み・不在、免許が合わない は ng
+function resFit(dp,rid,ds){
+  const isVeh=ST.res==='vehicle';
+  if(absenceOf(isVeh?'vehicle':'driver',rid,ds))return 'ng';
+  const dr=(db.drivers||[]).find(x=>x.id===(isVeh?dp.driver:rid));
+  const ve=(db.vehicles||[]).find(x=>x.id===(isVeh?rid:dp.vehicle));
+  if(dr&&ve&&!canDrive(dr,ve))return 'ng';
+  return 'ok';
+}
+function dropGuide(id){
+  const dp=(db.dispatches||[]).find(x=>x.id===id);if(!dp)return;
+  document.querySelectorAll('td[data-rid][data-date]').forEach(td=>{
+    if(!td.dataset.rid)return;
+    const a=dateFit(dp,td.dataset.date),b=resFit(dp,td.dataset.rid,td.dataset.date);
+    const k=(a==='ng'||b==='ng')?'ng':a==='warn'?'warn':'ok';
+    td.classList.add('dg-'+k);
+  });
+}
+function clearDropGuide(){document.querySelectorAll('td.dg-ok,td.dg-warn,td.dg-ng').forEach(td=>td.classList.remove('dg-ok','dg-warn','dg-ng'));}
 function onOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
 function onLeave(e){e.currentTarget.classList.remove('drag-over');}
 function onOverPending(e,elId){
@@ -4910,7 +5031,7 @@ function onDropToPending(e,elId){
   openM('mConfirm');
 }
 function onDrop(e,cell){
-  e.preventDefault();cell.classList.remove('drag-over');
+  e.preventDefault();cell.classList.remove('drag-over');clearDropGuide();
   if(!ST.drag)return;
   const date=cell.dataset.date,rid=cell.dataset.rid;
   if(!rid)return; // 持込み行・定期便ヘッダーへのドロップは無視（ドライバー・車両消去防止）
@@ -4930,7 +5051,8 @@ function onDrop(e,cell){
   const licNg=!!(dr&&ve&&!canDrive(dr,ve));
   document.getElementById('cLicWarn').classList.toggle('show',licNg);
   setConfirmOk(!licNg);
-  const absMsg=absenceWarn(newDriver,newVehicle,date);
+  let absMsg=absenceWarn(newDriver,newVehicle,date);
+  if(dp.wantType==='fixed'&&dp.deadline&&date!==dp.deadline)absMsg=`📌 お客様の指定日は ${wantMd(dp.deadline)} です（変更できない日）。`+(absMsg?'\n'+absMsg:'');
   const aw=document.getElementById('cAbsWarn');
   aw.textContent=absMsg?'⚠ '+absMsg.replace(/\n/g,'　'):'';
   aw.classList.toggle('show',!!absMsg);
@@ -5894,6 +6016,10 @@ function updateDeadlineWarn(){
   const dl=document.getElementById('dDeadline').value;
   const el=document.getElementById('deadlineWarn');
   const dd=document.getElementById('dDispatchDate').value;
+  if(_want==='fixed'){
+    el.textContent=!dl?'⚠ 指定日を選んでください':(dd&&dd!==dl)?`⚠ 配車確定日が、お客様の指定日（${wantMd(dl)}）と違います`:'';
+    return;
+  }
   if(_want==='after'){
     // 「○日以降」：その日より前に配車しようとしたら注意する
     el.textContent=!dl?'⚠ 「以降」の日付を選んでください':(dd&&dd<dl)?`⚠ 配車確定日が、お客様の希望（${wantMd(dl)}以降）より前です`:'';
@@ -6028,7 +6154,7 @@ async function saveDispatch(){
   const date=document.getElementById('dDate').value||null;
   const dispatchDate=document.getElementById('dDispatchDate').value||null;
   const deadline=document.getElementById('dDeadline').value||null;
-  const wantType=_want==='after'&&!deadline?'':_want; // 言い方（なるべく早く・今週中など）
+  const wantType=(_want==='after'||_want==='fixed')&&!deadline?'':_want; // 言い方（なるべく早く・今週中など）
   const isReg=document.getElementById('dType').value==='regular';
   const isCarryIn=document.getElementById('dCarryIn').checked;
   const status=document.getElementById('dStatus').value;
